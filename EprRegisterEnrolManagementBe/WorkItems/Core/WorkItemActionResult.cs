@@ -1,0 +1,128 @@
+namespace EprRegisterEnrolManagementBe.WorkItems.Core;
+
+/// <summary>
+/// Failure reasons returned by the work item engine. Endpoints translate
+/// these into HTTP problem responses; module service objects can branch on
+/// them to decide what to show the user.
+/// </summary>
+public enum WorkItemActionFailureCode
+{
+    WorkItemNotFound,
+    UnknownAction,
+    InvalidTransition,
+    TerminalState,
+
+    /// <summary>
+    /// The caller is not allowed to perform this assignment (e.g. a standard
+    /// user trying to assign someone else, or to take an item that is already
+    /// assigned to a different user).
+    /// </summary>
+    NotAuthorized,
+
+    /// <summary>
+    /// The assign request was structurally invalid (e.g. blank assignee id).
+    /// </summary>
+    InvalidAssignment,
+
+    /// <summary>
+    /// A request to add a note was structurally invalid (e.g. blank text or
+    /// over the size limit).
+    /// </summary>
+    InvalidNote,
+
+    /// <summary>
+    /// The work item was modified by another caller between load and save
+    /// (optimistic concurrency conflict). Retry the request after re-reading
+    /// the latest state.
+    /// </summary>
+    ConcurrencyConflict,
+
+    /// <summary>
+    /// The caller did not present an end-user identity (the BFF must
+    /// forward a <c>user:id</c> claim). Mutating operations refuse to write
+    /// audit entries that cannot be tied back to a real human, so without
+    /// this claim we 401 the request rather than persist a placeholder.
+    /// </summary>
+    MissingActorIdentity,
+
+    /// <summary>
+    /// The engine could not allocate a unique <c>applicationReference</c>
+    /// within its bounded retry budget (RA-219). This is a transient
+    /// server-side condition rather than a client error, so the endpoint maps
+    /// it to a 503 and the caller can safely retry the submission.
+    /// </summary>
+    ApplicationReferenceExhausted,
+
+    /// <summary>
+    /// A mandatory upstream notification a mutation is gated on could not be
+    /// delivered within its retry budget, so the mutation was abandoned before
+    /// anything was persisted (epr-p86e / RA-410: the operator-journey status
+    /// push that the re-accreditation decision is gated on). No state changed —
+    /// the caller may retry. Distinct from a client error: the endpoint maps it
+    /// to a generic 500 rather than a 4xx, because the request itself was
+    /// well-formed and the failure is a server-side dependency being
+    /// unreachable.
+    /// </summary>
+    UpstreamNotificationFailed,
+
+    /// <summary>
+    /// RA-448 phase 2: the backend call to resolve a real accreditation
+    /// number failed or timed out, so re-accreditation approval was
+    /// abandoned before anything was persisted. Kept distinct from
+    /// <see cref="UpstreamNotificationFailed"/> (a different dependency, the
+    /// operator-journey status push on /decision) so logs/alerts/error
+    /// codes keyed on this enum can tell the two outages apart. No state
+    /// changed — the caller may retry. Maps to a generic 500, not a 4xx, for
+    /// the same reason as <see cref="UpstreamNotificationFailed"/>.
+    /// </summary>
+    AccreditationNumberUnavailable,
+}
+
+/// <summary>
+/// Result of a state-changing operation. Either succeeds with the
+/// updated <see cref="WorkItem"/>, or fails with a <see cref="WorkItemActionFailureCode"/>
+/// and human-readable message.
+/// </summary>
+public sealed record WorkItemActionResult
+{
+    private WorkItemActionResult(
+        WorkItem? workItem,
+        WorkItemActionFailureCode? failureCode,
+        string? message,
+        bool isIdempotentReplay
+    )
+    {
+        WorkItem = workItem;
+        FailureCode = failureCode;
+        Message = message;
+        IsIdempotentReplay = isIdempotentReplay;
+    }
+
+    public WorkItem? WorkItem { get; }
+    public WorkItemActionFailureCode? FailureCode { get; }
+    public string? Message { get; }
+
+    /// <summary>
+    /// True when this success is the second-or-later call that performed
+    /// the same action — no state changed and no audit entry was written
+    /// because the operation had already been applied. Endpoints surface
+    /// this via the <c>X-Idempotent-Replay: true</c> response header so
+    /// clients can distinguish "first hit" from "replay".
+    /// </summary>
+    public bool IsIdempotentReplay { get; }
+
+    public bool IsSuccess => FailureCode is null;
+
+    public static WorkItemActionResult Success(WorkItem workItem) =>
+        new(workItem, failureCode: null, message: null, isIdempotentReplay: false);
+
+    /// <summary>
+    /// Same as <see cref="Success"/> but flags the result as a no-op replay
+    /// of an already-applied action.
+    /// </summary>
+    public static WorkItemActionResult IdempotentReplay(WorkItem workItem) =>
+        new(workItem, failureCode: null, message: null, isIdempotentReplay: true);
+
+    public static WorkItemActionResult Failure(WorkItemActionFailureCode code, string message) =>
+        new(workItem: null, code, message, isIdempotentReplay: false);
+}

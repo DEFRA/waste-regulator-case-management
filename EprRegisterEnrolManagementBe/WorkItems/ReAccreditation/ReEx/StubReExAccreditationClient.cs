@@ -1,0 +1,64 @@
+using EprRegisterEnrolManagementBe.WorkItems.ReAccreditation.Models;
+using EprRegisterEnrolManagementBe.WorkItems.ReAccreditation.ReEx.Dtos;
+
+namespace EprRegisterEnrolManagementBe.WorkItems.ReAccreditation.ReEx;
+
+/// <summary>
+/// Stub: always returns a fixed prior-year record regardless of the
+/// identifiers passed, so the application-details page can be exercised
+/// without ReEx credentials. Registered for every lookup when
+/// <c>REEX_API_BASIC_AUTH_USERNAME</c> is absent (local, compose), and for
+/// <c>e2e-</c> test organisations only via
+/// <see cref="TestOrganisationReExAccreditationClient"/> when
+/// <c>TestOrganisations__Enabled</c> is on (CDP test).
+/// </summary>
+internal sealed class StubReExAccreditationClient(TimeProvider timeProvider)
+    : IReExAccreditationClient
+{
+    public Task<PriorYearAccreditationDto?> GetPriorYearAsync(
+        string? organisationId,
+        string? registrationId,
+        int? year,
+        CancellationToken cancellationToken = default)
+    {
+        var priorYear = year ?? timeProvider.GetUtcNow().Year - 1;
+
+        return Task.FromResult<PriorYearAccreditationDto?>(new PriorYearAccreditationDto
+        {
+            Year = priorYear,
+            TonnageBand = "UpTo5000",
+            Authorisers =
+            [
+                new PriorYearAuthoriserDto
+                {
+                    FullName = "Jane Stub",
+                    Email = "jane.stub@example.com"
+                }
+            ],
+            BusinessPlan = new PriorYearBusinessPlanDto
+            {
+                NewInfrastructurePercent = 15,
+                PriceSupportPercent = 15,
+                BusinessCollectionsPercent = 15,
+                CommunicationsPercent = 15,
+                NewMarketsPercent = 10,
+                NewUsesPercent = 10,
+                // RA-456: the 7th "Activities or investment not covered by the
+                // other categories" category — matches HttpReExAccreditationClient's
+                // s_businessPlanMap entry for the same category, and the other
+                // six percentages above were rebalanced (20/20/20/20/10/10 ->
+                // 15/15/15/15/10/10) so all seven still sum to 100.
+                OtherPercent = 20
+            }
+        });
+    }
+
+    // Stub: no local fixture carries a submittedToRegulator code, so this always
+    // reports England - the same safe default RegulatorNationMapper itself falls
+    // back to when the code is absent.
+    public Task<Nation?> GetNationAsync(
+        string? organisationId,
+        string? registrationId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<Nation?>(Nation.England);
+}
