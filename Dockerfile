@@ -1,20 +1,20 @@
 ﻿# Build stage image
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
-COPY EprRegisterEnrolManagementBe.sln ./
-COPY EprRegisterEnrolManagementBe/EprRegisterEnrolManagementBe.csproj EprRegisterEnrolManagementBe/
-COPY EprRegisterEnrolManagementBe.Test/EprRegisterEnrolManagementBe.Test.csproj EprRegisterEnrolManagementBe.Test/
+COPY WasteRegulatorCaseManagement.sln ./
+COPY WasteRegulatorCaseManagement/WasteRegulatorCaseManagement.csproj WasteRegulatorCaseManagement/
+COPY WasteRegulatorCaseManagement.Test/WasteRegulatorCaseManagement.Test.csproj WasteRegulatorCaseManagement.Test/
 COPY tools/CustomAnalyzers/CustomAnalyzers.csproj tools/CustomAnalyzers/
-RUN dotnet restore EprRegisterEnrolManagementBe.sln
+RUN dotnet restore WasteRegulatorCaseManagement.sln
 COPY . .
-RUN dotnet publish EprRegisterEnrolManagementBe -c Release -o /app/publish /p:UseAppHost=false
+RUN dotnet publish WasteRegulatorCaseManagement -c Release -o /app/publish /p:UseAppHost=false
 
 # Development image: runs `dotnet watch` for hot reload during local development.
 # Used by docker compose --watch via the `develop:` block in compose.yml.
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS development
 WORKDIR /src
 COPY . .
-WORKDIR /src/EprRegisterEnrolManagementBe
+WORKDIR /src/WasteRegulatorCaseManagement
 RUN dotnet restore
 EXPOSE 8085
 ENV DOTNET_USE_POLLING_FILE_WATCHER=1
@@ -42,4 +42,4 @@ USER 1001
 EXPOSE 8085
 HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
     CMD curl -fsS http://localhost:8085/health || exit 1
-ENTRYPOINT ["dotnet", "EprRegisterEnrolManagementBe.dll"]
+ENTRYPOINT ["dotnet", "WasteRegulatorCaseManagement.dll"]

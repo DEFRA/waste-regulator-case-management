@@ -50,7 +50,7 @@ jobs:
           BRANCH_THRESHOLD=87
 
           {
-            echo "### Test coverage — epr-register-enrol-management-be"
+            echo "### Test coverage — waste-regulator-case-management"
             echo "| Metric | Coverage | Threshold |"
             echo "|---|---|---|"
             echo "| Line | ${LINE_PCT}% | ${LINE_THRESHOLD}% |"
@@ -94,7 +94,7 @@ jobs:
           fi
 
       - name: Build management-be docker image
-        run: docker build -t defradigital/epr-register-enrol-management-be:${{ github.sha }} .
+        run: docker build -t defradigital/waste-regulator-case-management:${{ github.sha }} .
 
       - name: Check for matching management-fe branch
         id: fe-branch

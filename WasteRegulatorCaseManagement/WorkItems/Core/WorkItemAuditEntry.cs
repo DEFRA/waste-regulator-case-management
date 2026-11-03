@@ -1,0 +1,87 @@
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization.Attributes;
+
+namespace WasteRegulatorCaseManagement.WorkItems.Core;
+
+/// <summary>
+/// A single entry in a work item's audit log (RA-97). The framework appends
+/// one of these for every successful state-changing engine call (action
+/// application, assignment, unassignment, note added) so modules inherit a complete audit trail without writing any audit code
+/// themselves.
+///
+/// Author identity is snapshotted from the <see cref="System.Security.Claims.ClaimsPrincipal"/>
+/// at write time so the audit narrative survives later directory changes.
+/// Stored in insertion order on disk; projected reverse-chronologically
+/// (newest-first, RA-568) on the wire so a UI renders the most recent
+/// activity at the top of the timeline.
+/// </summary>
+public sealed class WorkItemAuditEntry
+{
+    [BsonRepresentation(BsonType.String)]
+    public Guid Id { get; init; } = Guid.NewGuid();
+
+    /// <summary>
+    /// Stable machine-readable identifier of the action that produced this
+    /// entry (e.g. <c>action-applied</c>, <c>note-added</c>,
+    /// <c>assigned</c>, <c>unassigned</c>, <c>note-added</c>). Useful for
+    /// filtering / styling without parsing the display name.
+    /// </summary>
+    public required string Action { get; init; }
+
+    /// <summary>
+    /// Human-readable description of the action, suitable for direct
+    /// rendering by a UI (e.g. <c>Action applied</c>, <c>Note added</c>).
+    /// </summary>
+    public required string ActionDisplayName { get; init; }
+
+    /// <summary>
+    /// Free-form contextual details — e.g. the action id, the
+    /// from/to states, the assignee id/name, the note id. Stored as a
+    /// string-to-string dictionary so the wire shape is stable and trivially
+    /// renderable; the framework decides what to put here per action.
+    /// </summary>
+    public Dictionary<string, string?> Details { get; init; } = new();
+
+    /// <summary>
+    /// UTC timestamp the entry was recorded. Has no default initializer — the
+    /// engine must stamp this from the injected <see cref="TimeProvider"/>
+    /// so tests with a <c>FakeTimeProvider</c> are not silently undermined
+    /// by a wallclock fallback.
+    /// </summary>
+    public DateTime CreatedAt { get; init; }
+
+    /// <summary>
+    /// Identifier of the actor that performed the action. Snapshotted from
+    /// the <c>user:id</c> claim, falling back to the client id when
+    /// the call carries no end-user identity.
+    /// </summary>
+    public string? CreatedBy { get; init; }
+
+    /// <summary>
+    /// Human-readable name of the actor at the time the entry was recorded
+    /// (<c>user:name</c> claim) so list views do not need a separate user
+    /// lookup.
+    /// </summary>
+    public string? CreatedByName { get; init; }
+
+    /// <summary>
+    /// Work item state code as of this event — the state the item was in
+    /// immediately AFTER the event's mutation (epr-rr9s). Persisting a
+    /// per-event snapshot lets a UI render each historical entry with the
+    /// state it was actually in at the time, instead of stapling the live
+    /// current state onto every row.
+    ///
+    /// Nullable by design: audit entries written before epr-rr9s carry no
+    /// snapshot and leave this null. That is the defined fallback — the
+    /// frontend omits the State row when this is null. There is deliberately
+    /// no backfill migration.
+    ///
+    /// Every runtime producer stamps this, so on current data null means
+    /// "written before epr-rr9s" and nothing else. Keep it that way: if you
+    /// add a new site that constructs a WorkItemAuditEntry, set StateId from
+    /// the work item AFTER any state mutation. The one deliberate exception
+    /// is the ReAccreditation backfill migrations, whose entries record a
+    /// data-repair event rather than a caseworker-visible state change.
+    /// </summary>
+    public string? StateId { get; init; }
+}

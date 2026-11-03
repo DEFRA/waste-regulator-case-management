@@ -1,6 +1,6 @@
 # Seed reference hashing compatibility
 
-Sonar issue [AaAVI_Pprlc9PDceTdtf](https://sonarcloud.io/project/issues?id=DEFRA_epr-register-enrol-management-be&open=AaAVI_Pprlc9PDceTdtf)
+Sonar issue [AaAVI_Pprlc9PDceTdtf](https://sonarcloud.io/project/issues?id=DEFRA_waste-regulator-case-management&open=AaAVI_Pprlc9PDceTdtf)
 flags `ReAccreditationSeeder.GenerateDeterministicReference` under rule S4790.
 The reference generator now uses SHA-256 instead of SHA-1.
 

@@ -16,7 +16,7 @@ a localised change to a new module.
 
 ## Building blocks
 
-Defined in `EprRegisterEnrolManagementBe/WorkItems/Core/`:
+Defined in `WasteRegulatorCaseManagement/WorkItems/Core/`:
 
 | Type | Purpose |
 | --- | --- |
@@ -59,7 +59,7 @@ service objects.
 
 ## Adding a new work item type
 
-1. **Create a folder** under `EprRegisterEnrolManagementBe/WorkItems/<TypeName>/` containing:
+1. **Create a folder** under `WasteRegulatorCaseManagement/WorkItems/<TypeName>/` containing:
 
    ```
    WorkItems/MyType/
@@ -97,7 +97,7 @@ That is the complete list of changes required outside the new module folder.
 
 - A module **must not** depend on another module. If two modules need shared
   behaviour, lift it into the framework (or a clearly shared utility under
-  `EprRegisterEnrolManagementBe/Utils`).
+  `WasteRegulatorCaseManagement/Utils`).
 - Module DI registrations should use **module-scoped interfaces**
   (`IMyTypePersistence`, not `IPersistence`) to avoid colliding with other
   modules.
@@ -480,7 +480,7 @@ never runs outside Development, and prod can reach neither: startup refuses
 
 Reference implementation that demonstrates the framework's "one folder + one
 registration line" promise. All files live under
-`EprRegisterEnrolManagementBe/WorkItems/ReAccreditation/`:
+`WasteRegulatorCaseManagement/WorkItems/ReAccreditation/`:
 
 | File | Role |
 | --- | --- |

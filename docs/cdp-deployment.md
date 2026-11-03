@@ -1,7 +1,7 @@
 # CDP deployment configuration
 
 This document captures the metadata required to deploy
-`epr-register-enrol-management-be` onto the CDP platform. It
+`waste-regulator-case-management` onto the CDP platform. It
 complements the official
 [CDP documentation](https://github.com/DEFRA/cdp-documentation) — refer to
 those how-tos for the authoritative platform behaviour.
@@ -10,7 +10,7 @@ those how-tos for the authoritative platform behaviour.
 
 | Attribute      | Value                                          |
 | -------------- | ---------------------------------------------- |
-| Service name   | `epr-register-enrol-management-be`     |
+| Service name   | `waste-regulator-case-management`     |
 | Runtime        | .NET 10 (`dotnet10`) ASP.NET Core              |
 | Container port | `8085`                                         |
 | Health probe   | `GET /health` (anonymous, returns `200`)       |
@@ -23,13 +23,13 @@ These are produced by the CDP portal at deploy time unless noted otherwise.
 | -------------------------- | --------------------- | ----------------------------------------------------------- |
 | `ASPNETCORE_URLS`          | Container             | Set to `http://+:8085` (matches `EXPOSE`).                  |
 | `Mongo__DatabaseUri`       | CDP MongoDB binding   | Authenticated via IAM (`MONGODB-AWS`).                      |
-| `Mongo__DatabaseName`      | Service config        | Defaults to `epr-register-enrol-management-be`.     |
+| `Mongo__DatabaseName`      | Service config        | Defaults to `waste-regulator-case-management`.     |
 | `TraceHeader`              | Service config        | Defaults to `x-cdp-request-id`.                             |
 | `HTTP_PROXY` / `HTTPS_PROXY` | CDP platform        | CDP outbound proxy. Required for any external HTTP call. Also assigned process-wide to `HttpClient.DefaultProxy` at startup (for the GOV.UK Notify SDK's bare `HttpClient`) — any named `HttpClient` that must bypass Squid (e.g. `"DefaultClient"`, see [Operator backend push](#operator-backend-push-ra-311mbe-1)) has to opt out explicitly via `ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { UseProxy = false })`; omitting a primary handler is not the same as being unproxied. |
 | `TRUSTSTORE_*`             | CDP platform          | Loaded by `LoadCustomTrustStoreFromEnvironment`.            |
 | `OperatorBackendApi__Enabled` | Service config     | Master switch for the RA-311/MBE-1 outbound query push (see [Operator backend push](#operator-backend-push-ra-311mbe-1) below). Defaults to `false` — deploying this code is behaviour-neutral until this is explicitly set. |
 | `OperatorBackendApi__Url`  | Service config        | Internal base URL of `epr-register-enrol-backend` (CDP service-discovery name, not a public ingress hostname). Required (non-blank) when `OperatorBackendApi__Enabled=true` — startup fails otherwise. |
-| `OperatorBackendApi__ClientId` | Service config    | Defaults to `epr-register-enrol-management-be`. Only override if `epr-register-enrol-backend`'s `CaseManagementAuth:ExpectedClientId` expects a different value — prefer leaving both at their defaults. |
+| `OperatorBackendApi__ClientId` | Service config    | Defaults to `waste-regulator-case-management`. Only override if `epr-register-enrol-backend`'s `CaseManagementAuth:ExpectedClientId` expects a different value — prefer leaving both at their defaults. |
 | `Auth__ManagementFeClientId` | Service config  | The `clientId` (`x-cdp-client-id` value) that `management-fe` is expected to assert. Defaults to `frontend` — override only if `management-fe`'s own `BACKEND_API_CLIENT_ID` is set to something else. Must be distinct from `Auth__BackendClientId` (see RA-345 below). |
 | `Auth__BackendClientId` | Service config      | The `clientId` that `epr-register-enrol-backend` is expected to assert. Defaults to `epr-register-enrol-backend` — override only if that service's own `CaseWorking__ClientId` is set to something else. Must be distinct from `Auth__ManagementFeClientId`; the service throws at first request if the two collide. |
 | `ENVIRONMENT`              | CDP platform          | Platform environment name (`local`, `dev`, `test`, `perf-test`, `ext-test`, `prod`). Read by `CdpEnvironment.Read` for `NotifySendingPolicy` — see [Notify sending by environment](#notify-sending-by-environment) below — and for the [test organisations](#test-organisations-ra-000) prod startup guard. |
@@ -228,7 +228,7 @@ Provision through the cdp-portal "Create a service" / "Create a resource"
 flows so they appear under the service's owning team:
 
 - ECR repository (named after the service).
-- MongoDB database (`epr-register-enrol-management-be`).
+- MongoDB database (`waste-regulator-case-management`).
 - CloudWatch log group + dashboard (created automatically once the service
   publishes ECS metrics).
 

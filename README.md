@@ -32,7 +32,7 @@ Restore and run the API directly with `dotnet`:
 
 ```bash
 dotnet restore
-dotnet run --project EprRegisterEnrolManagementBe --launch-profile EprRegisterEnrolManagementBe
+dotnet run --project WasteRegulatorCaseManagement --launch-profile WasteRegulatorCaseManagement
 ```
 
 The API listens on `http://localhost:8085`. Verify it is up:
@@ -58,7 +58,7 @@ Picking "— anonymous —" clears it.
 > server response, not the cURL snippet, to confirm authentication.
 
 The MongoDB connection is configured in
-[`EprRegisterEnrolManagementBe/appsettings.Development.json`](EprRegisterEnrolManagementBe/appsettings.Development.json)
+[`WasteRegulatorCaseManagement/appsettings.Development.json`](WasteRegulatorCaseManagement/appsettings.Development.json)
 and can be overridden via the `Mongo__DatabaseUri` and `Mongo__DatabaseName`
 environment variables.
 
@@ -186,7 +186,7 @@ per-environment list — the tables below summarise it.
 | `Auth__MgmtTestsClientId` | No | Expected `x-cdp-client-id` on inbound calls from the mgmt-tests suite (default `epr-register-enrol-mgmt-tests`) |
 | `OperatorBackendApi__Enabled` | No | Master switch for the outbound query-note push to backend. `false` locally, `true` in dev/test/perf-test/ext-test/prod |
 | `OperatorBackendApi__Url` | No | Base URL of `epr-register-enrol-backend` |
-| `OperatorBackendApi__ClientId` | No | `clientId` this service asserts on its outbound push (default `epr-register-enrol-management-be`) — must match backend's `CaseManagementAuth:ExpectedClientId` |
+| `OperatorBackendApi__ClientId` | No | `clientId` this service asserts on its outbound push (default `waste-regulator-case-management`) — must match backend's `CaseManagementAuth:ExpectedClientId` |
 
 The `BACKEND`, `MANAGEMENT_FE` and `OPERATOR_BACKEND` secrets are optional in
 Development (the handler falls back to header-trust mode while no caller

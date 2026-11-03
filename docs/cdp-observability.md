@@ -7,7 +7,7 @@ for the streamlined ECS schema that survives ingestion.
 
 ## Structured logging — `IStructuredLogger<T>`
 
-[`Utils/Logging/StructuredLogger.cs`](../EprRegisterEnrolManagementBe/Utils/Logging/StructuredLogger.cs)
+[`Utils/Logging/StructuredLogger.cs`](../WasteRegulatorCaseManagement/Utils/Logging/StructuredLogger.cs)
 is a thin DI-friendly facade over `ILogger<T>` that lets callers
 emit a log entry with a **caller-defined property bag**:
 
@@ -41,7 +41,7 @@ NSubstitute and assert on the property bag directly.
 
 ## Notify-specific logging
 
-[`GovukNotifyClient`](../EprRegisterEnrolManagementBe/Notifications/GovukNotifyClient.cs)
+[`GovukNotifyClient`](../WasteRegulatorCaseManagement/Notifications/GovukNotifyClient.cs)
 takes `IStructuredLogger<GovukNotifyClient>` and emits with the
 following stable ECS shape on every call:
 
@@ -62,7 +62,7 @@ level with `event.outcome=failure` plus `AttemptNumber` and
 exhausted) emits at `Error` level with the original exception
 attached.
 
-[`NoOpNotifyClient`](../EprRegisterEnrolManagementBe/Notifications/NoOpNotifyClient.cs)
+[`NoOpNotifyClient`](../WasteRegulatorCaseManagement/Notifications/NoOpNotifyClient.cs)
 uses the same category/action/outcome so local-dev traffic shows up
 the same way in OpenSearch when the service is pointed at a CDP
 environment.
@@ -80,7 +80,7 @@ correlating an outbound failure with the originating BFF request is a
 single OpenSearch filter:
 
 ```
-container_name:"epr-register-enrol-management-be"
+container_name:"waste-regulator-case-management"
   AND event.category:"notify"
   AND event.outcome:"failure"
 ```

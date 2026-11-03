@@ -9,7 +9,7 @@ How a completed re-accreditation application travels from the operator's
 | --- | --- | --- |
 | **Operator FE** | `epr-register-enrol-frontend` | Node / Hapi |
 | **Operator BE** | `epr-register-enrol-backend` | .NET |
-| **Management BE** | `epr-register-enrol-management-be` (this repo) | .NET |
+| **Management BE** | `waste-regulator-case-management` (this repo) | .NET |
 | **MongoDB** | Shared cluster | — |
 
 ---
