@@ -248,7 +248,7 @@ The Mongo collection has an `assigneeAndSubmitted` index for the common
 | `orgId=<orgId>` | only cases of that organisation |
 | `isTerminal=true` | only concluded cases (`false`: only open ones) |
 
-If both are supplied, `assigneeId` wins.
+If both are supplied, the list holds the cases assigned to that user or to no one.
 
 ### Endpoints
 
