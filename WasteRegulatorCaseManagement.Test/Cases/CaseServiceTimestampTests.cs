@@ -60,7 +60,7 @@ public class CaseServiceTimestampTests
         new(new ClaimsIdentity(
         [
             new Claim("client_id", "test-client"),
-            new Claim("user:id", "alice-1"),
+            new Claim("user:nation", "ENGLAND"), new Claim("user:id", "alice-1"),
             new Claim("user:name", "Alice Example")
         ], "test"));
 

@@ -171,6 +171,7 @@ public class CaseAuthBoundaryTests
                 // otherwise normalise away) for the
                 // ResolveActorUserId-returns-null path.
                 client.DefaultRequestHeaders.TryAddWithoutValidation("x-cdp-user-id", _userId);
+                client.DefaultRequestHeaders.Add("x-cdp-user-nation", "ENGLAND");
             }
         }
 

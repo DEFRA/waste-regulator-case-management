@@ -40,6 +40,7 @@ public class ProblemDetailsExceptionHandlerTests
         await using var factory = new ThrowingFactory(_fixture);
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add(ClientIdDefaults.DefaultHeaderName, "test-client");
+        client.DefaultRequestHeaders.Add("x-cdp-user-nation", "ENGLAND");
 
         var response = await client.GetAsync("/cases", ct);
 

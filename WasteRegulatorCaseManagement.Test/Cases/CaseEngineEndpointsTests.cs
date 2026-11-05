@@ -248,6 +248,7 @@ public class CaseEngineEndpointsTests
             base.ConfigureClient(client);
             client.DefaultRequestHeaders.Add(ClientIdDefaults.DefaultHeaderName, "test-client");
             client.DefaultRequestHeaders.Add("x-cdp-user-id", "test-user");
+            client.DefaultRequestHeaders.Add("x-cdp-user-nation", "ENGLAND");
         }
 
         protected override void Dispose(bool disposing)

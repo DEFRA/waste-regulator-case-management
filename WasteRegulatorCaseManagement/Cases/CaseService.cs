@@ -268,8 +268,19 @@ public sealed class CaseService : ICaseService
         {
             return identityFailure;
         }
+        if (RequireCallerNation(user) is { } nationFailure)
+        {
+            return nationFailure;
+        }
 
         var (caseRecord, template, failure) = await LoadAsync(caseId, cancellationToken);
+        if (caseRecord is not null && !CaseNationScope.Includes(user, caseRecord))
+        {
+            return CaseActionResult.Failure(
+                CaseActionFailureCode.CaseNotFound,
+                $"No case exists with id '{caseId}'."
+            );
+        }
         if (failure is not null)
         {
             return failure;
@@ -382,6 +393,10 @@ public sealed class CaseService : ICaseService
         {
             return identityFailure;
         }
+        if (RequireCallerNation(user) is { } nationFailure)
+        {
+            return nationFailure;
+        }
 
         if (string.IsNullOrWhiteSpace(assigneeId))
         {
@@ -392,7 +407,7 @@ public sealed class CaseService : ICaseService
         }
 
         var caseRecord = await _persistence.GetByIdAsync(caseId, cancellationToken);
-        if (caseRecord is null)
+        if (caseRecord is null || !CaseNationScope.Includes(user, caseRecord))
         {
             return CaseActionResult.Failure(
                 CaseActionFailureCode.CaseNotFound,
@@ -489,9 +504,13 @@ public sealed class CaseService : ICaseService
         {
             return identityFailure;
         }
+        if (RequireCallerNation(user) is { } nationFailure)
+        {
+            return nationFailure;
+        }
 
         var caseRecord = await _persistence.GetByIdAsync(caseId, cancellationToken);
-        if (caseRecord is null)
+        if (caseRecord is null || !CaseNationScope.Includes(user, caseRecord))
         {
             return CaseActionResult.Failure(
                 CaseActionFailureCode.CaseNotFound,
@@ -579,6 +598,10 @@ public sealed class CaseService : ICaseService
         {
             return identityFailure;
         }
+        if (RequireCallerNation(user) is { } nationFailure)
+        {
+            return nationFailure;
+        }
 
         if (ValidateNoteText(text, out var trimmed, out var noteFailure) is false)
         {
@@ -590,7 +613,7 @@ public sealed class CaseService : ICaseService
         // whose module is no longer registered and which carry no
         // template snapshot.
         var caseRecord = await _persistence.GetByIdAsync(caseId, cancellationToken);
-        if (caseRecord is null)
+        if (caseRecord is null || !CaseNationScope.Includes(user, caseRecord))
         {
             return CaseActionResult.Failure(
                 CaseActionFailureCode.CaseNotFound,
@@ -952,6 +975,18 @@ public sealed class CaseService : ICaseService
     /// machine-to-machine calls), which is enough for the service to treat
     /// the call as "no human acting" for assignment purposes.
     /// </summary>
+    private static CaseActionResult? RequireCallerNation(ClaimsPrincipal? user)
+    {
+        if (CaseNationScope.CallerNation(user) is not null)
+        {
+            return null;
+        }
+        return CaseActionResult.Failure(
+            CaseActionFailureCode.NotAuthorized,
+            "Acting on a case requires a 'user:nation' claim scoping the caller to a nation."
+        );
+    }
+
     private static string? ResolveActorUserId(ClaimsPrincipal? user)
     {
         var id = user?.FindFirstValue("user:id");

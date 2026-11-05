@@ -43,9 +43,9 @@ internal static class SwaggerUiStubUserAssets
 
           const STORAGE_KEY = 'caseManagementSwaggerStubUser';
           const STUB_USERS = [
-            { id: 'stub-caseworker-1', name: 'Stub Caseworker One' },
-            { id: 'stub-caseworker-2', name: 'Stub Caseworker Two' },
-            { id: 'stub-caseworker-3', name: 'Stub Caseworker Three' }
+            { id: 'stub-caseworker-1', name: 'Stub Caseworker One', nation: 'ENGLAND' },
+            { id: 'stub-caseworker-2', name: 'Stub Caseworker Two', nation: 'ENGLAND' },
+            { id: 'stub-caseworker-3', name: 'Stub Caseworker Three', nation: 'ENGLAND' }
           ];
 
           function read() {
@@ -87,6 +87,7 @@ internal static class SwaggerUiStubUserAssets
             headers.set('x-cdp-client-id', 'local-swagger-ui');
             headers.set('x-cdp-user-id', user.id);
             headers.set('x-cdp-user-name', user.name);
+            if (user.nation) headers.set('x-cdp-user-nation', user.nation);
             init.headers = headers;
             return originalFetch(input, init);
           };

@@ -116,17 +116,22 @@ public class CaseServiceTests : IAsyncDisposable
     private static ClaimsPrincipal User() =>
         new(
             new ClaimsIdentity(
-                [new Claim("client_id", "test-client"), new Claim("user:id", "test-user")],
+                [new Claim("client_id", "test-client"), new Claim("user:nation", "ENGLAND"), new Claim("user:id", "test-user")],
                 "test"
             )
         );
 
     private static ClaimsPrincipal UserWithoutActorId() =>
-        new(new ClaimsIdentity([new Claim("client_id", "test-client")], "test"));
+        new(
+            new ClaimsIdentity(
+                [new Claim("client_id", "test-client"), new Claim("user:nation", "ENGLAND")],
+                "test"
+            )
+        );
 
     private static ClaimsPrincipal UserWithRoles(string userId, params string[] roles)
     {
-        var claims = new List<Claim> { new("client_id", "test-client"), new("user:id", userId) };
+        var claims = new List<Claim> { new("client_id", "test-client"), new("user:nation", "ENGLAND"), new("user:id", userId) };
         foreach (var role in roles)
         {
             claims.Add(new Claim(ClaimTypes.Role, role));
@@ -675,7 +680,7 @@ public class CaseServiceTests : IAsyncDisposable
         var caseRecord = await SeedAsync();
         var user = new ClaimsPrincipal(
             new ClaimsIdentity(
-                [new Claim("client_id", "test-client"), new Claim("user:id", "   ")],
+                [new Claim("client_id", "test-client"), new Claim("user:nation", "ENGLAND"), new Claim("user:id", "   ")],
                 "test"
             )
         );
@@ -1430,7 +1435,7 @@ public class CaseServiceTests : IAsyncDisposable
             new ClaimsIdentity(
                 [
                     new Claim("client_id", "test-client"),
-                    new Claim("user:id", "alice-1"),
+                    new Claim("user:nation", "ENGLAND"), new Claim("user:id", "alice-1"),
                     new Claim("user:name", "Alice Example"),
                 ],
                 "test"
@@ -1543,7 +1548,7 @@ public class CaseServiceTests : IAsyncDisposable
             new ClaimsIdentity(
                 [
                     new Claim("client_id", "test-client"),
-                    new Claim("user:id", userId),
+                    new Claim("user:nation", "ENGLAND"), new Claim("user:id", userId),
                     new Claim("user:name", userName),
                 ],
                 "test"

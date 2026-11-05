@@ -36,9 +36,9 @@ public static class ClientIdDefaults
     public const string DefaultRoleHeaderName = "x-cdp-user-role";
 
     /// <summary>
-    /// Optional header carrying the caller's nation scope as the BFF sees
-    /// it (e.g. <c>"England"</c>/<c>"Scotland"</c>/<c>"Wales"</c>/
-    /// <c>"NorthernIreland"</c>) — becomes claim <c>"user:nation"</c>.
+    /// Header carrying the caller's nation scope, one of
+    /// <c>ENGLAND</c>/<c>WALES</c>/<c>SCOTLAND</c>/<c>N_IRELAND</c> — becomes
+    /// claim <c>"user:nation"</c>, which scopes every case read and mutation.
     /// RA-469 groundwork: not folded into the v3 HMAC canonical payload —
     /// see <see cref="ClientIdAuthenticationHandler.ComputeSignature"/>.
     /// </summary>

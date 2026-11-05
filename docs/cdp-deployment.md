@@ -148,9 +148,9 @@ v3
 Empty-string placeholders must be included for absent optional fields — the
 field count and separator positions are fixed within each form. When a request
 carries no role/nation header, either form verifies; when it carries one, only
-the extended form over the sent values does. Apart from the RA-469
-recycling-operations endpoint, role/nation are audit-only claims — authorization
-is otherwise entirely the BFF's concern (see
+the extended form over the sent values does. Nation scopes every caseworker
+route (`ENGLAND`, `WALES`, `SCOTLAND` or `N_IRELAND`; see `docs/cases.md`); role
+is an audit-only claim, and role-based authorization is the BFF's concern (see
 `docs/adr/0005-rbac-in-frontend-drop-roles-from-payload.md`). See
 `ClientIdAuthenticationHandler.ComputeSignature` / `VerifySignature` for the
 authoritative implementation and

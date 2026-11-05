@@ -22,7 +22,7 @@ public class CaseTimelineAppenderTests
 
     private static readonly ClaimsPrincipal s_user = new(new ClaimsIdentity(
     [
-        new Claim("user:id", "user-1"),
+        new Claim("user:nation", "ENGLAND"), new Claim("user:id", "user-1"),
         new Claim("user:name", "Alice")
     ], "test"));
 

@@ -312,6 +312,13 @@ public static class CaseEndpoints
         return TypedResults.CreatedAtRoute(response, "GetCaseById", new { id = caseRecord.Id });
     }
 
+    private static ProblemHttpResult NationRequired() =>
+        TypedResults.Problem(
+            title: "Not authorised",
+            detail: "Reading cases requires a 'user:nation' claim scoping the caller to a nation.",
+            statusCode: StatusCodes.Status403Forbidden
+        );
+
     private static ProblemHttpResult BadRequest(string title, string detail) =>
         TypedResults.Problem(
             title: title,
@@ -319,7 +326,7 @@ public static class CaseEndpoints
             statusCode: StatusCodes.Status400BadRequest
         );
 
-    internal static async Task<Results<Ok<CaseResponse>, NotFound>> GetById(
+    internal static async Task<Results<Ok<CaseResponse>, NotFound, ProblemHttpResult>> GetById(
         [FromRoute] string id,
         HttpContext httpContext,
         [FromServices] ICasePersistence persistence,
@@ -327,8 +334,15 @@ public static class CaseEndpoints
         CancellationToken cancellationToken
     )
     {
+        if (CaseNationScope.CallerNation(httpContext.User) is null)
+        {
+            return NationRequired();
+        }
+
         var caseRecord = await persistence.GetByIdAsync(id, cancellationToken);
-        if (caseRecord is null)
+        // A case in another nation is reported exactly like one that does
+        // not exist, so its existence is not disclosed.
+        if (caseRecord is null || !CaseNationScope.Includes(httpContext.User, caseRecord))
         {
             return TypedResults.NotFound();
         }
@@ -342,7 +356,15 @@ public static class CaseEndpoints
         CancellationToken cancellationToken
     )
     {
-        var query = CaseQueryBinding.FromQueryString(httpContext.Request.Query);
+        if (CaseNationScope.CallerNation(httpContext.User) is not { } nation)
+        {
+            return NationRequired();
+        }
+
+        var query = CaseQueryBinding.FromQueryString(httpContext.Request.Query) with
+        {
+            Nation = nation,
+        };
 
         if (query.ExceedsPageCap)
         {

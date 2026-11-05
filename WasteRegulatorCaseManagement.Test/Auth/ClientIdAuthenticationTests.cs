@@ -55,6 +55,7 @@ public class ClientIdAuthenticationTests
 
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add(ClientIdDefaults.DefaultHeaderName, ClientId);
+        client.DefaultRequestHeaders.Add("x-cdp-user-nation", "ENGLAND");
 
         var response = await client.GetAsync("/cases", cancellationToken);
 
@@ -126,12 +127,13 @@ public class ClientIdAuthenticationTests
         var nonce = "nonce-valid";
         var signature = ClientIdAuthenticationHandler.ComputeSignature(
             Secret,
-            new ClientIdSignaturePayload(ClientId, null, null, timestamp, nonce)
+            new ClientIdSignaturePayload(ClientId, null, null, timestamp, nonce, Nation: "ENGLAND")
         );
 
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add(ClientIdDefaults.DefaultHeaderName, ClientId);
         AddTimestampAndNonce(client, timestamp, nonce);
+        client.DefaultRequestHeaders.Add("x-cdp-user-nation", "ENGLAND");
         client.DefaultRequestHeaders.Add("x-cdp-auth-signature", signature);
 
         var response = await client.GetAsync("/cases", cancellationToken);
@@ -270,20 +272,22 @@ public class ClientIdAuthenticationTests
         var nonceA = "nonce-caller-a";
         var signatureA = ClientIdAuthenticationHandler.ComputeSignature(
             Secret,
-            new ClientIdSignaturePayload(ClientId, null, null, timestamp, nonceA)
+            new ClientIdSignaturePayload(ClientId, null, null, timestamp, nonceA, Nation: "ENGLAND")
         );
         clientA.DefaultRequestHeaders.Add(ClientIdDefaults.DefaultHeaderName, ClientId);
         AddTimestampAndNonce(clientA, timestamp, nonceA);
+        clientA.DefaultRequestHeaders.Add("x-cdp-user-nation", "ENGLAND");
         clientA.DefaultRequestHeaders.Add("x-cdp-auth-signature", signatureA);
 
         using var clientB = factory.CreateClient();
         var nonceB = "nonce-caller-b";
         var signatureB = ClientIdAuthenticationHandler.ComputeSignature(
             OtherSecret,
-            new ClientIdSignaturePayload(OtherClientId, null, null, timestamp, nonceB)
+            new ClientIdSignaturePayload(OtherClientId, null, null, timestamp, nonceB, Nation: "ENGLAND")
         );
         clientB.DefaultRequestHeaders.Add(ClientIdDefaults.DefaultHeaderName, OtherClientId);
         AddTimestampAndNonce(clientB, timestamp, nonceB);
+        clientB.DefaultRequestHeaders.Add("x-cdp-user-nation", "ENGLAND");
         clientB.DefaultRequestHeaders.Add("x-cdp-auth-signature", signatureB);
 
         var responseA = await clientA.GetAsync("/cases", cancellationToken);
@@ -413,12 +417,13 @@ public class ClientIdAuthenticationTests
         var nonce = "nonce-replay";
         var signature = ClientIdAuthenticationHandler.ComputeSignature(
             Secret,
-            new ClientIdSignaturePayload(ClientId, null, null, timestamp, nonce)
+            new ClientIdSignaturePayload(ClientId, null, null, timestamp, nonce, Nation: "ENGLAND")
         );
 
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add(ClientIdDefaults.DefaultHeaderName, ClientId);
         AddTimestampAndNonce(client, timestamp, nonce);
+        client.DefaultRequestHeaders.Add("x-cdp-user-nation", "ENGLAND");
         client.DefaultRequestHeaders.Add("x-cdp-auth-signature", signature);
 
         var first = await client.GetAsync("/cases", cancellationToken);
@@ -457,6 +462,7 @@ public class ClientIdAuthenticationTests
 
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add(ClientIdDefaults.DefaultHeaderName, ClientId);
+        client.DefaultRequestHeaders.Add("x-cdp-user-nation", "ENGLAND");
 
         var response = await client.GetAsync("/cases", cancellationToken);
 
@@ -700,6 +706,7 @@ public class ClientIdAuthenticationTests
             client.DefaultRequestHeaders.Add(ClientIdDefaults.DefaultHeaderName, ClientId);
             client.DefaultRequestHeaders.Add(header, atCap);
         }
+        client.DefaultRequestHeaders.Add("x-cdp-user-nation", "ENGLAND");
 
         var response = await client.GetAsync("/cases", cancellationToken);
 
@@ -721,12 +728,13 @@ public class ClientIdAuthenticationTests
         var nonce = new string('n', 128);
         var signature = ClientIdAuthenticationHandler.ComputeSignature(
             Secret,
-            new ClientIdSignaturePayload(ClientId, null, null, timestamp, nonce)
+            new ClientIdSignaturePayload(ClientId, null, null, timestamp, nonce, Nation: "ENGLAND")
         );
 
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add(ClientIdDefaults.DefaultHeaderName, ClientId);
         AddTimestampAndNonce(client, timestamp, nonce);
+        client.DefaultRequestHeaders.Add("x-cdp-user-nation", "ENGLAND");
         client.DefaultRequestHeaders.Add("x-cdp-auth-signature", signature);
 
         var response = await client.GetAsync("/cases", cancellationToken);
@@ -772,6 +780,10 @@ public class ClientIdAuthenticationTests
         var atCap = new string('a', cap);
         client.DefaultRequestHeaders.Add(ClientIdDefaults.DefaultHeaderName, ClientId);
         client.DefaultRequestHeaders.Add(header, atCap);
+        if (header != "x-cdp-user-nation")
+        {
+            client.DefaultRequestHeaders.Add("x-cdp-user-nation", "ENGLAND");
+        }
 
         var response = await client.GetAsync("/cases", cancellationToken);
 
@@ -806,7 +818,7 @@ public class ClientIdAuthenticationTests
     }
 
     [Fact]
-    public async Task Role_and_nation_trust_headers_absent_auth_unaffected()
+    public async Task Role_and_nation_trust_headers_absent_still_authenticates()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var factory = new BareFactory();
@@ -819,7 +831,8 @@ public class ClientIdAuthenticationTests
 
         var response = await client.GetAsync("/cases", cancellationToken);
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        // Authenticated (not 401); case reads then need a nation claim.
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]
@@ -945,7 +958,7 @@ public class ClientIdAuthenticationTests
     }
 
     [Fact]
-    public async Task Legacy_six_line_v3_signature_without_role_or_nation_is_accepted()
+    public async Task Legacy_six_line_v3_signature_without_role_or_nation_authenticates()
     {
         // ADR-0007 — regression for the 2026-08-22 dev outage. A service
         // caller with no user role or nation signs the ORIGINAL v3 canonical
@@ -987,11 +1000,12 @@ public class ClientIdAuthenticationTests
 
         var response = await client.GetAsync("/cases", cancellationToken);
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        // Authenticated (not 401); case reads then need a nation claim.
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]
-    public async Task Extended_v3_signature_with_empty_role_and_nation_is_accepted()
+    public async Task Extended_v3_signature_with_empty_role_and_nation_authenticates()
     {
         // ADR-0007: management-fe signs the RA-469 extended form on EVERY
         // call, with role/nation as empty strings when it has none to
@@ -1020,7 +1034,8 @@ public class ClientIdAuthenticationTests
 
         var response = await client.GetAsync("/cases", cancellationToken);
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        // Authenticated (not 401); case reads then need a nation claim.
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]
@@ -1151,13 +1166,14 @@ public class ClientIdAuthenticationEnvVarTests
             const string clientId = "frontend";
             var signature = ClientIdAuthenticationHandler.ComputeSignature(
                 ManagementFeSecret,
-                new ClientIdSignaturePayload(clientId, null, null, timestamp, nonce)
+                new ClientIdSignaturePayload(clientId, null, null, timestamp, nonce, Nation: "ENGLAND")
             );
 
             using var client = factory.CreateClient();
             client.DefaultRequestHeaders.Add(ClientIdDefaults.DefaultHeaderName, clientId);
             client.DefaultRequestHeaders.Add("x-cdp-auth-timestamp", timestamp);
             client.DefaultRequestHeaders.Add("x-cdp-auth-nonce", nonce);
+            client.DefaultRequestHeaders.Add("x-cdp-user-nation", "ENGLAND");
             client.DefaultRequestHeaders.Add("x-cdp-auth-signature", signature);
 
             var response = await client.GetAsync(

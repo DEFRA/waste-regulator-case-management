@@ -30,6 +30,10 @@ namespace WasteRegulatorCaseManagement.Cases;
 /// </param>
 /// <param name="Page">1-based page number. Coerced to a minimum of 1.</param>
 /// <param name="PageSize">Page size. Coerced into [<see cref="MinPageSize"/>, <see cref="MaxPageSize"/>].</param>
+/// <param name="Nation">
+/// Restrict to cases of this nation. Set from the caller's
+/// <c>user:nation</c> claim, never from the query string.
+/// </param>
 /// <param name="SubmittedBy">
 /// Restrict to items submitted by this caller id. Caller-supplied via
 /// <c>?submittedBy=...</c>; RBAC (who is allowed to ask for whose items)
@@ -45,6 +49,7 @@ public sealed record CaseQuery(
     int Page = 1,
     int PageSize = 20,
     string? SubmittedBy = null,
+    string? Nation = null,
     string? Sort = null,
     bool? SortDescending = null)
 {

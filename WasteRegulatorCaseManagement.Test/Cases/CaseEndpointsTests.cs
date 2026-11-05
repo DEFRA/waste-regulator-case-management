@@ -41,8 +41,9 @@ public class CaseEndpointsTests
         bool includeAuthHeader = true,
         string? userId = "test-user",
         string? userName = null,
-        IReadOnlyCollection<CaseState>? states = null
-    ) => new(_fixture, includeAuthHeader, userId, userName, states);
+        IReadOnlyCollection<CaseState>? states = null,
+        string? nation = "ENGLAND"
+    ) => new(_fixture, includeAuthHeader, userId, userName, states, nation);
 
     [Fact]
     public async Task Post_returns_unauthorized_without_client_id()
@@ -695,6 +696,160 @@ public class CaseEndpointsTests
 
         var response = await client.GetAsync($"/cases/{id}", cancellationToken);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Get_by_id_returns_not_found_for_a_case_in_another_nation()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var factory = NewFactory(nation: "ENGLAND");
+        using var client = factory.CreateClient();
+        var id = Ulid.NewUlid().ToString();
+        await factory.SeedAsync(
+            new Case
+            {
+                SourceSystemId = Ulid.NewUlid().ToString(),
+                CallbackUrl = "https://source-system.test/callback",
+                Nation = "WALES",
+                OrgId = "test-org",
+                Id = id,
+                CaseType = CaseType,
+                StateId = "submitted",
+                SubmittedBy = "test-client",
+            },
+            cancellationToken
+        );
+
+        // Act
+        var response = await client.GetAsync($"/cases/{id}", cancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Get_by_id_is_forbidden_to_a_caller_without_a_nation()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var factory = NewFactory(nation: null);
+        using var client = factory.CreateClient();
+        var id = Ulid.NewUlid().ToString();
+        await factory.SeedAsync(
+            new Case
+            {
+                SourceSystemId = Ulid.NewUlid().ToString(),
+                CallbackUrl = "https://source-system.test/callback",
+                Nation = "ENGLAND",
+                OrgId = "test-org",
+                Id = id,
+                CaseType = CaseType,
+                StateId = "submitted",
+                SubmittedBy = "test-client",
+            },
+            cancellationToken
+        );
+
+        // Act
+        var response = await client.GetAsync($"/cases/{id}", cancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Get_list_is_forbidden_to_a_caller_without_a_nation()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var factory = NewFactory(nation: null);
+        using var client = factory.CreateClient();
+
+        // Act
+        var response = await client.GetAsync("/cases", cancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Get_list_returns_only_cases_in_the_callers_nation()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var factory = NewFactory(nation: "WALES");
+        using var client = factory.CreateClient();
+        var walesId = Ulid.NewUlid().ToString();
+        await factory.SeedAsync(
+            new Case
+            {
+                SourceSystemId = Ulid.NewUlid().ToString(),
+                CallbackUrl = "https://source-system.test/callback",
+                Nation = "WALES",
+                OrgId = "test-org",
+                Id = walesId,
+                CaseType = CaseType,
+                StateId = "submitted",
+                SubmittedBy = "test-client",
+            },
+            cancellationToken
+        );
+        await factory.SeedAsync(
+            new Case
+            {
+                SourceSystemId = Ulid.NewUlid().ToString(),
+                CallbackUrl = "https://source-system.test/callback",
+                Nation = "ENGLAND",
+                OrgId = "test-org",
+                Id = Ulid.NewUlid().ToString(),
+                CaseType = CaseType,
+                StateId = "submitted",
+                SubmittedBy = "test-client",
+            },
+            cancellationToken
+        );
+
+        // Act
+        var body = await client.GetFromJsonAsync<CaseListResponse>("/cases", cancellationToken);
+
+        // Assert
+        var item = Assert.Single(body!.Items);
+        Assert.Equal(walesId, item.Id);
+    }
+
+    [Fact]
+    public async Task AddNote_returns_not_found_for_a_case_in_another_nation()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var factory = NewFactory(nation: "ENGLAND");
+        using var client = factory.CreateClient();
+        var id = Ulid.NewUlid().ToString();
+        await factory.SeedAsync(
+            new Case
+            {
+                SourceSystemId = Ulid.NewUlid().ToString(),
+                CallbackUrl = "https://source-system.test/callback",
+                Nation = "SCOTLAND",
+                OrgId = "test-org",
+                Id = id,
+                CaseType = CaseType,
+                StateId = "submitted",
+                SubmittedBy = "test-client",
+            },
+            cancellationToken
+        );
+
+        // Act
+        var response = await client.PostAsJsonAsync(
+            $"/cases/{id}/notes",
+            new { text = "anything" },
+            cancellationToken
+        );
+
+        // Assert
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]
@@ -2092,6 +2247,7 @@ public class CaseEndpointsTests
         private readonly string? _userId;
         private readonly string? _userName;
         private readonly IReadOnlyCollection<CaseState>? _states;
+        private readonly string? _nation;
 
         /// <summary>
         /// The client id allowed to create cases. Defaults to the client
@@ -2104,9 +2260,11 @@ public class CaseEndpointsTests
             bool includeAuthHeader,
             string? userId,
             string? userName,
-            IReadOnlyCollection<CaseState>? states = null
+            IReadOnlyCollection<CaseState>? states,
+            string? nation
         )
         {
+            _nation = nation;
             _fixture = fixture;
             _includeAuthHeader = includeAuthHeader;
             _userId = userId;
@@ -2191,6 +2349,10 @@ public class CaseEndpointsTests
             if (_userName is not null)
             {
                 client.DefaultRequestHeaders.Add("x-cdp-user-name", _userName);
+            }
+            if (_nation is not null)
+            {
+                client.DefaultRequestHeaders.Add("x-cdp-user-nation", _nation);
             }
         }
 

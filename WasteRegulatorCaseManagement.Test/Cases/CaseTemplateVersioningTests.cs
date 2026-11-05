@@ -23,7 +23,7 @@ public class CaseTemplateVersioningTests
         new(new ClaimsIdentity(
         [
             new Claim("client_id", "test-client"),
-            new Claim("user:id", "test-user")
+            new Claim("user:nation", "ENGLAND"), new Claim("user:id", "test-user")
         ], "test"));
 
     [Fact]

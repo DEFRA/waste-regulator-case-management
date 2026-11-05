@@ -73,6 +73,14 @@ Only the Case Intake Processor may create cases: `POST /cases` requires the
 The case management service holds a reference to the submission, not its
 content: anything else a caseworker needs is fetched from the source system.
 
+### Nation scoping
+
+A caseworker sees and acts on only the cases of their own nation. Every route
+except `POST /cases` reads the signed `x-cdp-user-nation` header (claim
+`user:nation`, one of the intake `nation` values): a caller without one gets
+`403`, and a case in another nation is `404`, so its existence is not revealed.
+The list is filtered to the caller's nation before any other filter applies.
+
 ## Adding a new case type
 
 1. **Create a folder** under `WasteRegulatorCaseManagement/Cases/<TypeName>/` containing:
