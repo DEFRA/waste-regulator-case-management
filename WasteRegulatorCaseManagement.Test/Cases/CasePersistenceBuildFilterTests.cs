@@ -110,7 +110,7 @@ public class CasePersistenceBuildFilterTests
 	{
 		var doc = Render(new CaseQuery(Search: "  01kb  "));
 
-		Assert.Equal(new BsonRegularExpression("^01kb", "i"), doc["_id"].AsBsonRegularExpression);
+		doc["_id"].AsBsonRegularExpression.Should().Be(new BsonRegularExpression("^01kb", "i"));
 	}
 
 	[Fact]

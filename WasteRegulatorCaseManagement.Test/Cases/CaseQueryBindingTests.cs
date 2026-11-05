@@ -27,7 +27,7 @@ public class CaseQueryBindingTests
 	{
 		var query = CaseQueryBinding.FromQueryString(Q(("orgId", "   ")));
 
-		Assert.Null(query.OrgId);
+		query.OrgId.Should().BeNull();
 	}
 
 	[Fact]

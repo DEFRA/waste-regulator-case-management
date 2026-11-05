@@ -42,16 +42,13 @@ public sealed class SnsAnalyticsEventSenderTests
 		await _sender.Send(analyticsEvent, TestContext.Current.CancellationToken);
 
 		// Assert
-		Assert.Equal(TopicArn, _published!.TopicArn);
-		Assert.Equal("application/json", _published.MessageAttributes["Content-Type"].StringValue);
-		Assert.False(_published.MessageAttributes.ContainsKey("Content-Encoding"));
+		_published!.TopicArn.Should().Be(TopicArn);
+		_published.MessageAttributes["Content-Type"].StringValue.Should().Be("application/json");
+		_published.MessageAttributes.Should().NotContainKey("Content-Encoding");
 		using var message = JsonDocument.Parse(_published.Message);
-		Assert.Equal("note-added", message.RootElement.GetProperty("eventType").GetString());
-		Assert.Equal("2026-11-05T09:30:00.000Z", message.RootElement.GetProperty("occurredAt").GetString());
-		Assert.Equal(
-			"Called the producer",
-			message.RootElement.GetProperty("after").GetProperty("note").GetString()
-		);
+		message.RootElement.GetProperty("eventType").GetString().Should().Be("note-added");
+		message.RootElement.GetProperty("occurredAt").GetString().Should().Be("2026-11-05T09:30:00.000Z");
+		message.RootElement.GetProperty("after").GetProperty("note").GetString().Should().Be("Called the producer");
 	}
 
 	[Fact]
@@ -64,9 +61,9 @@ public sealed class SnsAnalyticsEventSenderTests
 		await _sender.Send(analyticsEvent, TestContext.Current.CancellationToken);
 
 		// Assert
-		Assert.Equal("gzip+base64", _published!.MessageAttributes["Content-Encoding"].StringValue);
+		_published!.MessageAttributes["Content-Encoding"].StringValue.Should().Be("gzip+base64");
 		using var message = JsonDocument.Parse(Decompress(_published.Message));
-		Assert.Equal(analyticsEvent.EventId, message.RootElement.GetProperty("eventId").GetString());
+		message.RootElement.GetProperty("eventId").GetString().Should().Be(analyticsEvent.EventId);
 	}
 
 	[Fact]
@@ -80,13 +77,13 @@ public sealed class SnsAnalyticsEventSenderTests
 		var analyticsEvent = AnalyticsEventWithNote(incompressible);
 
 		// Act
-		var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-			_sender.Send(analyticsEvent, TestContext.Current.CancellationToken)
-		);
+		var send = () => _sender.Send(analyticsEvent, TestContext.Current.CancellationToken);
 
 		// Assert
-		Assert.Equal("Analytics event message exceeds the SNS message size limit.", exception.Message);
-		Assert.Null(_published);
+		await send.Should()
+			.ThrowAsync<InvalidOperationException>()
+			.WithMessage("Analytics event message exceeds the SNS message size limit.");
+		_published.Should().BeNull();
 	}
 
 	private static AnalyticsEvent AnalyticsEventWithNote(string note) =>

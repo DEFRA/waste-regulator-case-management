@@ -59,7 +59,7 @@ public class CaseRegistryTests
 		registry.Load([beta]);
 
 		// Assert
-		Assert.Same(beta, Assert.Single(registry.Types));
+		registry.Types.Should().ContainSingle().Which.Should().BeSameAs(beta);
 	}
 
 	[Fact]
@@ -74,11 +74,10 @@ public class CaseRegistryTests
 			states: [new CaseState("accepted", "Accepted", IsTerminal: true)]);
 
 		// Act
-		var exception = Record.Exception(() => registry.Load([invalid]));
+		var load = () => registry.Load([invalid]);
 
 		// Assert
-		Assert.IsType<InvalidCaseModuleConfigException>(exception);
-		Assert.Contains("undeclared state 'submitted'", exception.Message);
+		load.Should().Throw<InvalidCaseModuleConfigException>().WithMessage("*undeclared state 'submitted'*");
 	}
 
 	[Fact]
@@ -92,11 +91,10 @@ public class CaseRegistryTests
 			transitions: [new CaseTransition("accept", "Accept", "submitted", "accepted")]);
 
 		// Act
-		var exception = Record.Exception(() => registry.Load([invalid]));
+		var load = () => registry.Load([invalid]);
 
 		// Assert
-		Assert.IsType<InvalidCaseModuleConfigException>(exception);
-		Assert.Contains("action 'accept'", exception.Message);
+		load.Should().Throw<InvalidCaseModuleConfigException>().WithMessage("*action 'accept'*");
 	}
 
 	[Fact]
@@ -116,10 +114,9 @@ public class CaseRegistryTests
 		};
 
 		// Act
-		var exception = Record.Exception(() => registry.Load([invalid]));
+		var load = () => registry.Load([invalid]);
 
 		// Assert
-		Assert.IsType<InvalidCaseModuleConfigException>(exception);
-		Assert.Contains("undeclared state 'accepted'", exception.Message);
+		load.Should().Throw<InvalidCaseModuleConfigException>().WithMessage("*undeclared state 'accepted'*");
 	}
 }

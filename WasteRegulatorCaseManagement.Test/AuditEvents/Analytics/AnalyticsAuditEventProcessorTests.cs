@@ -91,20 +91,23 @@ public sealed class AnalyticsAuditEventProcessorTests : IAsyncDisposable
 		await _processor.ProcessBatch(cancellationToken);
 
 		// Assert
-		var sent = Assert.Single(_sender.SentEvents);
-		Assert.Equal("case", sent.Entity);
-		Assert.Equal($"case_{caseRecord.Id}", sent.EntityId);
-		Assert.Equal("create", sent.Operation);
-		Assert.Equal("case-created", sent.EventType);
-		Assert.Equal("service:case-intake", sent.Actor);
-		Assert.Equal("case.v1.0", sent.SchemaVersion);
-		Assert.Null(sent.Before);
-		Assert.Equal("WALES", sent.After!["nation"].AsString);
+		var sent = _sender.SentEvents.Should().ContainSingle().Subject;
+		sent.Should()
+			.BeEquivalentTo(
+				new
+				{
+					Entity = "case",
+					EntityId = $"case_{caseRecord.Id}",
+					Operation = "create",
+					EventType = "case-created",
+					Actor = "service:case-intake",
+					SchemaVersion = "case.v1.0",
+					Before = (BsonDocument?)null,
+				}
+			);
+		sent.After!["nation"].AsString.Should().Be("WALES");
 		using var message = JsonDocument.Parse(JsonSerializer.Serialize(sent));
-		Assert.Equal(
-			"2026-11-05T09:30:00.000Z",
-			message.RootElement.GetProperty("after").GetProperty("submittedAt").GetString()
-		);
+		message.RootElement.GetProperty("after").GetProperty("submittedAt").GetString().Should().Be("2026-11-05T09:30:00.000Z");
 	}
 
 	[Fact]
@@ -121,21 +124,19 @@ public sealed class AnalyticsAuditEventProcessorTests : IAsyncDisposable
 		await _processor.ProcessBatch(cancellationToken);
 
 		// Assert
-		Assert.Equal([1L, 2L], _sender.SentEvents.Select(e => e.Sequence).ToArray());
+		_sender.SentEvents.Select(e => e.Sequence).Should().Equal([1L, 2L]);
 		var stored = await AuditEvents.Find(FilterDefinition<AuditEvent>.Empty).ToListAsync(cancellationToken);
-		Assert.All(
-			stored,
-			auditEvent =>
-				Assert.Equal(
-					new AuditEventDispatch
-					{
-						Status = AuditEventDispatchStatus.Dispatched,
-						Date = s_now,
-						AttemptCount = 1,
-					},
-					auditEvent.Dispatches[Analytics]
-				)
-		);
+		stored
+			.Select(auditEvent => auditEvent.Dispatches[Analytics])
+			.Should()
+			.AllBeEquivalentTo(
+				new AuditEventDispatch
+				{
+					Status = AuditEventDispatchStatus.Dispatched,
+					Date = s_now,
+					AttemptCount = 1,
+				}
+			);
 	}
 
 	[Fact]
@@ -163,7 +164,7 @@ public sealed class AnalyticsAuditEventProcessorTests : IAsyncDisposable
 		await _processor.ProcessBatch(cancellationToken);
 
 		// Assert
-		Assert.Empty(_sender.SentEvents);
+		_sender.SentEvents.Should().BeEmpty();
 	}
 
 	[Fact]
@@ -191,10 +192,10 @@ public sealed class AnalyticsAuditEventProcessorTests : IAsyncDisposable
 		await _processor.ProcessBatch(cancellationToken);
 
 		// Assert
-		Assert.Single(_sender.SentEvents);
+		_sender.SentEvents.Should().ContainSingle();
 		var stored = await AuditEvents.Find(e => e.EventId == auditEvent.EventId).SingleAsync(cancellationToken);
-		Assert.Equal(AuditEventDispatchStatus.Dispatched, stored.Dispatches[Analytics].Status);
-		Assert.Equal(2, stored.Dispatches[Analytics].AttemptCount);
+		stored.Dispatches[Analytics].Status.Should().Be(AuditEventDispatchStatus.Dispatched);
+		stored.Dispatches[Analytics].AttemptCount.Should().Be(2);
 	}
 
 	[Fact]
@@ -224,7 +225,7 @@ public sealed class AnalyticsAuditEventProcessorTests : IAsyncDisposable
 		await _processor.ProcessBatch(cancellationToken);
 
 		// Assert
-		Assert.Empty(_sender.SentEvents);
+		_sender.SentEvents.Should().BeEmpty();
 	}
 
 	[Fact]
@@ -242,19 +243,16 @@ public sealed class AnalyticsAuditEventProcessorTests : IAsyncDisposable
 
 		// Assert
 		var failed = await AuditEvents.Find(e => e.EventId == failing.EventId).SingleAsync(cancellationToken);
-		Assert.Equal(
-			new AuditEventDispatch
-			{
-				Status = AuditEventDispatchStatus.Failed,
-				Date = s_now,
-				Message = "Topic unavailable",
-				AttemptCount = 1,
-				NextAttemptAt = s_now.AddMinutes(1),
-			},
-			failed.Dispatches[Analytics]
-		);
+		failed.Dispatches[Analytics].Should().BeEquivalentTo(new AuditEventDispatch
+		{
+			Status = AuditEventDispatchStatus.Failed,
+			Date = s_now,
+			Message = "Topic unavailable",
+			AttemptCount = 1,
+			NextAttemptAt = s_now.AddMinutes(1),
+		});
 		var dispatched = await AuditEvents.Find(e => e.EventId == succeeding.EventId).SingleAsync(cancellationToken);
-		Assert.Equal(AuditEventDispatchStatus.Dispatched, dispatched.Dispatches[Analytics].Status);
+		dispatched.Dispatches[Analytics].Status.Should().Be(AuditEventDispatchStatus.Dispatched);
 	}
 
 	[Fact]
@@ -285,18 +283,15 @@ public sealed class AnalyticsAuditEventProcessorTests : IAsyncDisposable
 		await _processor.ProcessBatch(cancellationToken);
 
 		// Assert
-		Assert.Single(_sender.SentEvents);
+		_sender.SentEvents.Should().ContainSingle();
 		var stored = await AuditEvents.Find(e => e.EventId == auditEvent.EventId).SingleAsync(cancellationToken);
-		Assert.Equal(
-			new AuditEventDispatch
-			{
-				Status = AuditEventDispatchStatus.DeadLettered,
-				Date = s_now,
-				Message = "Topic unavailable",
-				AttemptCount = MaxDispatchAttempts,
-			},
-			stored.Dispatches[Analytics]
-		);
+		stored.Dispatches[Analytics].Should().BeEquivalentTo(new AuditEventDispatch
+		{
+			Status = AuditEventDispatchStatus.DeadLettered,
+			Date = s_now,
+			Message = "Topic unavailable",
+			AttemptCount = MaxDispatchAttempts,
+		});
 	}
 
 	[Fact]
@@ -312,7 +307,7 @@ public sealed class AnalyticsAuditEventProcessorTests : IAsyncDisposable
 		await _processor.ProcessBatch(cancellationToken);
 
 		// Assert
-		Assert.Empty(_sender.SentEvents);
+		_sender.SentEvents.Should().BeEmpty();
 	}
 
 	[Fact]
@@ -336,9 +331,9 @@ public sealed class AnalyticsAuditEventProcessorTests : IAsyncDisposable
 		await _processor.ProcessBatch(cancellationToken);
 
 		// Assert
-		Assert.Equal([first.EventId], _sender.SentEvents.Select(e => e.EventId).ToArray());
+		_sender.SentEvents.Select(e => e.EventId).Should().Equal([first.EventId]);
 		var unsent = await AuditEvents.Find(e => e.EventId == second.EventId).SingleAsync(cancellationToken);
-		Assert.Empty(unsent.Dispatches);
+		unsent.Dispatches.Should().BeEmpty();
 	}
 
 	private static AuditEvent AuditEventWith(long sequence, Dictionary<string, AuditEventDispatch> dispatches) =>

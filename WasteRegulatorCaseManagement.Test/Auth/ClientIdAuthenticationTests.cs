@@ -994,7 +994,7 @@ public class ClientIdAuthenticationTests
 		var response = await client.GetAsync("/cases", cancellationToken);
 
 		// Assert
-		Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.OK);
 	}
 
 	[Fact]
@@ -1030,7 +1030,7 @@ public class ClientIdAuthenticationTests
 		var response = await client.GetAsync("/cases", cancellationToken);
 
 		// Assert
-		Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 	}
 
 	[Fact]

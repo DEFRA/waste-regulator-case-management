@@ -383,11 +383,11 @@ public class CaseServiceTests : IAsyncDisposable
 		);
 
 		// Assert
-		Assert.True(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var persisted = await _persistence.GetByIdAsync(caseRecord.Id, TestContext.Current.CancellationToken);
-		Assert.Equal("approved", persisted!.StateId);
-		Assert.Contains(persisted.Timeline, entry => entry.PerformedById == "competing-user");
-		Assert.Single(persisted.Timeline, entry => entry.Action == "state-changed");
+		persisted!.StateId.Should().Be("approved");
+		persisted.Timeline.Should().Contain(entry => entry.PerformedById == "competing-user");
+		persisted.Timeline.Should().ContainSingle(entry => entry.Action == "state-changed");
 	}
 
 	[Fact]
@@ -1646,8 +1646,8 @@ public class CaseServiceTests : IAsyncDisposable
 
 		Assert.True(result.IsSuccess, result.Message);
 		var fetched = await GetAsync(result.Case!.Id);
-		var entry = Assert.Single(fetched.Timeline);
-		Assert.Equal("service:test-client", entry.PerformedById);
+		var entry = fetched.Timeline.Should().ContainSingle().Subject;
+		entry.PerformedById.Should().Be("service:test-client");
 	}
 
 

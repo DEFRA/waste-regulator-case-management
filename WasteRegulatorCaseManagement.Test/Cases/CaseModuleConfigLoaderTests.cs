@@ -39,16 +39,10 @@ public sealed class CaseModuleConfigLoaderTests : IAsyncDisposable
 			.GetCollection<CaseModuleConfig>("caseModuleConfig")
 			.Find(c => c.CaseType == "CSoC")
 			.SingleAsync(cancellationToken);
-		Assert.Equal("SUBMITTED", stored.InitialStateId);
-		Assert.Equal(
-			["ACCEPTED", "CANCELLED"],
-			stored.States.Where(s => s.IsTerminal).Select(s => s.Id).ToArray()
-		);
-		Assert.Equal(
-			["accept", "cancel"],
-			stored.Transitions.Select(t => t.ActionId).ToArray()
-		);
-		Assert.Equal("{{decision.reason}}", stored.CallbackMappings["CANCELLED"]["reason"].AsString);
+		stored.InitialStateId.Should().Be("SUBMITTED");
+		stored.States.Where(s => s.IsTerminal).Select(s => s.Id).Should().Equal(["ACCEPTED", "CANCELLED"]);
+		stored.Transitions.Select(t => t.ActionId).Should().Equal(["accept", "cancel"]);
+		stored.CallbackMappings["CANCELLED"]["reason"].AsString.Should().Be("{{decision.reason}}");
 	}
 
 	[Fact]
@@ -64,8 +58,8 @@ public sealed class CaseModuleConfigLoaderTests : IAsyncDisposable
 		await _loader.StartAsync(cancellationToken);
 
 		// Assert
-		Assert.NotNull(_registry.Find("database-only"));
-		Assert.NotNull(_registry.Find("CSoC"));
+		_registry.Find("database-only").Should().NotBeNull();
+		_registry.Find("CSoC").Should().NotBeNull();
 	}
 
 	[Fact]
@@ -82,6 +76,6 @@ public sealed class CaseModuleConfigLoaderTests : IAsyncDisposable
 		await _loader.StartAsync(cancellationToken);
 
 		// Assert
-		Assert.Equal("CSoC", _registry.Find("CSoC")!.DisplayName);
+		_registry.Find("CSoC")!.DisplayName.Should().Be("CSoC");
 	}
 }

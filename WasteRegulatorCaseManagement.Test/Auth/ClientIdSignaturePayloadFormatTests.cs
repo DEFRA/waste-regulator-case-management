@@ -49,7 +49,7 @@ public class ClientIdSignaturePayloadFormatTests
 
 		var actual = ClientIdAuthenticationHandler.ComputeSignature(Secret, payload);
 
-		Assert.Equal(WireFormatReference.ExtendedV3(Secret, payload), actual);
+		actual.Should().Be(WireFormatReference.ExtendedV3(Secret, payload));
 	}
 
 	[Fact]

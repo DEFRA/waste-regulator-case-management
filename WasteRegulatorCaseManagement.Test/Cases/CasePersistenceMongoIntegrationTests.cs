@@ -137,81 +137,60 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
 	}
 
 	[Fact]
-	public async Task DefineIndexes_creates_the_eight_documented_indexes_on_startup()
+	public async Task DefineIndexes_creates_the_documented_indexes_on_startup()
 	{
-		// Constructor of CasePersistence calls EnsureIndexes; we
-		// assert what the driver actually wrote (not what we asked for)
-		// so a future change to the index set is caught here.
+		// Arrange
 		var collection = _clientFactory.GetCollection<Case>("cases");
+
+		// Act
 		var indexes = await (
 			await collection.Indexes.ListAsync(TestContext.Current.CancellationToken)
 		).ToListAsync(TestContext.Current.CancellationToken);
 
-		// Mongo always writes a default _id_ index in addition to ours.
-		var keyDocs = indexes
-			.Where(i => i["name"].AsString != "_id_")
-			.Select(i => i["key"].AsBsonDocument.ToString())
-			.OrderBy(s => s, StringComparer.Ordinal)
-			.ToList();
-
-		Assert.Equal(8, keyDocs.Count);
-		Assert.Contains(
-			keyDocs,
-			k => k.Contains("\"nation\" : 1, \"orgId\" : 1, \"submittedAt\" : -1")
-		);
-		Assert.Contains(
-			keyDocs,
-			k => k.Contains("\"nation\" : 1, \"isTerminal\" : 1, \"submittedAt\" : -1")
-		);
-		Assert.Contains(
-			keyDocs,
-			k => k.Contains("\"nation\" : 1") && k.Contains("\"submittedAt\" : -1")
-		);
-		Assert.Contains(keyDocs, k => k.Contains("\"sourceSystemId\" : 1"));
-		Assert.Contains(
-			keyDocs,
-			k => k.Contains("\"caseType\" : 1") && k.Contains("\"submittedAt\" : -1")
-		);
-		Assert.Contains(
-			keyDocs,
-			k => k.Contains("\"stateId\" : 1") && k.Contains("\"submittedAt\" : -1")
-		);
-		Assert.Contains(
-			keyDocs,
-			k => k.Contains("\"assignedToId\" : 1") && k.Contains("\"submittedAt\" : -1")
-		);
-		Assert.Contains(
-			keyDocs,
-			k =>
-				k.Contains("\"submittedAt\" : -1")
-				&& !k.Contains("caseType")
-				&& !k.Contains("stateId")
-				&& !k.Contains("assignedToId")
-		);
+		// Assert
+		indexes
+			.Where(index => index["name"].AsString != "_id_")
+			.Select(index => index["key"].AsBsonDocument)
+			.Should()
+			.BeEquivalentTo(
+				[
+					new BsonDocument { { "caseType", 1 }, { "submittedAt", -1 } },
+					new BsonDocument { { "stateId", 1 }, { "submittedAt", -1 } },
+					new BsonDocument { { "submittedAt", -1 } },
+					new BsonDocument { { "assignedToId", 1 }, { "submittedAt", -1 } },
+					new BsonDocument { { "nation", 1 }, { "submittedAt", -1 } },
+					new BsonDocument { { "nation", 1 }, { "orgId", 1 }, { "submittedAt", -1 } },
+					new BsonDocument { { "nation", 1 }, { "isTerminal", 1 }, { "submittedAt", -1 } },
+					new BsonDocument { { "sourceSystemId", 1 } },
+				],
+				options => options.ComparingByValue<BsonDocument>()
+			);
+		indexes
+			.Single(index => index["key"].AsBsonDocument == new BsonDocument("sourceSystemId", 1))["unique"]
+			.AsBoolean.Should()
+			.BeTrue();
 	}
 
 	[Fact]
 	public async Task EnsureIndexes_is_idempotent_when_the_indexes_already_match()
 	{
-		// The reconcile must not drop/recreate when nothing changed: running
-		// the persistence ctor twice against the same database is a no-op the
-		// second time (CreateMany succeeds, no conflict path taken).
+		// Arrange
 		var freshDb = MongoIntegrationFixture.NewDatabaseName("cases_idempotent");
 		var factory = new TestMongoDbClientFactory(_fixture.ConnectionString, freshDb);
 		try
 		{
 			_ = new CasePersistence(factory, NullLoggerFactory.Instance, new CaseRegistry([]), new AuditEventService(factory, TimeProvider.System));
-			var ex = Record.Exception(() =>
-				new CasePersistence(factory, NullLoggerFactory.Instance, new CaseRegistry([]), new AuditEventService(factory, TimeProvider.System))
-			);
-			Assert.Null(ex);
 
-			var collection = factory.GetCollection<Case>("cases");
+			// Act
+			var createAgain = () =>
+				new CasePersistence(factory, NullLoggerFactory.Instance, new CaseRegistry([]), new AuditEventService(factory, TimeProvider.System));
+
+			// Assert
+			createAgain.Should().NotThrow();
 			var indexes = await (
-				await collection.Indexes.ListAsync(TestContext.Current.CancellationToken)
+				await factory.GetCollection<Case>("cases").Indexes.ListAsync(TestContext.Current.CancellationToken)
 			).ToListAsync(TestContext.Current.CancellationToken);
-			// Mongo's default _id_ index plus our eight.
-			Assert.Equal(9, indexes.Count);
+			indexes.Should().HaveCount(9, "Mongo's _id_ index plus the service's eight");
 		}
 		finally
 		{
@@ -475,8 +454,8 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
 			.Find(FilterDefinition<AuditEvent>.Empty)
 			.SortBy(e => e.Sequence)
 			.ToListAsync(cancellationToken);
-		Assert.Equal(["insert", "update"], auditEvents.Select(e => e.Operation).ToArray());
-		Assert.Equal([0, 1], auditEvents.Select(e => e.Version).ToArray());
+		auditEvents.Select(e => e.Operation).Should().Equal(["insert", "update"]);
+		auditEvents.Select(e => e.Version).Should().Equal([0, 1]);
 	}
 
 	private static CaseTimelineEntry CreatedEntry(DateTime now) =>
