@@ -39,7 +39,7 @@ public class SwaggerUiEndpointTests
         // Sanity: contains the dropdown-mount marker and one of the stub
         // user ids embedded in the JS bundle, confirming the asset that
         // monkey-patches window.fetch with CDP trust headers is wired up.
-        Assert.Contains("epr-stub-user-picker", body, StringComparison.Ordinal);
+        Assert.Contains("stub-user-picker", body, StringComparison.Ordinal);
         Assert.Contains("stub-caseworker-1", body, StringComparison.Ordinal);
     }
 

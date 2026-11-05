@@ -615,7 +615,7 @@ static void ConfigureEndpoints(WebApplication app)
 
         app.UseSwaggerUI(options =>
         {
-            options.SwaggerEndpoint("/openapi/v1.json", "EPR Management BE v1");
+            options.SwaggerEndpoint("/openapi/v1.json", "Waste Regulator Case Management v1");
             options.RoutePrefix = "swagger";
             // Inject the stub-user picker into the topbar. The script
             // also monkey-patches window.fetch so every Try it out call

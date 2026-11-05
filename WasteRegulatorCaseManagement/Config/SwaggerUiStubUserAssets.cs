@@ -41,7 +41,7 @@ internal static class SwaggerUiStubUserAssets
         (function () {
           'use strict';
 
-          const STORAGE_KEY = 'eprSwaggerStubUser';
+          const STORAGE_KEY = 'caseManagementSwaggerStubUser';
           const STUB_USERS = [
             { id: 'stub-caseworker-1', name: 'Stub Caseworker One' },
             { id: 'stub-caseworker-2', name: 'Stub Caseworker Two' },
@@ -93,17 +93,17 @@ internal static class SwaggerUiStubUserAssets
 
           function buildPicker() {
             const wrapper = document.createElement('div');
-            wrapper.id = 'epr-stub-user-picker';
+            wrapper.id = 'stub-user-picker';
             wrapper.style.cssText =
               'display:flex;align-items:center;gap:8px;margin-left:auto;' +
               'padding:0 16px;color:#fff;font-family:sans-serif;font-size:13px;';
 
             const label = document.createElement('label');
             label.textContent = 'Authenticate as:';
-            label.htmlFor = 'epr-stub-user-select';
+            label.htmlFor = 'stub-user-select';
 
             const select = document.createElement('select');
-            select.id = 'epr-stub-user-select';
+            select.id = 'stub-user-select';
             select.style.cssText =
               'padding:4px 6px;border-radius:4px;border:1px solid #ccc;' +
               'background:#fff;color:#333;min-width:220px;';
@@ -134,7 +134,7 @@ internal static class SwaggerUiStubUserAssets
           }
 
           function attach() {
-            if (document.getElementById('epr-stub-user-picker')) return true;
+            if (document.getElementById('stub-user-picker')) return true;
             const topbar = document.querySelector('.topbar-wrapper');
             if (!topbar) return false;
             topbar.style.display = 'flex';

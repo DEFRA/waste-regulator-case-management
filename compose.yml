@@ -55,7 +55,7 @@ services:
     environment:
       ASPNETCORE_URLS: http://+:8085
       Mongo__DatabaseUri: mongodb://mongodb:27017/
-      Mongo__DatabaseName: epr-register-case-management
+      Mongo__DatabaseName: waste-regulator-case-management
       NOTIFY_API_KEY: ${NOTIFY_API_KEY}
     networks:
       - cdp-tenant
