@@ -40,11 +40,6 @@ public sealed class EphemeralMongoTestFactory : WebApplicationFactory<Program>
             builder.UseEnvironment(_environment);
         }
 
-        // Seeding is irrelevant to the DI/metadata contracts these tests
-        // assert on; disable by default so it can never slow a test down.
-        // Settings applied below (e.g. CaseSeederGatingTests exercising
-        // the flag itself) override this on a per-key basis.
-        builder.UseSetting("Cases:SeedOnStartup", "false");
         foreach (var (key, value) in _settings)
         {
             builder.UseSetting(key, value);

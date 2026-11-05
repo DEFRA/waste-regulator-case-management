@@ -1979,11 +1979,6 @@ public class CaseServiceTests : IAsyncDisposable
         public Task CreateAsync(Case caseRecord, CancellationToken cancellationToken = default) =>
             inner.CreateAsync(caseRecord, cancellationToken);
 
-        public Task<bool> CreateIfAbsentAsync(
-            Case caseRecord,
-            CancellationToken cancellationToken = default
-        ) => inner.CreateIfAbsentAsync(caseRecord, cancellationToken);
-
         public Task<Case?> GetByIdAsync(
             Guid id,
             CancellationToken cancellationToken = default

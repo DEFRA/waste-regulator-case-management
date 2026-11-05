@@ -32,39 +32,6 @@ public static class CaseModuleExtensions
     }
 
     /// <summary>
-    /// Conditionally register the startup seeder,
-    /// <see cref="CaseSeederHostedService"/>. It writes demo records
-    /// that reference stub user identifiers (e.g. <c>stub-standard-1</c>,
-    /// <c>stub-assign-1</c>, <c>stub-portal-client</c>), so it must NEVER run
-    /// outside a developer environment: it needs both
-    /// <see cref="IHostEnvironment.IsDevelopment"/> and
-    /// <c>Cases:SeedOnStartup</c>. If the flag is observed in any other
-    /// environment a one-shot warning hosted service is registered instead, so
-    /// the misconfiguration is visible in startup logs without ever touching
-    /// the database.
-    /// </summary>
-    public static IServiceCollection AddCaseSeeders(
-        this IServiceCollection services,
-        IHostEnvironment environment,
-        IConfiguration configuration)
-    {
-        var seedFlag = configuration.GetValue("Cases:SeedOnStartup", false);
-        var seedDemoData = seedFlag && environment.IsDevelopment();
-
-        if (seedFlag && !seedDemoData)
-        {
-            services.AddHostedService<CaseSeederMisconfigurationWarningHostedService>();
-        }
-
-        if (seedDemoData)
-        {
-            services.AddHostedService<CaseSeederHostedService>();
-        }
-
-        return services;
-    }
-
-    /// <summary>
     /// Register a single case module: its type, its services, and itself
     /// as an <see cref="ICaseModule"/> so its endpoints can be mapped later.
     /// </summary>

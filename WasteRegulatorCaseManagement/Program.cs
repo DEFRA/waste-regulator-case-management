@@ -146,13 +146,6 @@ static void ConfigureCases(WebApplicationBuilder builder)
     // See docs in WasteRegulatorCaseManagement/Cases for the contract a module must implement.
     services.AddCaseFramework();
     services.AddSingleton<ICasePersistence, CasePersistence>();
-
-    // The demo seeder writes records referencing stub user ids, so it is
-    // gated to Development hosts even when Cases:SeedOnStartup=true.
-    // A misconfiguration warning is emitted at startup if the flag is
-    // observed in any other environment. See
-    // CaseModuleExtensions.AddCaseSeeders.
-    services.AddCaseSeeders(builder.Environment, builder.Configuration);
 }
 
 [ExcludeFromCodeCoverage]

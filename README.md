@@ -117,14 +117,6 @@ Tear it down with:
 docker compose down -v
 ```
 
-> **Pulling a branch that changes seed data? Tear the volume down first.**
-> Case seeding is insert-only (`CreateIfAbsentAsync` against a
-> deterministic id), so an existing MongoDB volume keeps whatever it seeded
-> the first time and edits to a seed item's contents never reach it. The
-> resulting e2e failures look like a broken frontend rather than stale
-> fixtures. `docker compose down -v` and start clean. See
-> [`docs/cases.md`](docs/cases.md#seeding) for the full rules.
-
 ## Endpoints
 
 | Method | Path                                         | Description                            |
@@ -204,7 +196,6 @@ Notify-testing walkthrough.
 | `Mongo__DatabaseUri` | No | MongoDB connection string (default `mongodb://127.0.0.1:27017`; IAM auth in deployed environments) |
 | `Mongo__DatabaseName` | No | MongoDB database name (default `waste-regulator-case-management`) |
 | `Cors__AllowedOrigins` | No | CORS allow-list (array). Empty = deny-all |
-| `Cases__SeedOnStartup` | No | Runs registered case seeders on boot. Honoured in Development only |
 | `ENVIRONMENT` | No | Platform environment name (`local`/`dev`/`test`/`perf-test`/`ext-test`/`prod`) |
 
 ### Example local/testing values

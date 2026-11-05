@@ -16,21 +16,6 @@ public interface ICasePersistence
 {
     Task CreateAsync(Case caseRecord, CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// Insert <paramref name="caseRecord"/> only if no document with the
-    /// same <see cref="Case.Id"/> exists. Returns <c>true</c> when
-    /// the document was inserted and <c>false</c> when an item with
-    /// that id already existed (the on-disk document is left
-    /// untouched). The check is atomic — it relies on the unique
-    /// <c>_id</c> index, so two callers racing with the same id
-    /// produce exactly one insert and one <c>false</c> regardless of
-    /// timing (epr-33c).
-    /// </summary>
-    Task<bool> CreateIfAbsentAsync(
-        Case caseRecord,
-        CancellationToken cancellationToken = default
-    );
-
     Task<Case?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -87,28 +72,6 @@ public sealed class CasePersistence
             caseRecord.TypeId,
             caseRecord.SubmittedBy ?? "unknown"
         );
-    }
-
-    public async Task<bool> CreateIfAbsentAsync(
-        Case caseRecord,
-        CancellationToken cancellationToken = default
-    )
-    {
-        ArgumentNullException.ThrowIfNull(caseRecord);
-
-        try
-        {
-            await Collection.InsertOneAsync(caseRecord, cancellationToken: cancellationToken);
-            return true;
-        }
-        catch (MongoWriteException ex)
-            when (ex.WriteError?.Category == ServerErrorCategory.DuplicateKey)
-        {
-            // _id already in the collection — another instance won the
-            // race or the seeder has already run on this database.
-            // Either way the caller treats this as a successful no-op.
-            return false;
-        }
     }
 
     public async Task<Case?> GetByIdAsync(

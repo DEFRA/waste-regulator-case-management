@@ -4,13 +4,12 @@ namespace WasteRegulatorCaseManagement.Cases;
 
 /// <summary>
 /// Discovers every <see cref="ICaseMigration"/> registered with DI and
-/// runs them in sequence at application startup. Mirrors the
-/// <see cref="CaseSeederHostedService"/> fault-tolerance posture: a
-/// failed migration is logged as a warning and startup continues — the
-/// migration will be re-attempted on the next boot.
+/// runs them in sequence at application startup. A failed migration is
+/// logged as a warning and startup continues — the migration will be
+/// re-attempted on the next boot.
 ///
-/// Unlike the seeder, migrations run in all environments (including Production)
-/// because they are needed to keep existing documents consistent with evolving
+/// Migrations run in all environments (including Production) because they
+/// are needed to keep existing documents consistent with evolving
 /// schema expectations.
 /// </summary>
 internal sealed class CaseMigrationHostedService(

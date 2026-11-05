@@ -1784,9 +1784,6 @@ public class CaseEndpointsTests
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
-            // Prevent the seeder from writing seed data into the test DB.
-            builder.UseSetting("Cases:SeedOnStartup", "false");
-
             builder.ConfigureServices(services =>
             {
                 services.RemoveAll<ICasePersistence>();
@@ -1879,11 +1876,6 @@ public class CaseEndpointsTests
 
         public Task CreateAsync(Case caseRecord, CancellationToken cancellationToken = default) =>
             Inner.CreateAsync(caseRecord, cancellationToken);
-
-        public Task<bool> CreateIfAbsentAsync(
-            Case caseRecord,
-            CancellationToken cancellationToken = default
-        ) => Inner.CreateIfAbsentAsync(caseRecord, cancellationToken);
 
         public Task<Case?> GetByIdAsync(
             Guid id,
