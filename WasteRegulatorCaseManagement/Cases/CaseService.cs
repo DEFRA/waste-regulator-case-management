@@ -85,15 +85,6 @@ public interface ICaseService
 		CancellationToken cancellationToken = default
 	);
 
-	/// <summary>
-	/// Compute the currently-available actions for a case. Returns
-	/// <c>null</c> when no case exists with the supplied id.
-	/// </summary>
-	Task<CaseEngineProjection?> ProjectAsync(
-		string caseId,
-		CancellationToken cancellationToken = default
-	);
-
 	/// <summary>Project an already-loaded case. Pure; safe to call without I/O.</summary>
 	CaseEngineProjection Project(Case caseRecord);
 }
@@ -819,15 +810,6 @@ public sealed class CaseService : ICaseService
 		trimmed = t;
 		failure = null;
 		return true;
-	}
-
-	public async Task<CaseEngineProjection?> ProjectAsync(
-		string caseId,
-		CancellationToken cancellationToken = default
-	)
-	{
-		var caseRecord = await _persistence.GetByIdAsync(caseId, cancellationToken);
-		return caseRecord is null ? null : Project(caseRecord);
 	}
 
 	public CaseEngineProjection Project(Case caseRecord)

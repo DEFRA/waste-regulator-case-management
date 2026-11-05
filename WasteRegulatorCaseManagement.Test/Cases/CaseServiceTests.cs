@@ -513,33 +513,6 @@ public class CaseServiceTests : IAsyncDisposable
 	}
 
 	[Fact]
-	public async Task ProjectAsync_returns_null_when_case_missing()
-	{
-		var type = BuildType();
-
-		var projection = await BuildService(type)
-			.ProjectAsync(Ulid.NewUlid().ToString(), TestContext.Current.CancellationToken);
-
-		Assert.Null(projection);
-	}
-
-	[Fact]
-	public async Task ProjectAsync_returns_projection_for_an_existing_case()
-	{
-		var type = BuildType(
-			transitions: [new CaseTransition("approve", "Approve", "submitted", "approved")]
-		);
-		var caseRecord = await SeedAsync();
-
-		var projection = await BuildService(type)
-			.ProjectAsync(caseRecord.Id, TestContext.Current.CancellationToken);
-
-		Assert.NotNull(projection);
-		Assert.Equal(caseRecord.Id, projection!.Case.Id);
-		Assert.Contains("approve", projection.AvailableActions.Select(a => a.ActionId));
-	}
-
-	[Fact]
 	public async Task ApplyAction_fails_when_type_is_unregistered_and_has_no_template_snapshot()
 	{
 		// Distinct from ApplyAction_fails_when_action_unknown (a registered
