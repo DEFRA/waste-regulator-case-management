@@ -45,10 +45,4 @@ public sealed record WorkItemListItemResponse(
     string? AssignedToId = null,
     string? AssignedToName = null,
     DateTime? AssignedAt = null,
-    string? AssignedBy = null,
-    // RA-410: the state this work item returns to when its current waypoint
-    // discharges. Equal to StateId for any item not in a waypoint state.
-    // Mirrors WorkItemResponse.OriginStateId so the single-item and list
-    // shapes agree — see that field for why a client cannot derive it.
-    // Additive + nullable, so the list DTO stays backward-compatible.
-    string? OriginStateId = null);
+    string? AssignedBy = null);

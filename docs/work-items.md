@@ -25,7 +25,6 @@ Defined in `WasteRegulatorCaseManagement/WorkItems/Core/`:
 | `WorkItemTransition` | A named action (`approve`, `reject`, `withdraw`) that moves a work item from one state to another. `CallerInvocable` (default `true`) decides whether the generic action endpoint may select it by id, or whether it is reachable only through a module's own service resolving it server-side. |
 | `IWorkItemType` | Declares a type's `TypeId`, `DisplayName`, `InitialState`, `States`, `GetTasksForState(stateId)` and `Transitions`. Pure & side-effect free. |
 | `IWorkItemModule` | A module's entry point. Exposes the `Type` and contributes `RegisterServices(services)` and `MapEndpoints(endpoints)`. |
-| `IWorkItemOriginStateResolver` | Optional, module-supplied. Lets a type say "this item is in a waypoint and will return to some *other* state" — see [Waypoint origin state](#waypoint-origin-state-ra-410). |
 | `IWorkItemRegistry` | DI-resolvable lookup of every registered type. |
 | `IWorkItemService` | Framework service object that drives state transitions. Resolves the work item, validates the request against the type, persists the change and writes an audit log. |
 | `WorkItem` | The persisted work item envelope: id, type id, state id, submitted-at, last-modified-at, submitted-by (CDP client id), free-form payload. |
@@ -171,45 +170,6 @@ v1 work item was being progressed.
 
 `WorkItemResponse` includes `templateVersion`. Clients use it (together
 with `typeId`) to pick the correct detail template for the work item.
-
-## Waypoint origin state (RA-410)
-
-The engine normally treats a work item's `StateId` as the whole answer to
-*where is this item in its lifecycle?* For most types it is. It comes apart
-for a **waypoint state** — a state an item passes through on its way back to
-somewhere else, where the question a caller actually needs answered is *back
-to where?*
-
-Re-accreditation's `updated` state is the motivating case: an application
-queried mid-review lands there once the operator responds. Which stage it
-returns to is derivable only from the item's own audit history, so no client
-can compute it — and the case management frontend needs it to decide which
-call to action to offer. Offering "Duly make" for an application queried out
-of `submitted` is right; offering it for one queried out of assessment would
-invite a caseworker to send the application backwards.
-
-`IWorkItemOriginStateResolver` is the seam. A module registers one as a
-singleton; the engine consults every registered resolver and takes the first
-that returns a non-null state id, falling back to `workItem.StateId` when they
-all abstain. The result is surfaced as `originStateId` on `WorkItemResponse`
-and on each item of the list response — always populated, and equal to
-`stateId` for any item not in a waypoint.
-
-This is a **read projection only**. It governs nothing about where the item
-actually *is*: available actions, terminality and transition from-state
-matching all keep using `workItem.StateId`. Redirecting those would let a
-caller invoke an action from a state the item is not in.
-
-Rules for implementations:
-
-- **Return null to abstain**, including for every work item whose `TypeId`
-  is not your own. An abstaining resolver is invisible.
-- **Be pure.** This runs on every read projection; no I/O.
-- **Resolve against the supplied template**, not the live type, so an
-  in-flight item is judged by the rules it was submitted under.
-- Core must never learn the module's state names. A resolver that throws,
-  abstains, or names a state the template does not declare is ignored and
-  the engine falls back to `workItem.StateId`.
 
 ## Assignment (RA-95)
 

@@ -644,10 +644,7 @@ public static class WorkItemEndpoints
                 .ToList(),
             w.Payload.TryGetValue("applicationReference", out var reference) && reference.IsString
                 ? reference.AsString
-                : null,
-            // RA-410: falls back to the item's own state so the field is
-            // always populated, even for a projection built without one.
-            projection.OriginStateId ?? w.StateId
+                : null
         );
     }
 
@@ -675,10 +672,7 @@ public static class WorkItemEndpoints
             w.AssignedToId,
             w.AssignedToName,
             w.AssignedAt,
-            w.AssignedBy,
-            // RA-410: falls back to the item's own state so the field is
-            // always populated, even for a projection built without one.
-            projection.OriginStateId ?? w.StateId
+            w.AssignedBy
         );
     }
 }

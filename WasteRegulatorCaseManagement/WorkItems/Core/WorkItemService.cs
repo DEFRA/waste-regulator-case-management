@@ -102,12 +102,7 @@ public interface IWorkItemService
 public sealed record WorkItemEngineProjection(
     WorkItem WorkItem,
     string TemplateVersion,
-    IReadOnlyCollection<WorkItemTransition> AvailableActions,
-    // RA-410: the state this item returns to when its current waypoint
-    // discharges (see IWorkItemOriginStateResolver). Almost always
-    // WorkItem.StateId. Defaults to null so callers constructing a projection
-    // directly are unaffected; Project always populates it.
-    string? OriginStateId = null
+    IReadOnlyCollection<WorkItemTransition> AvailableActions
 );
 
 public sealed class WorkItemService : IWorkItemService
@@ -129,7 +124,6 @@ public sealed class WorkItemService : IWorkItemService
     private readonly IReadOnlyCollection<IWorkItemPostActionHook> _postActionHooks;
     private readonly TimeProvider _timeProvider;
     private readonly IApplicationReferenceGenerator _referenceGenerator;
-    private readonly IReadOnlyCollection<IWorkItemOriginStateResolver> _originStateResolvers;
 
     public WorkItemService(
         IWorkItemRegistry registry,
@@ -137,8 +131,7 @@ public sealed class WorkItemService : IWorkItemService
         ILogger<WorkItemService> logger,
         TimeProvider? timeProvider = null,
         IEnumerable<IWorkItemPostActionHook>? postActionHooks = null,
-        IApplicationReferenceGenerator? referenceGenerator = null,
-        IEnumerable<IWorkItemOriginStateResolver>? originStateResolvers = null
+        IApplicationReferenceGenerator? referenceGenerator = null
     )
     {
         this._registry = registry;
@@ -147,8 +140,6 @@ public sealed class WorkItemService : IWorkItemService
         _postActionHooks = postActionHooks?.ToArray() ?? Array.Empty<IWorkItemPostActionHook>();
         _timeProvider = timeProvider ?? TimeProvider.System;
         _referenceGenerator = referenceGenerator ?? new ApplicationReferenceGenerator();
-        _originStateResolvers =
-            originStateResolvers?.ToArray() ?? Array.Empty<IWorkItemOriginStateResolver>();
     }
 
     public async Task<WorkItemActionResult> SubmitAsync(
@@ -896,21 +887,12 @@ public sealed class WorkItemService : IWorkItemService
             return new WorkItemEngineProjection(
                 workItem,
                 ResolveTemplateVersion(workItem),
-                Array.Empty<WorkItemTransition>(),
-                // No template means no resolver could have been consulted, so
-                // the item is reported as its own origin.
-                workItem.StateId
+                Array.Empty<WorkItemTransition>()
             );
         }
 
         var isTerminal = TerminalStates.Find(template, workItem.StateId) is not null;
 
-        // Available actions are matched on the item's ACTUAL state, never its
-        // origin state. Where an item can move next is a different question
-        // from where it came in from: an item in 'updated' reports the
-        // originating state via OriginStateId but only ever offers the
-        // transitions that genuinely leave 'updated'. Matching on the origin
-        // would let a caller invoke an action from a state the item is not in.
         IReadOnlyCollection<WorkItemTransition> available = isTerminal
             ? Array.Empty<WorkItemTransition>()
             : template
@@ -939,8 +921,7 @@ public sealed class WorkItemService : IWorkItemService
         return new WorkItemEngineProjection(
             workItem,
             template.TemplateVersion,
-            available,
-            ResolveOriginStateId(workItem, template)
+            available
         );
     }
 
@@ -1075,83 +1056,6 @@ public sealed class WorkItemService : IWorkItemService
         ?? workItem.TemplateSnapshot?.TemplateVersion
         ?? _registry.Find(workItem.TypeId)?.TemplateVersion
         ?? "unknown";
-
-    /// <summary>
-    /// RA-410: the state <paramref name="workItem"/> returns to when its
-    /// current waypoint discharges. Normally the state the item is in, but a
-    /// module may name a different one via an
-    /// <see cref="IWorkItemOriginStateResolver"/> — see that interface for
-    /// why. The first resolver with an opinion wins; a resolver that returns
-    /// null (or names a state the template does not declare) is ignored, so an
-    /// abstaining or stale resolver degrades to reporting the item's own
-    /// state rather than reporting a state it was never in.
-    ///
-    /// This is a read projection only. Nothing about where the item actually
-    /// *is* — which actions are available, terminality, the transition
-    /// from-state guard — is resolved through here.
-    /// </summary>
-    private string ResolveOriginStateId(WorkItem workItem, IWorkItemTemplate template)
-    {
-        foreach (var resolver in _originStateResolvers)
-        {
-            // Scope by type before consulting. Without this every resolver
-            // would see every item, and "first non-null wins" would make the
-            // outcome depend on module registration order — not something any
-            // contract promises.
-            if (
-                !string.Equals(resolver.TypeId, workItem.TypeId, StringComparison.OrdinalIgnoreCase)
-            )
-            {
-                continue;
-            }
-
-            string? resolved;
-            try
-            {
-                resolved = resolver.ResolveOriginStateId(workItem, template);
-            }
-            catch (Exception ex)
-            {
-                // A resolver is consulted on every read, so a buggy one must
-                // not take the worklist down with it. Fall back to the item's
-                // real state, which is what the engine did before RA-372.
-                _logger.LogError(
-                    ex,
-                    "Origin state resolver {ResolverType} failed for work item {WorkItemId}; "
-                        + "falling back to its actual state {StateId}",
-                    resolver.GetType().FullName,
-                    workItem.Id,
-                    workItem.StateId
-                );
-                continue;
-            }
-
-            if (string.IsNullOrWhiteSpace(resolved))
-            {
-                continue;
-            }
-
-            if (
-                !template.States.Any(s =>
-                    string.Equals(s.Id, resolved, StringComparison.OrdinalIgnoreCase)
-                )
-            )
-            {
-                _logger.LogWarning(
-                    "Origin state resolver {ResolverType} returned state '{ResolvedStateId}' for work "
-                        + "item {WorkItemId}, which its template does not declare; ignoring",
-                    resolver.GetType().FullName,
-                    resolved,
-                    workItem.Id
-                );
-                continue;
-            }
-
-            return resolved;
-        }
-
-        return workItem.StateId;
-    }
 
     /// <summary>
     /// Append a single entry to the work item's audit log (RA-97). Called
