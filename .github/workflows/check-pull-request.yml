@@ -29,11 +29,11 @@ jobs:
       - name: Lint (dotnet format)
         run: dotnet format style --verify-no-changes
       - name: Test with coverage
-        run: dotnet test --coverage --coverage-output-format cobertura --results-directory ./coverage
+        run: dotnet test --coverage --coverage-output-format cobertura --coverage-settings ${{ github.workspace }}/WasteRegulatorCaseManagement.Test/coverage.settings.xml --results-directory ./coverage
 
-      # Baseline as measured on 2026-08-19 (RA-437 branch-coverage follow-up,
-      # second pass): 93.89% line / 88.24% branch. Fails the job on
-      # regression; raise as coverage improves.
+      # Baseline as measured on 2026-11-05, excluding generated sources:
+      # 92.93% line / 87.33% branch. Fails the job on regression; raise as
+      # coverage improves.
       - name: Enforce coverage threshold and report on PR
         if: always()
         run: |
