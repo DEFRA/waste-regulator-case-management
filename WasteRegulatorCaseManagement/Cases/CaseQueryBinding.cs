@@ -9,7 +9,7 @@ namespace WasteRegulatorCaseManagement.Cases;
 /// </summary>
 internal static class CaseQueryBinding
 {
-    internal const string TypeIdParam = "typeId";
+    internal const string CaseTypeParam = "caseType";
     internal const string StateIdParam = "stateId";
     internal const string SearchParam = "search";
     internal const string AssigneeIdParam = "assigneeId";
@@ -28,7 +28,7 @@ internal static class CaseQueryBinding
         ArgumentNullException.ThrowIfNull(query);
 
         return new CaseQuery(
-            TypeIds: ReadStrings(query, TypeIdParam),
+            CaseTypes: ReadStrings(query, CaseTypeParam),
             StateIds: ReadStrings(query, StateIdParam),
             Search: ReadString(query, SearchParam),
             AssigneeId: ReadString(query, AssigneeIdParam),

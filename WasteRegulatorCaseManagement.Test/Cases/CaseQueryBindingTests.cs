@@ -40,15 +40,15 @@ public class CaseQueryBindingTests
     {
         var query = CaseQueryBinding.FromQueryString(Q(
             ("submittedBy", "other-tenant-id"),
-            ("typeId", "re-accreditation"),
+            ("caseType", "re-accreditation"),
             ("page", "2"),
             ("pageSize", "10")));
 
         Assert.Equal("other-tenant-id", query.SubmittedBy);
         Assert.Equal(2, query.Page);
         Assert.Equal(10, query.PageSize);
-        Assert.NotNull(query.TypeIds);
-        Assert.Contains("re-accreditation", query.TypeIds!);
+        Assert.NotNull(query.CaseTypes);
+        Assert.Contains("re-accreditation", query.CaseTypes!);
     }
 
     [Fact]

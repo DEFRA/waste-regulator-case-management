@@ -47,7 +47,7 @@ public class CaseTimelineAppenderTests
             CallbackUrl = "https://source-system.test/callback",
             Nation = "ENGLAND",
             OrgId = "test-org",
-            TypeId = "test-type",
+            CaseType = "test-type",
             StateId = "submitted",
         };
         await _persistence.CreateAsync(caseRecord, ct);
@@ -130,7 +130,7 @@ public class CaseTimelineAppenderTests
             Nation = "ENGLAND",
             OrgId = "test-org",
             Id = caseId,
-            TypeId = "test-type",
+            CaseType = "test-type",
             StateId = "submitted",
         };
 

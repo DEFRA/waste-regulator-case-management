@@ -32,7 +32,7 @@ public class CaseEndpointsTests
     private static readonly string[] s_expectedCapturedStateIds = ["submitted"];
     private static readonly string[] s_expectedCapturedTypeIds = ["re-accreditation", "other-type"];
 
-    private const string TypeId = "test-type";
+    private const string CaseType = "test-type";
     private readonly MongoIntegrationFixture _fixture;
 
     public CaseEndpointsTests(MongoIntegrationFixture fixture) => _fixture = fixture;
@@ -55,7 +55,7 @@ public class CaseEndpointsTests
             "/cases",
             new
             {
-                typeId = TypeId,
+                caseType = CaseType,
                 sourceSystemId = Ulid.NewUlid().ToString(),
                 callbackUrl = "https://source-system.test/callback",
                 nation = "ENGLAND",
@@ -76,7 +76,7 @@ public class CaseEndpointsTests
 
         var response = await client.PostAsJsonAsync(
             "/cases",
-            new { typeId = string.Empty },
+            new { caseType = string.Empty },
             cancellationToken
         );
 
@@ -94,7 +94,7 @@ public class CaseEndpointsTests
 
         var response = await client.PostAsJsonAsync(
             "/cases",
-            new { typeId = 42 },
+            new { caseType = 42 },
             cancellationToken
         );
 
@@ -112,7 +112,7 @@ public class CaseEndpointsTests
 
         var response = await client.PostAsJsonAsync(
             "/cases",
-            new { typeId = "unknown-type" },
+            new { caseType = "unknown-type" },
             cancellationToken
         );
 
@@ -132,7 +132,7 @@ public class CaseEndpointsTests
             "/cases",
             new
             {
-                typeId = TypeId,
+                caseType = CaseType,
                 sourceSystemId = "csoc-2024-eng-00123",
                 callbackUrl = "https://source-system.test/declarations/00123",
                 nation = "ENGLAND",
@@ -153,7 +153,7 @@ public class CaseEndpointsTests
 
         var persisted = await factory.Persistence.GetByIdAsync(body!.Id, cancellationToken);
         Assert.NotNull(persisted);
-        Assert.Equal(TypeId, persisted!.TypeId);
+        Assert.Equal(CaseType, persisted!.CaseType);
         Assert.Equal("submitted", persisted.StateId);
         Assert.Equal("test-client", persisted.SubmittedBy);
         Assert.Equal("csoc-2024-eng-00123", persisted.SourceSystemId);
@@ -174,7 +174,7 @@ public class CaseEndpointsTests
         Assert.StartsWith("/cases/", response.Headers.Location!.AbsolutePath);
 
         Assert.True(Ulid.TryParse(body.Id, out _), $"'{body.Id}' is not a ULID");
-        Assert.Equal(TypeId, body.TypeId);
+        Assert.Equal(CaseType, body.CaseType);
         Assert.Equal("submitted", body.StateId);
         Assert.False(body.IsTerminal);
         Assert.Equal("test-client", body.SubmittedBy);
@@ -201,7 +201,7 @@ public class CaseEndpointsTests
             "/cases",
             new
             {
-                typeId = TypeId,
+                caseType = CaseType,
                 sourceSystemId = Ulid.NewUlid().ToString(),
                 callbackUrl = "https://source-system.test/callback",
                 nation = "ENGLAND",
@@ -220,7 +220,7 @@ public class CaseEndpointsTests
         Assert.Equal("alice-1", entry.PerformedById);
         Assert.Equal("Alice Example", entry.PerformedByName);
         Assert.Equal(persisted.SubmittedAt, entry.PerformedAt);
-        Assert.Equal(TypeId, entry.Details["typeId"]);
+        Assert.Equal(CaseType, entry.Details["caseType"]);
         Assert.Equal("submitted", entry.Details["stateId"]);
         Assert.Equal("submitted", entry.StateId);
         // Birth event was part of the original CreateAsync (no follow-up
@@ -249,7 +249,7 @@ public class CaseEndpointsTests
             "/cases",
             new
             {
-                typeId = TypeId,
+                caseType = CaseType,
                 sourceSystemId = Ulid.NewUlid().ToString(),
                 callbackUrl = "https://source-system.test/callback",
                 nation = "ENGLAND",
@@ -266,7 +266,7 @@ public class CaseEndpointsTests
     public async Task Post_records_submission_metadata_on_birth_audit_entry()
     {
         // RA-126: birth audit entry must carry source / clientId / userId
-        // alongside the existing typeId / stateId / templateVersion keys so audit consumers can reconstruct the
+        // alongside the existing caseType / stateId / templateVersion keys so audit consumers can reconstruct the
         // submission origin without joining back to request logs.
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var factory = NewFactory(userId: "alice-1", userName: "Alice Example");
@@ -276,7 +276,7 @@ public class CaseEndpointsTests
             "/cases",
             new
             {
-                typeId = TypeId,
+                caseType = CaseType,
                 sourceSystemId = Ulid.NewUlid().ToString(),
                 callbackUrl = "https://source-system.test/callback",
                 nation = "ENGLAND",
@@ -292,7 +292,7 @@ public class CaseEndpointsTests
         Assert.NotNull(persisted);
         var entry = Assert.Single(persisted!.Timeline);
         Assert.Equal("case-created", entry.Action);
-        Assert.Equal(TypeId, entry.Details["typeId"]);
+        Assert.Equal(CaseType, entry.Details["caseType"]);
         Assert.Equal("submitted", entry.Details["stateId"]);
         Assert.Equal("v1", entry.Details["templateVersion"]);
         Assert.Equal("operator-fe", entry.Details["source"]);
@@ -313,7 +313,7 @@ public class CaseEndpointsTests
             "/cases",
             new
             {
-                typeId = TypeId,
+                caseType = CaseType,
                 sourceSystemId = Ulid.NewUlid().ToString(),
                 callbackUrl = "https://source-system.test/callback",
                 nation = "ENGLAND",
@@ -350,7 +350,7 @@ public class CaseEndpointsTests
         // for the field under test.
         var json = $$"""
             {
-                "typeId": "{{TypeId}}",
+                "caseType": "{{CaseType}}",
                 "sourceSystemId": "{{Ulid.NewUlid()}}",
                 "callbackUrl": "https://source-system.test/callback",
                 "nation": "ENGLAND",
@@ -379,7 +379,7 @@ public class CaseEndpointsTests
             "/cases",
             new
             {
-                typeId = TypeId,
+                caseType = CaseType,
                 sourceSystemId = Ulid.NewUlid().ToString(),
                 callbackUrl = "https://source-system.test/callback",
                 nation = "ENGLAND",
@@ -406,7 +406,7 @@ public class CaseEndpointsTests
             "/cases",
             new
             {
-                typeId = TypeId,
+                caseType = CaseType,
                 callbackUrl = "https://source-system.test/callback",
                 nation = "ENGLAND",
                 orgId = "test-org",
@@ -430,7 +430,7 @@ public class CaseEndpointsTests
             "/cases",
             new
             {
-                typeId = TypeId,
+                caseType = CaseType,
                 sourceSystemId = Ulid.NewUlid().ToString(),
                 callbackUrl = "https://source-system.test/callback",
                 nation = "England",
@@ -455,7 +455,7 @@ public class CaseEndpointsTests
             "/cases",
             new
             {
-                typeId = TypeId,
+                caseType = CaseType,
                 sourceSystemId = Ulid.NewUlid().ToString(),
                 callbackUrl = "/declarations/00123",
                 nation = "ENGLAND",
@@ -480,7 +480,7 @@ public class CaseEndpointsTests
             "/cases",
             new
             {
-                typeId = TypeId,
+                caseType = CaseType,
                 sourceSystemId = Ulid.NewUlid().ToString(),
                 callbackUrl = "https://source-system.test/callback",
                 nation = "ENGLAND",
@@ -503,7 +503,7 @@ public class CaseEndpointsTests
         using var client = factory.CreateClient();
         var submission = new
         {
-            typeId = TypeId,
+            caseType = CaseType,
             sourceSystemId = "csoc-2024-eng-00999",
             callbackUrl = "https://source-system.test/callback",
             nation = "ENGLAND",
@@ -537,7 +537,7 @@ public class CaseEndpointsTests
                 Nation = "ENGLAND",
                 OrgId = "test-org",
                 Id = id,
-                TypeId = TypeId,
+                CaseType = CaseType,
                 StateId = "submitted",
                 SubmittedBy = "test-client",
             },
@@ -549,7 +549,7 @@ public class CaseEndpointsTests
 
         var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
         Assert.Equal(id, body?.Id);
-        Assert.Equal(TypeId, body?.TypeId);
+        Assert.Equal(CaseType, body?.CaseType);
     }
 
     [Fact]
@@ -582,7 +582,7 @@ public class CaseEndpointsTests
                 Nation = "ENGLAND",
                 OrgId = "test-org",
                 Id = id,
-                TypeId = TypeId,
+                CaseType = CaseType,
                 StateId = "submitted",
                 SubmittedBy = "other-tenant",
             },
@@ -608,7 +608,7 @@ public class CaseEndpointsTests
                 Nation = "ENGLAND",
                 OrgId = "test-org",
                 Id = Ulid.NewUlid().ToString(),
-                TypeId = TypeId,
+                CaseType = CaseType,
                 StateId = "submitted",
                 SubmittedBy = "test-client",
             },
@@ -622,7 +622,7 @@ public class CaseEndpointsTests
                 Nation = "ENGLAND",
                 OrgId = "test-org",
                 Id = Ulid.NewUlid().ToString(),
-                TypeId = TypeId,
+                CaseType = CaseType,
                 StateId = "submitted",
                 SubmittedBy = "other-tenant",
             },
@@ -660,7 +660,7 @@ public class CaseEndpointsTests
                 Nation = "ENGLAND",
                 OrgId = "test-org",
                 Id = Ulid.NewUlid().ToString(),
-                TypeId = TypeId,
+                CaseType = CaseType,
                 StateId = "submitted",
                 SubmittedBy = "test-client",
             },
@@ -674,7 +674,7 @@ public class CaseEndpointsTests
                 Nation = "ENGLAND",
                 OrgId = "test-org",
                 Id = Ulid.NewUlid().ToString(),
-                TypeId = TypeId,
+                CaseType = CaseType,
                 StateId = "submitted",
                 SubmittedBy = "other-tenant",
             },
@@ -705,7 +705,7 @@ public class CaseEndpointsTests
         // rather than calling GetRawText() on an undefined element (which
         // throws).
         var cancellationToken = TestContext.Current.CancellationToken;
-        var type = new TestCaseType(TypeId, "Test type");
+        var type = new TestCaseType(CaseType, "Test type");
         var registry = new CaseRegistry([type]);
         var engine = Substitute.For<ICaseService>();
         var httpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext
@@ -740,7 +740,7 @@ public class CaseEndpointsTests
         // request succeeds; the assertion is just that it doesn't throw
         // and completes normally, proving the truncation path ran.
         var cancellationToken = TestContext.Current.CancellationToken;
-        var type = new TestCaseType(TypeId, "Test type");
+        var type = new TestCaseType(CaseType, "Test type");
         var registry = new CaseRegistry([type]);
         var engine = Substitute.For<ICaseService>();
         var submittedCase = new Case
@@ -750,7 +750,7 @@ public class CaseEndpointsTests
             Nation = "ENGLAND",
             OrgId = "test-org",
             Id = Ulid.NewUlid().ToString(),
-            TypeId = TypeId,
+            CaseType = CaseType,
             StateId = "submitted",
             SubmittedAt = DateTime.UtcNow,
             LastModifiedAt = DateTime.UtcNow,
@@ -773,7 +773,7 @@ public class CaseEndpointsTests
 
         var largeValue = new string('x', 5000);
         var body = JsonDocument
-            .Parse($"{{\"typeId\":\"{TypeId}\",\"payload\":{{\"note\":\"{largeValue}\"}}}}")
+            .Parse($"{{\"caseType\":\"{CaseType}\",\"payload\":{{\"note\":\"{largeValue}\"}}}}")
             .RootElement;
         var httpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext
         {
@@ -817,7 +817,7 @@ public class CaseEndpointsTests
         // an unexpected engine failure should surface as a 500, not be
         // disguised as a client error.
         var cancellationToken = TestContext.Current.CancellationToken;
-        var type = new TestCaseType(TypeId, "Test type");
+        var type = new TestCaseType(CaseType, "Test type");
         var registry = new CaseRegistry([type]);
         var engine = Substitute.For<ICaseService>();
         engine
@@ -834,7 +834,7 @@ public class CaseEndpointsTests
         var body = JsonDocument.Parse(
             $$"""
             {
-                "typeId": "{{TypeId}}",
+                "caseType": "{{CaseType}}",
                 "sourceSystemId": "{{Ulid.NewUlid()}}",
                 "callbackUrl": "https://source-system.test/callback",
                 "nation": "ENGLAND",
@@ -913,7 +913,7 @@ public class CaseEndpointsTests
         // is MissingActorIdentity, which has its own named switch arm; this
         // exercises the fallback arm that catches anything else.
         var cancellationToken = TestContext.Current.CancellationToken;
-        var type = new TestCaseType(TypeId, "Test type");
+        var type = new TestCaseType(CaseType, "Test type");
         var registry = new CaseRegistry([type]);
         var engine = Substitute.For<ICaseService>();
         engine
@@ -935,7 +935,7 @@ public class CaseEndpointsTests
         var body = JsonDocument.Parse(
             $$"""
             {
-                "typeId": "{{TypeId}}",
+                "caseType": "{{CaseType}}",
                 "sourceSystemId": "{{Ulid.NewUlid()}}",
                 "callbackUrl": "https://source-system.test/callback",
                 "nation": "ENGLAND",
@@ -1000,7 +1000,7 @@ public class CaseEndpointsTests
                 Nation = "ENGLAND",
                 OrgId = "test-org",
                 Id = Ulid.NewUlid().ToString(),
-                TypeId = TypeId,
+                CaseType = CaseType,
                 StateId = "submitted",
                 SubmittedBy = "test-client",
             },
@@ -1014,7 +1014,7 @@ public class CaseEndpointsTests
                 Nation = "ENGLAND",
                 OrgId = "test-org",
                 Id = Ulid.NewUlid().ToString(),
-                TypeId = TypeId,
+                CaseType = CaseType,
                 StateId = "submitted",
                 SubmittedBy = "test-client",
             },
@@ -1050,7 +1050,7 @@ public class CaseEndpointsTests
             Nation = "ENGLAND",
             OrgId = "test-org",
             Id = Ulid.NewUlid().ToString(),
-            TypeId = TypeId,
+            CaseType = CaseType,
             StateId = "submitted",
             SubmittedBy = "test-client",
             AssignedToId = "alice-1",
@@ -1105,15 +1105,15 @@ public class CaseEndpointsTests
         using var client = factory.CreateClient();
 
         var response = await client.GetAsync(
-            "/cases?typeId=re-accreditation&typeId=other-type&stateId=submitted&search=acme&assigneeId=alice-1&unassigned=true&page=2&pageSize=5",
+            "/cases?caseType=re-accreditation&caseType=other-type&stateId=submitted&search=acme&assigneeId=alice-1&unassigned=true&page=2&pageSize=5",
             cancellationToken
         );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var captured = factory.Recording.LastQuery;
         Assert.NotNull(captured);
-        Assert.NotNull(captured!.TypeIds);
-        Assert.Equal(s_expectedCapturedTypeIds, captured.TypeIds);
+        Assert.NotNull(captured!.CaseTypes);
+        Assert.Equal(s_expectedCapturedTypeIds, captured.CaseTypes);
         Assert.Equal(s_expectedCapturedStateIds, captured.StateIds);
         Assert.Equal("acme", captured.Search);
         Assert.Equal("alice-1", captured.AssigneeId);
@@ -1138,7 +1138,7 @@ public class CaseEndpointsTests
                 Nation = "ENGLAND",
                 OrgId = "test-org",
                 Id = id,
-                TypeId = TypeId,
+                CaseType = CaseType,
                 StateId = "submitted",
                 SubmittedBy = "test-client",
             },
@@ -1179,7 +1179,7 @@ public class CaseEndpointsTests
                 Nation = "ENGLAND",
                 OrgId = "test-org",
                 Id = id,
-                TypeId = TypeId,
+                CaseType = CaseType,
                 StateId = "submitted",
                 SubmittedBy = "test-client",
             },
@@ -1211,7 +1211,7 @@ public class CaseEndpointsTests
                 Nation = "ENGLAND",
                 OrgId = "test-org",
                 Id = id,
-                TypeId = TypeId,
+                CaseType = CaseType,
                 StateId = "submitted",
                 SubmittedBy = "test-client",
             },
@@ -1246,7 +1246,7 @@ public class CaseEndpointsTests
                 Nation = "ENGLAND",
                 OrgId = "test-org",
                 Id = id,
-                TypeId = TypeId,
+                CaseType = CaseType,
                 StateId = "submitted",
                 SubmittedBy = "test-client",
             },
@@ -1282,7 +1282,7 @@ public class CaseEndpointsTests
                 Nation = "ENGLAND",
                 OrgId = "test-org",
                 Id = id,
-                TypeId = TypeId,
+                CaseType = CaseType,
                 StateId = "submitted",
                 SubmittedBy = "test-client",
             },
@@ -1330,7 +1330,7 @@ public class CaseEndpointsTests
                 Nation = "ENGLAND",
                 OrgId = "test-org",
                 Id = id,
-                TypeId = TypeId,
+                CaseType = CaseType,
                 StateId = "submitted",
                 SubmittedBy = "test-client",
                 AssignedToId = "alice-1",
@@ -1372,7 +1372,7 @@ public class CaseEndpointsTests
                 Nation = "ENGLAND",
                 OrgId = "test-org",
                 Id = id,
-                TypeId = TypeId,
+                CaseType = CaseType,
                 StateId = "submitted",
                 SubmittedBy = "test-client",
                 AssignedToId = "alice-1",
@@ -1405,7 +1405,7 @@ public class CaseEndpointsTests
                 Nation = "ENGLAND",
                 OrgId = "test-org",
                 Id = id,
-                TypeId = TypeId,
+                CaseType = CaseType,
                 StateId = "submitted",
                 SubmittedBy = "test-client",
                 AssignedToId = "alice-1",
@@ -1445,7 +1445,7 @@ public class CaseEndpointsTests
                 Nation = "ENGLAND",
                 OrgId = "test-org",
                 Id = id,
-                TypeId = TypeId,
+                CaseType = CaseType,
                 StateId = "submitted",
                 SubmittedBy = "test-client",
             },
@@ -1499,7 +1499,7 @@ public class CaseEndpointsTests
                 Nation = "ENGLAND",
                 OrgId = "test-org",
                 Id = id,
-                TypeId = TypeId,
+                CaseType = CaseType,
                 StateId = stateId,
                 SubmittedBy = "test-client",
             },
@@ -1545,7 +1545,7 @@ public class CaseEndpointsTests
                 Nation = "ENGLAND",
                 OrgId = "test-org",
                 Id = id,
-                TypeId = TypeId,
+                CaseType = CaseType,
                 StateId = stateId,
                 SubmittedBy = "test-client",
                 AssignedToId = "alice-1",
@@ -1593,7 +1593,7 @@ public class CaseEndpointsTests
                 Nation = "ENGLAND",
                 OrgId = "test-org",
                 Id = id,
-                TypeId = TypeId,
+                CaseType = CaseType,
                 StateId = "submitted",
                 SubmittedBy = "test-client",
             },
@@ -1634,7 +1634,7 @@ public class CaseEndpointsTests
                 Nation = "ENGLAND",
                 OrgId = "test-org",
                 Id = id,
-                TypeId = TypeId,
+                CaseType = CaseType,
                 StateId = "submitted",
                 SubmittedBy = "test-client",
             },
@@ -1665,7 +1665,7 @@ public class CaseEndpointsTests
                 Nation = "ENGLAND",
                 OrgId = "test-org",
                 Id = id,
-                TypeId = TypeId,
+                CaseType = CaseType,
                 StateId = "submitted",
                 SubmittedBy = "test-client",
             },
@@ -1707,7 +1707,7 @@ public class CaseEndpointsTests
                 Nation = "ENGLAND",
                 OrgId = "test-org",
                 Id = id,
-                TypeId = TypeId,
+                CaseType = CaseType,
                 StateId = "submitted",
                 SubmittedBy = "test-client",
             },
@@ -1773,7 +1773,7 @@ public class CaseEndpointsTests
                 Nation = "ENGLAND",
                 OrgId = "test-org",
                 Id = id,
-                TypeId = TypeId,
+                CaseType = CaseType,
                 StateId = "submitted",
                 SubmittedBy = "test-client",
                 Timeline =
@@ -1848,7 +1848,7 @@ public class CaseEndpointsTests
                 Nation = "ENGLAND",
                 OrgId = "test-org",
                 Id = id,
-                TypeId = TypeId,
+                CaseType = CaseType,
                 StateId = "submitted",
                 SubmittedBy = "test-client",
                 Timeline =
@@ -1944,7 +1944,7 @@ public class CaseEndpointsTests
                 Nation = "ENGLAND",
                 OrgId = "test-org",
                 Id = id,
-                TypeId = TypeId,
+                CaseType = CaseType,
                 StateId = "submitted",
                 SubmittedBy = "other-tenant",
             },
@@ -2046,7 +2046,7 @@ public class CaseEndpointsTests
                 ));
                 services.AddSingleton<ICaseType>(
                     new TestCaseType(
-                        TypeId,
+                        CaseType,
                         "Test type",
                         states: _states
                     )

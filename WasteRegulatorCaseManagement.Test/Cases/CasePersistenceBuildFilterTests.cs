@@ -59,9 +59,9 @@ public class CasePersistenceBuildFilterTests
     [Fact]
     public void TypeIdsRenderAsInClause()
     {
-        var doc = Render(new CaseQuery(TypeIds: s_typeIdsReAccreditationAndRegistration));
+        var doc = Render(new CaseQuery(CaseTypes: s_typeIdsReAccreditationAndRegistration));
 
-        var expected = new BsonDocument("typeId", new BsonDocument("$in",
+        var expected = new BsonDocument("caseType", new BsonDocument("$in",
             new BsonArray { "re-accreditation", "registration" }));
         Assert.Equal(expected, doc);
     }
@@ -194,12 +194,12 @@ public class CasePersistenceBuildFilterTests
     public void MultipleClausesAreCombined()
     {
         var doc = Render(new CaseQuery(
-            TypeIds: s_typeIdsReAccreditation,
+            CaseTypes: s_typeIdsReAccreditation,
             StateIds: s_stateIdsSubmitted,
             AssigneeId: "user-1",
             SubmittedBy: "bob"));
 
-        Assert.Equal("re-accreditation", doc["typeId"]["$in"].AsBsonArray[0].AsString);
+        Assert.Equal("re-accreditation", doc["caseType"]["$in"].AsBsonArray[0].AsString);
         Assert.Equal("submitted", doc["stateId"]["$in"].AsBsonArray[0].AsString);
         Assert.Equal("user-1", doc["assignedToId"].AsString);
         Assert.Equal("bob", doc["submittedBy"].AsString);

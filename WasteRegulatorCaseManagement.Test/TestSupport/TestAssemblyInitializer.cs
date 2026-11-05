@@ -10,7 +10,7 @@ namespace WasteRegulatorCaseManagement.Test.TestSupport;
 /// touches a Case serializer. Without this, any test class that
 /// renders / serialises a Case before a class that uses
 /// <see cref="MongoIntegrationFixture"/> sees PascalCase element
-/// names (e.g. "TypeId" rather than "typeId") because the
+/// names (e.g. "CaseType" rather than "caseType") because the
 /// <see cref="MongoConventions.Register"/> call is otherwise gated on
 /// the integration fixture's static constructor — and xUnit test
 /// ordering across collections is non-deterministic in CI.

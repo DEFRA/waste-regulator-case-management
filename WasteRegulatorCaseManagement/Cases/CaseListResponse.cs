@@ -31,7 +31,7 @@ public sealed record CaseListResponse(
 /// </summary>
 public sealed record CaseListItemResponse(
     string Id,
-    string TypeId,
+    string CaseType,
     string StateId,
     bool IsTerminal,
     DateTime SubmittedAt,

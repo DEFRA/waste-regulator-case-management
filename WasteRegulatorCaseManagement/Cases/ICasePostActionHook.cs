@@ -15,7 +15,7 @@ namespace WasteRegulatorCaseManagement.Cases;
 ///   hook itself (typically via an audit entry written through
 ///   <see cref="ICaseTimelineAppender"/>) so a side-effect failure does
 ///   not unwind the originating mutation that has already persisted.</item>
-///   <item>Only react to cases whose <see cref="Case.TypeId"/>
+///   <item>Only react to cases whose <see cref="Case.CaseType"/>
 ///   matches the module they belong to.</item>
 /// </list>
 /// </summary>

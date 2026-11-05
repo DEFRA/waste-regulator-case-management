@@ -106,7 +106,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
             CallbackUrl = "https://source-system.test/callback",
             Nation = "ENGLAND",
             OrgId = "test-org",
-            TypeId = "re-accreditation",
+            CaseType = "re-accreditation",
             StateId = "submitted",
             SubmittedAt = now,
             LastModifiedAt = now,
@@ -120,7 +120,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
             TestContext.Current.CancellationToken
         );
         Assert.NotNull(fetched);
-        Assert.Equal("re-accreditation", fetched!.TypeId);
+        Assert.Equal("re-accreditation", fetched!.CaseType);
         Assert.Equal("submitted", fetched.StateId);
         Assert.Equal("client-1", fetched.SubmittedBy);
         Assert.Equal("test-org", fetched.OrgId);
@@ -155,7 +155,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
         Assert.Equal(5, keyDocs.Count);
         Assert.Contains(
             keyDocs,
-            k => k.Contains("\"typeId\" : 1") && k.Contains("\"submittedAt\" : -1")
+            k => k.Contains("\"caseType\" : 1") && k.Contains("\"submittedAt\" : -1")
         );
         Assert.Contains(
             keyDocs,
@@ -169,7 +169,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
             keyDocs,
             k =>
                 k.Contains("\"submittedAt\" : -1")
-                && !k.Contains("typeId")
+                && !k.Contains("caseType")
                 && !k.Contains("stateId")
                 && !k.Contains("assignedToId")
         );
@@ -214,7 +214,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
             CallbackUrl = "https://source-system.test/callback",
             Nation = "ENGLAND",
             OrgId = "test-org",
-            TypeId = "re-accreditation",
+            CaseType = "re-accreditation",
             StateId = "submitted",
             SubmittedAt = now,
             LastModifiedAt = now,
@@ -263,7 +263,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
             CallbackUrl = "https://source-system.test/callback",
             Nation = "ENGLAND",
             OrgId = orgId,
-            TypeId = "test",
+            CaseType = "test",
             StateId = stateId,
             SubmittedAt = now.AddMinutes(-submittedMinutesAgo),
             LastModifiedAt = now,
@@ -375,7 +375,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
             CallbackUrl = "https://source-system.test/callback",
             Nation = "ENGLAND",
             OrgId = "Acme",
-            TypeId = "test",
+            CaseType = "test",
             StateId = "submitted",
             SubmittedAt = now,
             LastModifiedAt = now,
@@ -434,7 +434,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
             CallbackUrl = "https://source-system.test/callback",
             Nation = "ENGLAND",
             OrgId = "test-org",
-            TypeId = "re-accreditation",
+            CaseType = "re-accreditation",
             StateId = "submitted",
             SubmittedAt = now,
             LastModifiedAt = now,
@@ -507,7 +507,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
         var legacyDoc = new BsonDocument
         {
             ["_id"] = id.ToString(),
-            ["typeId"] = "re-accreditation",
+            ["caseType"] = "re-accreditation",
             ["stateId"] = "submitted",
             ["submittedAt"] = new BsonDateTime(now),
             ["lastModifiedAt"] = new BsonDateTime(now),

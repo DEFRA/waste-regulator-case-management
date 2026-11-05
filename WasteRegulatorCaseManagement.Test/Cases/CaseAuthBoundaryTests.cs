@@ -23,7 +23,7 @@ namespace WasteRegulatorCaseManagement.Test.Cases;
 /// </summary>
 public class CaseAuthBoundaryTests
 {
-    private const string TypeId = "test-type";
+    private const string CaseType = "test-type";
     private const string TenantClientId = "test-client";
     private readonly MongoIntegrationFixture _fixture;
 
@@ -122,7 +122,7 @@ public class CaseAuthBoundaryTests
         CallbackUrl = "https://source-system.test/callback",
         Nation = "ENGLAND",
         OrgId = "test-org",
-        TypeId = TypeId,
+        CaseType = CaseType,
         StateId = "submitted",
         SubmittedBy = TenantClientId
     };
@@ -156,7 +156,7 @@ public class CaseAuthBoundaryTests
                 services.AddSingleton<IMongoDbClientFactory>(clientFactory);
                 services.AddSingleton<ICasePersistence>(sp =>
                     new CasePersistence(clientFactory, sp.GetRequiredService<ILoggerFactory>(), sp.GetRequiredService<ICaseRegistry>()));
-                services.AddSingleton<ICaseType>(new TestCaseType(TypeId, "Test type"));
+                services.AddSingleton<ICaseType>(new TestCaseType(CaseType, "Test type"));
             });
         }
 

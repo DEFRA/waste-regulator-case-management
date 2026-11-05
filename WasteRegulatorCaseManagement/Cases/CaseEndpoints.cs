@@ -24,7 +24,7 @@ public static class CaseEndpoints
     private const string CallerClientIdField = "caller.client_id";
     private const string ErrorMessageField = "error.message";
     private const string InvalidRequestTitle = "Invalid request";
-    private const string CaseTypeIdField = "case.type_id";
+    private const string CaseTypeField = "case.case_type";
 
     // Request body size caps (epr-rvz). The case endpoints all parse
     // their JSON body manually after .DisableValidation(), so without an
@@ -140,34 +140,34 @@ public static class CaseEndpoints
         }
 
         if (
-            !body.TryGetProperty("typeId", out var typeIdElement)
+            !body.TryGetProperty("caseType", out var typeIdElement)
             || typeIdElement.ValueKind != JsonValueKind.String
             || string.IsNullOrWhiteSpace(typeIdElement.GetString())
         )
         {
             log.Log(
                 LogLevel.Warning,
-                "Case submission rejected: missing or empty typeId",
+                "Case submission rejected: missing or empty caseType",
                 new Dictionary<string, object?> { ["http.request.body"] = loggedBody }
             );
             return BadRequest(
                 InvalidRequestTitle,
-                "'typeId' is required and must be a non-empty string."
+                "'caseType' is required and must be a non-empty string."
             );
         }
 
-        var typeId = typeIdElement.GetString()!;
-        var type = registry.Find(typeId);
+        var caseType = typeIdElement.GetString()!;
+        var type = registry.Find(caseType);
         if (type is null)
         {
             log.Log(
                 LogLevel.Warning,
-                "Case submission rejected: unknown typeId",
-                new Dictionary<string, object?> { [CaseTypeIdField] = typeId }
+                "Case submission rejected: unknown caseType",
+                new Dictionary<string, object?> { [CaseTypeField] = caseType }
             );
             return BadRequest(
                 "Unknown case type",
-                $"No case type is registered with id '{typeId}'."
+                $"No case type is registered with id '{caseType}'."
             );
         }
 
@@ -178,7 +178,7 @@ public static class CaseEndpoints
                 "Case submission rejected: invalid intake fields",
                 new Dictionary<string, object?>
                 {
-                    [CaseTypeIdField] = typeId,
+                    [CaseTypeField] = caseType,
                     [ErrorMessageField] = intakeError,
                 }
             );
@@ -202,7 +202,7 @@ public static class CaseEndpoints
                     "Case submission rejected: 'source' is not a string",
                     new Dictionary<string, object?>
                     {
-                        [CaseTypeIdField] = typeId,
+                        [CaseTypeField] = caseType,
                         [ErrorMessageField] = $"'source' ValueKind was {sourceElement.ValueKind}",
                     }
                 );
@@ -237,7 +237,7 @@ public static class CaseEndpoints
                 "Case submission threw an unhandled exception",
                 new Dictionary<string, object?>
                 {
-                    [CaseTypeIdField] = typeId,
+                    [CaseTypeField] = caseType,
                     [CallerClientIdField] = submittedBy ?? "(unknown)",
                     ["error.type"] = ex.GetType().FullName,
                     [ErrorMessageField] = ex.Message,
@@ -254,7 +254,7 @@ public static class CaseEndpoints
                 "Case submission failed",
                 new Dictionary<string, object?>
                 {
-                    [CaseTypeIdField] = typeId,
+                    [CaseTypeField] = caseType,
                     [CallerClientIdField] = submittedBy ?? "(unknown)",
                     ["error.code"] = result.FailureCode.ToString(),
                     [ErrorMessageField] = result.Message,
@@ -284,7 +284,7 @@ public static class CaseEndpoints
             new Dictionary<string, object?>
             {
                 ["case.id"] = caseRecord.Id,
-                [CaseTypeIdField] = typeId,
+                [CaseTypeField] = caseType,
                 [CallerClientIdField] = submittedBy ?? "(unknown)",
             }
         );
@@ -405,7 +405,7 @@ public static class CaseEndpoints
             return ToHttpResult(
                 CaseActionResult.Failure(
                     CaseActionFailureCode.UnknownAction,
-                    $"Action '{actionId}' is not declared by case type '{caseRecord!.TypeId}'."),
+                    $"Action '{actionId}' is not declared by case type '{caseRecord!.CaseType}'."),
                 engine);
         }
 
@@ -570,7 +570,7 @@ public static class CaseEndpoints
         var w = projection.Case;
         return new CaseResponse(
             w.Id,
-            w.TypeId,
+            w.CaseType,
             w.StateId,
             w.IsTerminal,
             w.SubmittedAt,
@@ -625,7 +625,7 @@ public static class CaseEndpoints
         var w = projection.Case;
         return new CaseListItemResponse(
             w.Id,
-            w.TypeId,
+            w.CaseType,
             w.StateId,
             w.IsTerminal,
             w.SubmittedAt,

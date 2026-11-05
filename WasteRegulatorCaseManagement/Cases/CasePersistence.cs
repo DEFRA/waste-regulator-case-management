@@ -71,7 +71,7 @@ public sealed class CasePersistence
         Logger.LogInformation(
             "Submitted case {CaseId} of type {CaseTypeId} by {SubmittedBy}",
             caseRecord.Id,
-            caseRecord.TypeId,
+            caseRecord.CaseType,
             caseRecord.SubmittedBy ?? "unknown"
         );
     }
@@ -183,9 +183,9 @@ public sealed class CasePersistence
         var builder = Builders<Case>.Filter;
         var clauses = new List<FilterDefinition<Case>>();
 
-        if (query.TypeIds is { Count: > 0 } typeIds)
+        if (query.CaseTypes is { Count: > 0 } caseTypes)
         {
-            clauses.Add(builder.In(w => w.TypeId, typeIds));
+            clauses.Add(builder.In(w => w.CaseType, caseTypes));
         }
 
         if (query.StateIds is { Count: > 0 } stateIds)
@@ -267,7 +267,7 @@ public sealed class CasePersistence
         Logger.LogInformation(
             "Updated case {CaseId} of type {CaseTypeId} now in state {CaseState} (version {Version})",
             caseRecord.Id,
-            caseRecord.TypeId,
+            caseRecord.CaseType,
             caseRecord.StateId,
             caseRecord.Version
         );
@@ -280,7 +280,7 @@ public sealed class CasePersistence
     {
         var typeAndSubmitted = new CreateIndexModel<Case>(
             builder.Combine(
-                builder.Ascending(w => w.TypeId),
+                builder.Ascending(w => w.CaseType),
                 builder.Descending(w => w.SubmittedAt)
             )
         );

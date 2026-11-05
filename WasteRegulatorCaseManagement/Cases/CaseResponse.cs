@@ -12,7 +12,7 @@ namespace WasteRegulatorCaseManagement.Cases;
 /// </summary>
 public sealed record CaseResponse(
     string Id,
-    string TypeId,
+    string CaseType,
     string StateId,
     bool IsTerminal,
     DateTime SubmittedAt,

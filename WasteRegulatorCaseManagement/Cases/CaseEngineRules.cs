@@ -27,5 +27,5 @@ internal static class CaseEngineRules
     internal static ICaseTemplate? ResolveTemplate(
         Case caseRecord,
         ICaseRegistry registry
-    ) => caseRecord.TemplateSnapshot ?? (ICaseTemplate?)registry.Find(caseRecord.TypeId);
+    ) => caseRecord.TemplateSnapshot ?? (ICaseTemplate?)registry.Find(caseRecord.CaseType);
 }

@@ -17,7 +17,7 @@ namespace WasteRegulatorCaseManagement.Test.Cases;
 /// </summary>
 public class CaseServiceTests : IAsyncDisposable
 {
-    private const string TypeId = "test-type";
+    private const string CaseType = "test-type";
     private static readonly DateTime InitialNow = new(2026, 4, 27, 10, 0, 0, DateTimeKind.Utc);
     private static readonly DateTime TickedNow = InitialNow.AddMinutes(5);
 
@@ -75,7 +75,7 @@ public class CaseServiceTests : IAsyncDisposable
             new CaseState("rejected", "Rejected", IsTerminal: true),
         };
         return new TestCaseType(
-            TypeId,
+            CaseType,
             "Test type",
             initialState: states[0],
             states: states,
@@ -95,7 +95,7 @@ public class CaseServiceTests : IAsyncDisposable
             Nation = "ENGLAND",
             OrgId = "test-org",
             Id = Ulid.NewUlid().ToString(),
-            TypeId = TypeId,
+            CaseType = CaseType,
             StateId = stateId,
             SubmittedAt = InitialNow,
             LastModifiedAt = InitialNow,
@@ -316,7 +316,7 @@ public class CaseServiceTests : IAsyncDisposable
         var stateA = new CaseState("state-a", "State A");
         var stateB = new CaseState("state-b", "State B");
         var type = new TestCaseType(
-            TypeId,
+            CaseType,
             "Test type",
             initialState: stateA,
             states: [stateA, stateB],
@@ -350,7 +350,7 @@ public class CaseServiceTests : IAsyncDisposable
         var stateB = new CaseState("state-b", "State B");
         var stateC = new CaseState("state-c", "State C");
         var type = new TestCaseType(
-            TypeId,
+            CaseType,
             "Test type",
             initialState: stateA,
             states: [stateA, stateB, stateC],
@@ -435,7 +435,7 @@ public class CaseServiceTests : IAsyncDisposable
             Nation = "ENGLAND",
             OrgId = "test-org",
             Id = Ulid.NewUlid().ToString(),
-            TypeId = TypeId,
+            CaseType = CaseType,
             StateId = "submitted",
             SubmittedAt = InitialNow,
             LastModifiedAt = InitialNow,
@@ -484,7 +484,7 @@ public class CaseServiceTests : IAsyncDisposable
             Nation = "ENGLAND",
             OrgId = "test-org",
             Id = Ulid.NewUlid().ToString(),
-            TypeId = TypeId,
+            CaseType = CaseType,
             StateId = "submitted",
             SubmittedAt = InitialNow,
             LastModifiedAt = InitialNow,
@@ -518,7 +518,7 @@ public class CaseServiceTests : IAsyncDisposable
             Nation = "ENGLAND",
             OrgId = "test-org",
             Id = Ulid.NewUlid().ToString(),
-            TypeId = TypeId,
+            CaseType = CaseType,
             StateId = "submitted",
             SubmittedAt = InitialNow,
             LastModifiedAt = InitialNow,
@@ -559,7 +559,7 @@ public class CaseServiceTests : IAsyncDisposable
             Nation = "ENGLAND",
             OrgId = "test-org",
             Id = Ulid.NewUlid().ToString(),
-            TypeId = TypeId,
+            CaseType = CaseType,
             StateId = "submitted",
             SubmittedAt = InitialNow,
             LastModifiedAt = InitialNow,
@@ -585,7 +585,7 @@ public class CaseServiceTests : IAsyncDisposable
             Nation = "ENGLAND",
             OrgId = "test-org",
             Id = Ulid.NewUlid().ToString(),
-            TypeId = TypeId,
+            CaseType = CaseType,
             StateId = "approved",
             SubmittedAt = InitialNow,
             LastModifiedAt = InitialNow,
@@ -643,7 +643,7 @@ public class CaseServiceTests : IAsyncDisposable
             Nation = "ENGLAND",
             OrgId = "test-org",
             Id = Ulid.NewUlid().ToString(),
-            TypeId = orphanTypeId,
+            CaseType = orphanTypeId,
             StateId = "submitted",
             SubmittedAt = InitialNow,
             LastModifiedAt = InitialNow,
@@ -1017,7 +1017,7 @@ public class CaseServiceTests : IAsyncDisposable
             new CaseState("approved", "Approved", IsTerminal: true),
             new CaseState("rejected", "Rejected", IsTerminal: true),
         };
-        return new TestCaseType(TypeId, "Test type", initialState: states[0], states: states);
+        return new TestCaseType(CaseType, "Test type", initialState: states[0], states: states);
     }
 
     [Theory]
@@ -1140,7 +1140,7 @@ public class CaseServiceTests : IAsyncDisposable
         // calls "closed" terminal. The live registry no longer declares that
         // state at all, but the in-flight item must still be treated as closed.
         var snapshotType = new TestCaseType(
-            TypeId,
+            CaseType,
             "Test type",
             initialState: new CaseState("submitted", "Submitted"),
             states:
@@ -1204,7 +1204,7 @@ public class CaseServiceTests : IAsyncDisposable
             Nation = "ENGLAND",
             OrgId = "test-org",
             Id = Ulid.NewUlid().ToString(),
-            TypeId = "not-registered",
+            CaseType = "not-registered",
             StateId = "submitted",
             SubmittedAt = InitialNow,
             LastModifiedAt = InitialNow,
@@ -1861,7 +1861,7 @@ public class CaseServiceTests : IAsyncDisposable
         Assert.True(result.IsSuccess);
         Assert.NotNull(result.Case);
         var fetched = await GetAsync(result.Case!.Id);
-        Assert.Equal(TypeId, fetched.TypeId);
+        Assert.Equal(CaseType, fetched.CaseType);
         Assert.Equal("submitted", fetched.StateId);
         Assert.False(fetched.IsTerminal);
         Assert.Equal("test-client", fetched.SubmittedBy);
@@ -1902,7 +1902,7 @@ public class CaseServiceTests : IAsyncDisposable
         Assert.Equal("Alice Example", entry.PerformedByName);
         Assert.Equal(fetched.SubmittedAt, entry.PerformedAt);
         Assert.Equal(TickedNow, entry.PerformedAt);
-        Assert.Equal(TypeId, entry.Details["typeId"]);
+        Assert.Equal(CaseType, entry.Details["caseType"]);
         Assert.Equal("submitted", entry.Details["stateId"]);
         Assert.Equal("v1", entry.Details["templateVersion"]);
         // epr-rr9s: the birth entry snapshots the initial state.
@@ -1928,7 +1928,7 @@ public class CaseServiceTests : IAsyncDisposable
 
         // No document was created: the database is empty for this type.
         var page = await _persistence.QueryAsync(
-            new CaseQuery(TypeIds: [TypeId], Page: 1, PageSize: 10),
+            new CaseQuery(CaseTypes: [CaseType], Page: 1, PageSize: 10),
             TestContext.Current.CancellationToken
         );
         Assert.Empty(page.Items);
@@ -1938,7 +1938,7 @@ public class CaseServiceTests : IAsyncDisposable
     public async Task Submit_records_submission_metadata_on_birth_audit_entry()
     {
         // RA-126: source / clientId / userId are appended to the birth
-        // entry's Details alongside the existing typeId / stateId /
+        // entry's Details alongside the existing caseType / stateId /
         // templateVersion keys. PerformedAt must be the server-side receipt
         // time from the injected TimeProvider, not a client-supplied value.
         var type = BuildType();
@@ -1962,7 +1962,7 @@ public class CaseServiceTests : IAsyncDisposable
         var entry = Assert.Single(fetched.Timeline);
         Assert.Equal("case-created", entry.Action);
         Assert.Equal(TickedNow, entry.PerformedAt);
-        Assert.Equal(TypeId, entry.Details["typeId"]);
+        Assert.Equal(CaseType, entry.Details["caseType"]);
         Assert.Equal("submitted", entry.Details["stateId"]);
         Assert.Equal("v1", entry.Details["templateVersion"]);
         Assert.Equal("operator-fe", entry.Details["source"]);

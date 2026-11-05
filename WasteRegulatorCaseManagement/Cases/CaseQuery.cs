@@ -4,8 +4,8 @@ namespace WasteRegulatorCaseManagement.Cases;
 /// Filter, search and pagination parameters accepted by
 /// <see cref="ICasePersistence.QueryAsync"/>.
 /// </summary>
-/// <param name="TypeIds">
-/// Restrict to items whose <see cref="Case.TypeId"/> is in this set.
+/// <param name="CaseTypes">
+/// Restrict to items whose <see cref="Case.CaseType"/> is in this set.
 /// Empty/null means "any type".
 /// </param>
 /// <param name="StateIds">
@@ -37,7 +37,7 @@ namespace WasteRegulatorCaseManagement.Cases;
 /// whatever scope the request asks for. Empty/null means "any submitter".
 /// </param>
 public sealed record CaseQuery(
-    IReadOnlyCollection<string>? TypeIds = null,
+    IReadOnlyCollection<string>? CaseTypes = null,
     IReadOnlyCollection<string>? StateIds = null,
     string? Search = null,
     string? AssigneeId = null,

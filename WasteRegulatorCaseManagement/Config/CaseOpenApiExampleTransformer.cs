@@ -21,7 +21,7 @@ internal sealed class CaseOpenApiExampleTransformer : IOpenApiDocumentTransforme
         {
             ["SubmitCase"] = JsonNode.Parse("""
                 {
-                    "typeId": "CSoC",
+                    "caseType": "CSoC",
                     "sourceSystemId": "csoc-2024-eng-00123",
                     "callbackUrl": "https://waste-obligations.example/organisations/org-00456/compliance-declarations/00123",
                     "nation": "ENGLAND",

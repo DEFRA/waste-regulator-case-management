@@ -25,7 +25,7 @@ public class CaseModuleExtensionsTests
 
         var registry = provider.GetRequiredService<ICaseRegistry>();
         Assert.Single(registry.Types);
-        Assert.Equal("recording", registry.Find("recording")?.TypeId);
+        Assert.Equal("recording", registry.Find("recording")?.CaseType);
 
         // Module's RegisterServices should have run, registering the marker.
         Assert.NotNull(provider.GetService<RecordingModule.Marker>());
@@ -43,8 +43,8 @@ public class CaseModuleExtensionsTests
 
         var modules = provider.GetServices<ICaseModule>().ToList();
         Assert.Equal(2, modules.Count);
-        Assert.Contains(modules, m => m.Type.TypeId == "recording");
-        Assert.Contains(modules, m => m.Type.TypeId == "endpoint");
+        Assert.Contains(modules, m => m.Type.CaseType == "recording");
+        Assert.Contains(modules, m => m.Type.CaseType == "endpoint");
     }
 
     [Fact]

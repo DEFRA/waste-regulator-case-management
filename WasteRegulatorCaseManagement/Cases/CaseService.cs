@@ -163,7 +163,7 @@ public sealed class CaseService : ICaseService
 
         var caseRecord = new Case
         {
-            TypeId = type.TypeId,
+            CaseType = type.CaseType,
             StateId = type.InitialState.Id,
             IsTerminal = type.InitialState.IsTerminal,
             SubmittedAt = now,
@@ -199,7 +199,7 @@ public sealed class CaseService : ICaseService
             now,
             new()
             {
-                ["typeId"] = type.TypeId,
+                ["caseType"] = type.CaseType,
                 ["stateId"] = caseRecord.StateId,
                 ["templateVersion"] = snapshot.TemplateVersion,
                 [SourceKey] =
@@ -240,9 +240,9 @@ public sealed class CaseService : ICaseService
         {
             _logger.LogError(
                 ex,
-                "MongoDB write failed for case {CaseId} typeId={TypeId} submittedBy={SubmittedBy}: {ExceptionType}",
+                "MongoDB write failed for case {CaseId} caseType={CaseType} submittedBy={SubmittedBy}: {ExceptionType}",
                 caseRecord.Id,
-                type.TypeId,
+                type.CaseType,
                 submittedBy,
                 ex.GetType().Name
             );
@@ -250,9 +250,9 @@ public sealed class CaseService : ICaseService
         }
 
         _logger.LogInformation(
-            "Case {CaseId} ({TypeId}) submitted in state {StateId} by {User}",
+            "Case {CaseId} ({CaseType}) submitted in state {StateId} by {User}",
             caseRecord.Id,
-            caseRecord.TypeId,
+            caseRecord.CaseType,
             caseRecord.StateId,
             DescribeUser(user)
         );
@@ -289,7 +289,7 @@ public sealed class CaseService : ICaseService
         {
             return CaseActionResult.Failure(
                 CaseActionFailureCode.UnknownAction,
-                $"Action '{actionId}' is not declared by case type '{caseRecord!.TypeId}'."
+                $"Action '{actionId}' is not declared by case type '{caseRecord!.CaseType}'."
             );
         }
 
@@ -356,9 +356,9 @@ public sealed class CaseService : ICaseService
             return ConcurrencyConflict(caseRecord.Id);
         }
         _logger.LogInformation(
-            "Case {CaseId} ({TypeId}) transitioned from {FromState} to {ToState} via action {ActionId} by {User}",
+            "Case {CaseId} ({CaseType}) transitioned from {FromState} to {ToState} via action {ActionId} by {User}",
             caseRecord.Id,
-            caseRecord.TypeId,
+            caseRecord.CaseType,
             previousState,
             caseRecord.StateId,
             transition.ActionId,
@@ -462,9 +462,9 @@ public sealed class CaseService : ICaseService
             return ConcurrencyConflict(caseRecord.Id);
         }
         _logger.LogInformation(
-            "Case {CaseId} ({TypeId}) assigned from {PreviousAssignee} to {NewAssignee} by {User}",
+            "Case {CaseId} ({CaseType}) assigned from {PreviousAssignee} to {NewAssignee} by {User}",
             caseRecord.Id,
-            caseRecord.TypeId,
+            caseRecord.CaseType,
             previousAssigneeId ?? "(unassigned)",
             trimmedAssigneeId,
             DescribeUser(user)
@@ -546,9 +546,9 @@ public sealed class CaseService : ICaseService
             return ConcurrencyConflict(caseRecord.Id);
         }
         _logger.LogInformation(
-            "Case {CaseId} ({TypeId}) unassigned (was {PreviousAssignee}) by {User}",
+            "Case {CaseId} ({CaseType}) unassigned (was {PreviousAssignee}) by {User}",
             caseRecord.Id,
-            caseRecord.TypeId,
+            caseRecord.CaseType,
             previousAssigneeId,
             DescribeUser(user)
         );
@@ -624,9 +624,9 @@ public sealed class CaseService : ICaseService
             return ConcurrencyConflict(caseRecord.Id);
         }
         _logger.LogInformation(
-            "Note added to case {CaseId} ({TypeId}) by {User}",
+            "Note added to case {CaseId} ({CaseType}) by {User}",
             caseRecord.Id,
-            caseRecord.TypeId,
+            caseRecord.CaseType,
             DescribeUser(user)
         );
 
@@ -750,7 +750,7 @@ public sealed class CaseService : ICaseService
                 null,
                 CaseActionResult.Failure(
                     CaseActionFailureCode.UnknownAction,
-                    $"Case {caseId} references unregistered type '{caseRecord.TypeId}' and has no stored template snapshot."
+                    $"Case {caseId} references unregistered type '{caseRecord.CaseType}' and has no stored template snapshot."
                 )
             );
         }
@@ -805,11 +805,11 @@ public sealed class CaseService : ICaseService
         if (template is null)
         {
             _logger.LogWarning(
-                "Case {CaseId} refused {Operation}: type {TypeId} is not registered "
+                "Case {CaseId} refused {Operation}: type {CaseType} is not registered "
                     + "and the item has no template snapshot, so terminality cannot be determined",
                 caseRecord.Id,
                 operation,
-                caseRecord.TypeId
+                caseRecord.CaseType
             );
 
             return CaseActionResult.Failure(
@@ -830,9 +830,9 @@ public sealed class CaseService : ICaseService
         }
 
         _logger.LogInformation(
-            "Case {CaseId} ({TypeId}) refused {Operation}: terminal state {StateId}",
+            "Case {CaseId} ({CaseType}) refused {Operation}: terminal state {StateId}",
             caseRecord.Id,
-            caseRecord.TypeId,
+            caseRecord.CaseType,
             operation,
             terminal.Id
         );
@@ -852,7 +852,7 @@ public sealed class CaseService : ICaseService
     private string ResolveTemplateVersion(Case caseRecord) =>
         caseRecord.TemplateVersion
         ?? caseRecord.TemplateSnapshot?.TemplateVersion
-        ?? _registry.Find(caseRecord.TypeId)?.TemplateVersion
+        ?? _registry.Find(caseRecord.CaseType)?.TemplateVersion
         ?? "unknown";
 
     /// <summary>

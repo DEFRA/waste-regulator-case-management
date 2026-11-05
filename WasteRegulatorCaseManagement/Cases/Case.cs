@@ -24,8 +24,8 @@ public sealed class Case
     [BsonId]
     public string Id { get; init; } = Ulid.NewUlid().ToString();
 
-    /// <summary>The <see cref="ICaseType.TypeId"/> this item is an instance of.</summary>
-    public required string TypeId { get; init; }
+    /// <summary>The <see cref="ICaseType.CaseType"/> this item is an instance of.</summary>
+    public required string CaseType { get; init; }
 
     /// <summary>Current <see cref="CaseState.Id"/>. Set to the type's initial state on creation.</summary>
     public required string StateId { get; set; }

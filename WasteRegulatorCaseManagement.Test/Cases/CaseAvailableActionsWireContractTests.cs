@@ -31,7 +31,7 @@ namespace WasteRegulatorCaseManagement.Test.Cases;
 /// </summary>
 public class CaseAvailableActionsWireContractTests
 {
-    private const string TypeId = "wire-contract-type";
+    private const string CaseType = "wire-contract-type";
     private readonly MongoIntegrationFixture _fixture;
 
     public CaseAvailableActionsWireContractTests(MongoIntegrationFixture fixture) =>
@@ -119,7 +119,7 @@ public class CaseAvailableActionsWireContractTests
                 Nation = "ENGLAND",
                 OrgId = "test-org",
                 Id = caseId,
-                TypeId = TypeId,
+                CaseType = CaseType,
                 StateId = "queried",
                 SubmittedBy = "test-client",
             },
@@ -156,7 +156,7 @@ public class CaseAvailableActionsWireContractTests
                 // non-invocable transitions sharing a FromStateId and
                 // a DisplayName, alongside one genuine caller-invocable action.
                 services.AddSingleton<ICaseType>(new TestCaseType(
-                    TypeId,
+                    CaseType,
                     "Wire contract type",
                     states:
                     [

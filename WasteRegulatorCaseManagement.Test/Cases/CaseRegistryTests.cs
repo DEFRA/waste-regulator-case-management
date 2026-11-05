@@ -63,6 +63,6 @@ public class CaseRegistryTests
 
         var ex = Assert.Throws<DuplicateCaseTypeException>(
             () => new CaseRegistry([first, second]));
-        Assert.Equal("alpha", ex.TypeId);
+        Assert.Equal("alpha", ex.CaseType);
     }
 }

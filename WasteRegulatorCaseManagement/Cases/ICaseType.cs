@@ -10,7 +10,7 @@ namespace WasteRegulatorCaseManagement.Cases;
 public interface ICaseType : ICaseTemplate
 {
     /// <summary>Stable, machine-readable identifier (e.g. "CSoC").</summary>
-    string TypeId { get; }
+    string CaseType { get; }
 
     /// <summary>Human-readable name shown in UIs and timelines.</summary>
     string DisplayName { get; }

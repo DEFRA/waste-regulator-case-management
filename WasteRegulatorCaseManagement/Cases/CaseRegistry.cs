@@ -8,7 +8,7 @@ public interface ICaseRegistry
 {
     IReadOnlyCollection<ICaseType> Types { get; }
 
-    ICaseType? Find(string typeId);
+    ICaseType? Find(string caseType);
 }
 
 public sealed class CaseRegistry : ICaseRegistry
@@ -20,28 +20,28 @@ public sealed class CaseRegistry : ICaseRegistry
         _types = new Dictionary<string, ICaseType>(StringComparer.OrdinalIgnoreCase);
         foreach (var type in types)
         {
-            if (string.IsNullOrWhiteSpace(type.TypeId))
+            if (string.IsNullOrWhiteSpace(type.CaseType))
             {
-                throw new InvalidCaseTypeException("Case type id cannot be empty.");
+                throw new InvalidCaseTypeException("Case case type cannot be empty.");
             }
 
-            if (!_types.TryAdd(type.TypeId, type))
+            if (!_types.TryAdd(type.CaseType, type))
             {
-                throw new DuplicateCaseTypeException(type.TypeId);
+                throw new DuplicateCaseTypeException(type.CaseType);
             }
         }
     }
 
     public IReadOnlyCollection<ICaseType> Types => _types.Values.ToList().AsReadOnly();
 
-    public ICaseType? Find(string typeId) =>
-        typeId is not null && _types.TryGetValue(typeId, out var type) ? type : null;
+    public ICaseType? Find(string caseType) =>
+        caseType is not null && _types.TryGetValue(caseType, out var type) ? type : null;
 }
 
-public sealed class DuplicateCaseTypeException(string typeId)
-    : Exception($"A case type with id '{typeId}' is already registered.")
+public sealed class DuplicateCaseTypeException(string caseType)
+    : Exception($"A case type with id '{caseType}' is already registered.")
 {
-    public string TypeId { get; } = typeId;
+    public string CaseType { get; } = caseType;
 }
 
 public sealed class InvalidCaseTypeException(string message) : Exception(message);

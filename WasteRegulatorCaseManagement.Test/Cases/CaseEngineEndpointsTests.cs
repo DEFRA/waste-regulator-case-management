@@ -21,7 +21,7 @@ namespace WasteRegulatorCaseManagement.Test.Cases;
 /// </summary>
 public class CaseEngineEndpointsTests
 {
-    private const string TypeId = "test-type";
+    private const string CaseType = "test-type";
     private readonly MongoIntegrationFixture _fixture;
 
     public CaseEngineEndpointsTests(MongoIntegrationFixture fixture) => _fixture = fixture;
@@ -45,7 +45,7 @@ public class CaseEngineEndpointsTests
             Nation = "ENGLAND",
             OrgId = "test-org",
             Id = caseId,
-            TypeId = TypeId,
+            CaseType = CaseType,
             StateId = "submitted",
             SubmittedBy = "test-client"
         }, cancellationToken);
@@ -73,7 +73,7 @@ public class CaseEngineEndpointsTests
             Nation = "ENGLAND",
             OrgId = "test-org",
             Id = caseId,
-            TypeId = TypeId,
+            CaseType = CaseType,
             StateId = "submitted",
             SubmittedBy = "test-client"
         }, cancellationToken);
@@ -115,7 +115,7 @@ public class CaseEngineEndpointsTests
             Nation = "ENGLAND",
             OrgId = "test-org",
             Id = caseId,
-            TypeId = TypeId,
+            CaseType = CaseType,
             StateId = "submitted",
             SubmittedBy = "test-client"
         }, cancellationToken);
@@ -138,7 +138,7 @@ public class CaseEngineEndpointsTests
         using var client = factory.CreateClient();
 
         var snapshotType = new TestCaseType(
-            TypeId,
+            CaseType,
             "Test type",
             states:
             [
@@ -157,7 +157,7 @@ public class CaseEngineEndpointsTests
             Nation = "ENGLAND",
             OrgId = "test-org",
             Id = caseId,
-            TypeId = TypeId,
+            CaseType = CaseType,
             StateId = "submitted",
             SubmittedBy = "test-client",
             TemplateSnapshot = CaseTemplateSnapshot.Capture(snapshotType),
@@ -190,7 +190,7 @@ public class CaseEngineEndpointsTests
             Nation = "ENGLAND",
             OrgId = "test-org",
             Id = caseId,
-            TypeId = TypeId,
+            CaseType = CaseType,
             StateId = "submitted",
             SubmittedBy = "test-client"
         }, cancellationToken);
@@ -229,7 +229,7 @@ public class CaseEngineEndpointsTests
                     new CasePersistence(clientFactory, sp.GetRequiredService<ILoggerFactory>(), sp.GetRequiredService<ICaseRegistry>()));
 
                 services.AddSingleton<ICaseType>(new TestCaseType(
-                    TypeId,
+                    CaseType,
                     "Test type",
                     states:
                     [

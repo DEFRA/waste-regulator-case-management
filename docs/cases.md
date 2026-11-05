@@ -23,11 +23,11 @@ Defined in `WasteRegulatorCaseManagement/Cases/`:
 | `CaseState` | Identifier + display name for a state. `IsTerminal` marks completion states (e.g. approved/rejected). |
 | `CaseTask` | Identifier + display name for a unit of work to be completed in a state. |
 | `CaseTransition` | A named action (`approve`, `reject`, `withdraw`) that moves a case from one state to another. `CallerInvocable` (default `true`) decides whether the generic action endpoint may select it by id, or whether it is reachable only through a module's own service resolving it server-side. |
-| `ICaseType` | Declares a type's `TypeId`, `DisplayName`, `InitialState`, `States`, `GetTasksForState(stateId)` and `Transitions`. Pure & side-effect free. |
+| `ICaseType` | Declares a type's `CaseType`, `DisplayName`, `InitialState`, `States`, `GetTasksForState(stateId)` and `Transitions`. Pure & side-effect free. |
 | `ICaseModule` | A module's entry point. Exposes the `Type` and contributes `RegisterServices(services)` and `MapEndpoints(endpoints)`. |
 | `ICaseRegistry` | DI-resolvable lookup of every registered type. |
 | `ICaseService` | Framework service object that drives state transitions. Resolves the case, validates the request against the type, persists the change and writes an timeline. |
-| `Case` | The persisted case: id, type id, state id, terminal flag, submitted-at, last-modified-at, submitted-by (CDP client id), the intake fields (source system id, callback URL, nation, org id, producer type, display data) and the timeline. |
+| `Case` | The persisted case: id, case type, state id, terminal flag, submitted-at, last-modified-at, submitted-by (CDP client id), the intake fields (source system id, callback URL, nation, org id, producer type, display data) and the timeline. |
 | `ICasePersistence` | Framework-owned MongoDB persistence for `Case`s. |
 | `CaseModuleExtensions` | `AddCaseFramework()`, `AddCaseModule<T>()`, `MapCaseModules()`, `MapCaseFrameworkEndpoints()`. |
 
@@ -44,9 +44,9 @@ are mounted by `MapCaseFrameworkEndpoints()`:
 
 | Method | Route | Description |
 | --- | --- | --- |
-| `POST` | `/cases` | Submit a new case. Body: `{ "typeId", "sourceSystemId", "callbackUrl", "nation", "orgId", "producerType"?, "displayData"? }` — see below. The `typeId` must be registered with the framework; the server stamps the case with the type's `InitialState`, the caller's CDP client id and a server-side timestamp. Returns `201 Created` with `Location: /cases/{id}`; a `sourceSystemId` that already has a case returns that case with `200 OK` and `X-Idempotent-Replay: true`. |
+| `POST` | `/cases` | Submit a new case. Body: `{ "caseType", "sourceSystemId", "callbackUrl", "nation", "orgId", "producerType"?, "displayData"? }` — see below. The `caseType` must be registered with the framework; the server stamps the case with the type's `InitialState`, the caller's CDP client id and a server-side timestamp. Returns `201 Created` with `Location: /cases/{id}`; a `sourceSystemId` that already has a case returns that case with `200 OK` and `X-Idempotent-Replay: true`. |
 | `GET` | `/cases/{id}` | Fetch a single case by id, projected with the actions the engine will currently allow. |
-| `GET` | `/cases` | List persisted cases (with the same projection), newest first, with filter / search / pagination per RA-93. Query string parameters: `typeId` (repeatable), `stateId` (repeatable), `search` (free-text — matched on id and submitter), `page` (1-based, default 1), `pageSize` (default 20, capped at 100). Returns a paged envelope: `{ items, totalCount, page, pageSize }`. |
+| `GET` | `/cases` | List persisted cases (with the same projection), newest first, with filter / search / pagination per RA-93. Query string parameters: `caseType` (repeatable), `stateId` (repeatable), `search` (free-text — matched on id and submitter), `page` (1-based, default 1), `pageSize` (default 20, capped at 100). Returns a paged envelope: `{ items, totalCount, page, pageSize }`. |
 | `POST` | `/cases/{id}/actions/{actionId}` | Invoke a named action declared by the type's transitions. `409` if the case is in a terminal state; `400` for unknown actions, transitions whose from-state does not match, and transitions declared `CallerInvocable: false`. |
 
 All three endpoints require authentication via the CDP client id
@@ -179,7 +179,7 @@ v1 case was being progressed.
 ### Wire format
 
 `CaseResponse` includes `templateVersion`. Clients use it (together
-with `typeId`) to pick the correct detail template for the case.
+with `caseType`) to pick the correct detail template for the case.
 
 ## Assignment (RA-95)
 
@@ -304,7 +304,7 @@ the case document. An entry carries:
 | `Id` | Server-generated ULID. |
 | `Action` | Stable machine id of the action: `case-created`, `state-changed`, `assigned`, `unassigned`, `note-added`. Modules append their own alongside these (e.g. `notification-sent`). |
 | `ActionDisplayName` | Human-readable description (e.g. `Note added`). |
-| `Details` | `Dictionary<string, string?>` of contextual fields per action: `typeId`/`stateId`/`templateVersion` (submission); `actionId`/`actionDisplayName`/`fromStateId`/`toStateId`; `assigneeId`/`assigneeName`/`previousAssigneeId`/`previousAssigneeName` (unassigned); `text` (note). |
+| `Details` | `Dictionary<string, string?>` of contextual fields per action: `caseType`/`stateId`/`templateVersion` (submission); `actionId`/`actionDisplayName`/`fromStateId`/`toStateId`; `assigneeId`/`assigneeName`/`previousAssigneeId`/`previousAssigneeName` (unassigned); `text` (note). |
 | `PerformedAt` | UTC timestamp from the injected `TimeProvider`. |
 | `PerformedById` | Snapshot of the actor's user id (`user:id` claim, required — mutations without it are rejected with 401). |
 | `PerformedByName` | Snapshot of the actor's display name (`user:name`) at write time. |

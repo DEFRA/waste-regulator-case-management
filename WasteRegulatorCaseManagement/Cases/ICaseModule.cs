@@ -25,7 +25,7 @@ public interface ICaseModule
 
     /// <summary>
     /// Map the module's HTTP endpoints. Called after the framework has built its
-    /// own routes. Modules should mount under a path that includes their TypeId
+    /// own routes. Modules should mount under a path that includes their CaseType
     /// to stay isolated, e.g. <c>/cases/&lt;type-id&gt;/...</c>.
     /// </summary>
     void MapEndpoints(IEndpointRouteBuilder endpoints);

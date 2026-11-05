@@ -120,7 +120,7 @@ public sealed class MongoIndexReconcilerTests
                 CallbackUrl = "https://source-system.test/callback",
                 Nation = "ENGLAND",
                 OrgId = "test-org",
-                TypeId = "test-type",
+                CaseType = "test-type",
                 StateId = "state-1",
             },
             new Case
@@ -129,7 +129,7 @@ public sealed class MongoIndexReconcilerTests
                 CallbackUrl = "https://source-system.test/callback",
                 Nation = "ENGLAND",
                 OrgId = "test-org",
-                TypeId = "test-type",
+                CaseType = "test-type",
                 StateId = "state-1",
             },
         };

@@ -24,7 +24,7 @@ namespace WasteRegulatorCaseManagement.Test.Cases;
 public class CaseServiceTimestampTests
     : IAsyncDisposable
 {
-    private const string TypeId = "test-type";
+    private const string CaseType = "test-type";
     private static readonly DateTimeOffset T = new(2026, 4, 27, 10, 0, 0, TimeSpan.Zero);
 
     private readonly TestMongoDbClientFactory _clientFactory;
@@ -51,7 +51,7 @@ public class CaseServiceTimestampTests
 
     private static TestCaseType BuildType() =>
         new(
-            TypeId,
+            CaseType,
             "Test type",
             initialState: new CaseState("submitted", "Submitted"),
             states: [new CaseState("submitted", "Submitted")]);
@@ -113,7 +113,7 @@ public class CaseServiceTimestampTests
             Nation = "ENGLAND",
             OrgId = "test-org",
             Id = Ulid.NewUlid().ToString(),
-            TypeId = TypeId,
+            CaseType = CaseType,
             StateId = "submitted",
             SubmittedAt = T.UtcDateTime,
             LastModifiedAt = T.UtcDateTime,
@@ -144,7 +144,7 @@ public class CaseServiceTimestampTests
             CallbackUrl = "https://source-system.test/callback",
             Nation = "ENGLAND",
             OrgId = "test-org",
-            TypeId = TypeId,
+            CaseType = CaseType,
             StateId = "submitted",
         };
         Assert.Equal(default, caseRecord.SubmittedAt);

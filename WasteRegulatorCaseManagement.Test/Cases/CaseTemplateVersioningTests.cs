@@ -14,7 +14,7 @@ namespace WasteRegulatorCaseManagement.Test.Cases;
 /// </summary>
 public class CaseTemplateVersioningTests
 {
-    private const string TypeId = "test-type";
+    private const string CaseType = "test-type";
     private static readonly DateTime Now = new(2026, 4, 27, 10, 0, 0, DateTimeKind.Utc);
 
     private readonly ICasePersistence _persistence = Substitute.For<ICasePersistence>();
@@ -66,7 +66,7 @@ public class CaseTemplateVersioningTests
             CallbackUrl = "https://source-system.test/callback",
             Nation = "ENGLAND",
             OrgId = "test-org",
-            TypeId = TypeId,
+            CaseType = CaseType,
             StateId = "submitted",
             SubmittedAt = Now,
             LastModifiedAt = Now,
@@ -104,7 +104,7 @@ public class CaseTemplateVersioningTests
             Nation = "ENGLAND",
             OrgId = "test-org",
             Id = Ulid.NewUlid().ToString(),
-            TypeId = TypeId,
+            CaseType = CaseType,
             StateId = "submitted",
             SubmittedAt = Now,
             LastModifiedAt = Now,
@@ -134,7 +134,7 @@ public class CaseTemplateVersioningTests
             CallbackUrl = "https://source-system.test/callback",
             Nation = "ENGLAND",
             OrgId = "test-org",
-            TypeId = TypeId,
+            CaseType = CaseType,
             StateId = "submitted",
             SubmittedAt = Now,
             LastModifiedAt = Now
@@ -163,7 +163,7 @@ public class CaseTemplateVersioningTests
             CallbackUrl = "https://source-system.test/callback",
             Nation = "ENGLAND",
             OrgId = "test-org",
-            TypeId = "different-type",
+            CaseType = "different-type",
             StateId = "anything"
         };
 
@@ -194,7 +194,7 @@ public class CaseTemplateVersioningTests
             Transitions = transitions;
         }
 
-        public string TypeId => "test-type";
+        public string CaseType => "test-type";
         public string DisplayName => "Versioned test type";
         public CaseState InitialState { get; }
         public IReadOnlyCollection<CaseState> States { get; }

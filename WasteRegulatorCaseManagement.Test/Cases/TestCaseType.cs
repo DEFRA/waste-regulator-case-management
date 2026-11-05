@@ -9,20 +9,20 @@ namespace WasteRegulatorCaseManagement.Test.Cases;
 internal sealed class TestCaseType : ICaseType
 {
     public TestCaseType(
-        string typeId,
+        string caseType,
         string displayName,
         CaseState? initialState = null,
         IReadOnlyCollection<CaseState>? states = null,
         IReadOnlyCollection<CaseTransition>? transitions = null)
     {
-        TypeId = typeId;
+        CaseType = caseType;
         DisplayName = displayName;
         InitialState = initialState ?? new CaseState("submitted", "Submitted");
         States = states ?? [InitialState];
         Transitions = transitions ?? Array.Empty<CaseTransition>();
     }
 
-    public string TypeId { get; }
+    public string CaseType { get; }
     public string DisplayName { get; }
     public CaseState InitialState { get; }
     public IReadOnlyCollection<CaseState> States { get; }
