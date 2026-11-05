@@ -1,3 +1,4 @@
+using WasteRegulatorCaseManagement.AuditEvents;
 using System.Net;
 using MongoDB.Bson;
 using System.Net.Http.Json;
@@ -68,7 +69,7 @@ public class ProblemDetailsExceptionHandlerTests
                 services.RemoveAll<ICasePersistence>();
                 var clientFactory = new TestMongoDbClientFactory(
                     fixture.ConnectionString, _databaseName);
-                var real = new CasePersistence(clientFactory, NullLoggerFactory.Instance, new CaseRegistry([]));
+                var real = new CasePersistence(clientFactory, NullLoggerFactory.Instance, new CaseRegistry([]), new AuditEventService(clientFactory, TimeProvider.System));
                 services.AddSingleton<ICasePersistence>(new ThrowingOnQueryPersistence(real));
             });
         }

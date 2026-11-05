@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using WasteRegulatorCaseManagement.AuditEvents;
 using WasteRegulatorCaseManagement.Auth;
 using WasteRegulatorCaseManagement.Config;
 using WasteRegulatorCaseManagement.Health;
@@ -143,6 +144,7 @@ static void ConfigureCases(WebApplicationBuilder builder)
     var services = builder.Services;
 
     services.AddCaseFramework();
+    services.AddSingleton<AuditEventService>();
     services.AddSingleton<ICasePersistence, CasePersistence>();
 }
 

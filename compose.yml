@@ -24,6 +24,7 @@ services:
 
   mongodb:
     image: mongo:7.0.28
+    command: ['mongod', '--replSet', 'rs0', '--bind_ip_all']
     networks:
       - cdp-tenant
     ports:
@@ -31,7 +32,14 @@ services:
     volumes:
       - mongodb-data:/data
     healthcheck:
-      test: ['CMD', 'mongosh', '--quiet', '--eval', 'db.hello().ok']
+      test:
+        [
+          'CMD',
+          'mongosh',
+          '--quiet',
+          '--eval',
+          "try { rs.status().ok } catch (e) { rs.initiate({_id:'rs0',members:[{_id:0,host:'mongodb:27017'}]}).ok }",
+        ]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -54,7 +62,7 @@ services:
       - 'compose/aws.env'
     environment:
       ASPNETCORE_URLS: http://+:8085
-      Mongo__DatabaseUri: mongodb://mongodb:27017/
+      Mongo__DatabaseUri: mongodb://mongodb:27017/?replicaSet=rs0&directConnection=true
       Mongo__DatabaseName: waste-regulator-case-management
       NOTIFY_API_KEY: ${NOTIFY_API_KEY}
     networks:

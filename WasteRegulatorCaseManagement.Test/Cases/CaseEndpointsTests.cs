@@ -1,3 +1,6 @@
+using WasteRegulatorCaseManagement.Utils.Mongo;
+using MongoDB.Driver;
+using WasteRegulatorCaseManagement.AuditEvents;
 using System.Net;
 using MongoDB.Bson;
 using System.Net.Http.Json;
@@ -705,6 +708,53 @@ public class CaseEndpointsTests
         Assert.Equal("Submitted against the wrong obligation year.", body.Decision!["reason"]);
         var stateChange = Assert.Single(body.Timeline!, e => e.Action == "state-changed");
         Assert.Equal("Submitted against the wrong obligation year.", stateChange.Details["decision.reason"]);
+    }
+
+    [Fact]
+    public async Task Intake_and_cancel_each_record_an_audit_event_with_the_case_before_and_after()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var factory = NewFactory(userId: "alice-1");
+        using var client = factory.CreateClient();
+        var caseId = await SubmitCSoCCaseAsync(client, "csoc-2024-eng-00129", cancellationToken);
+
+        // Act
+        await client.PostAsJsonAsync(
+            $"/cases/{caseId}/actions/cancel",
+            new { decision = new { reason = "Duplicate submission." } },
+            cancellationToken
+        );
+
+        // Assert
+        var auditEvents = await factory
+            .Services.GetRequiredService<IMongoDbClientFactory>()
+            .GetCollection<AuditEvent>("auditEvents")
+            .Find(e => e.EntityId == $"case_{caseId}")
+            .SortBy(e => e.Sequence)
+            .ToListAsync(cancellationToken);
+        Assert.Collection(
+            auditEvents,
+            created =>
+            {
+                Assert.Equal("insert", created.Operation);
+                Assert.Equal("case-created", created.EventType);
+                Assert.Equal("service:test-client", created.Actor);
+                Assert.Equal("case", created.Entity);
+                Assert.Equal("case.v1.0", created.SchemaVersion);
+                Assert.Null(created.Before);
+                Assert.Equal("SUBMITTED", created.After!["stateId"].AsString);
+            },
+            cancelled =>
+            {
+                Assert.Equal("update", cancelled.Operation);
+                Assert.Equal("state-changed", cancelled.EventType);
+                Assert.Equal("user:alice-1", cancelled.Actor);
+                Assert.Equal(1, cancelled.Version);
+                Assert.Equal("SUBMITTED", cancelled.Before!["stateId"].AsString);
+                Assert.Equal("CANCELLED", cancelled.After!["stateId"].AsString);
+            }
+        );
     }
 
     [Fact]
@@ -2421,7 +2471,10 @@ public class CaseEndpointsTests
             (RecordingPersistence)Services.GetRequiredService<ICasePersistence>();
 
         public Task SeedAsync(Case item, CancellationToken cancellationToken) =>
-            Persistence.CreateAsync(item, cancellationToken);
+            Services
+                .GetRequiredService<IMongoDbClientFactory>()
+                .GetCollection<Case>("cases")
+                .InsertOneAsync(item, cancellationToken: cancellationToken);
 
         public async Task<List<Case>> AllItemsAsync(CancellationToken cancellationToken)
         {
@@ -2455,7 +2508,7 @@ public class CaseEndpointsTests
                     new CasePersistence(
                         clientFactory,
                         sp.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>(),
-                        sp.GetRequiredService<CaseRegistry>())
+                        sp.GetRequiredService<CaseRegistry>(), new AuditEventService(clientFactory, TimeProvider.System))
                 ));
                 services.UseCaseModuleConfigs(
                     TestCaseType.Create(

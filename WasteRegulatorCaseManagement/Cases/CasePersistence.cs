@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using WasteRegulatorCaseManagement.AuditEvents;
 using WasteRegulatorCaseManagement.Utils.Mongo;
 using MongoDB.Bson;
 using MongoDB.Driver;
@@ -8,6 +9,10 @@ namespace WasteRegulatorCaseManagement.Cases;
 /// <summary>
 /// Persistence for <see cref="Case"/>s. Every case type shares a single
 /// envelope and index strategy.
+///
+/// Every create and replace records an audit event for the case's newest
+/// <see cref="Case.Timeline"/> entry in the same transaction, so the
+/// audit events hold every committed change and nothing else.
 /// </summary>
 public interface ICasePersistence
 {
@@ -50,22 +55,47 @@ public sealed class CasePersistence
     : MongoService<Case>,
         ICasePersistence
 {
+    private const string AuditEntity = "case";
+    private const string AuditSchemaVersion = "case.v1.0";
+
     private readonly CaseRegistry _registry;
+    private readonly AuditEventService _auditEvents;
+    private readonly MongoTransactions _transactions;
 
     public CasePersistence(
         IMongoDbClientFactory connectionFactory,
         ILoggerFactory loggerFactory,
-        CaseRegistry registry
+        CaseRegistry registry,
+        AuditEventService auditEvents
     )
         : base(connectionFactory, "cases", loggerFactory)
     {
         _registry = registry;
+        _auditEvents = auditEvents;
+        _transactions = new MongoTransactions(Client, Logger);
     }
 
     [ExcludeFromCodeCoverage]
     public async Task CreateAsync(Case caseRecord, CancellationToken cancellationToken = default)
     {
-        await Collection.InsertOneAsync(caseRecord, cancellationToken: cancellationToken);
+        await _transactions.Execute(
+            async (session, transactionCancellationToken) =>
+            {
+                await Collection.InsertOneAsync(
+                    session,
+                    caseRecord,
+                    cancellationToken: transactionCancellationToken
+                );
+                await _auditEvents.RecordEvent(
+                    session,
+                    AuditEventFor(caseRecord, AuditEventOperation.Insert, before: null),
+                    transactionCancellationToken
+                );
+                return true;
+            },
+            transactionName: "create case",
+            cancellationToken
+        );
         Logger.LogInformation(
             "Submitted case {CaseId} of type {CaseTypeId} by {SubmittedBy}",
             caseRecord.Id,
@@ -257,18 +287,36 @@ public sealed class CasePersistence
         var expectedVersion = caseRecord.Version;
         caseRecord.Version = expectedVersion + 1;
 
-        var result = await Collection.ReplaceOneAsync(
-            w => w.Id == caseRecord.Id && w.Version == expectedVersion,
-            caseRecord,
-            cancellationToken: cancellationToken
-        );
-
-        if (result.MatchedCount != 1)
+        try
+        {
+            await _transactions.Execute(
+                async (session, transactionCancellationToken) =>
+                {
+                    var before =
+                        await Collection.FindOneAndReplaceAsync(
+                            session,
+                            w => w.Id == caseRecord.Id && w.Version == expectedVersion,
+                            caseRecord,
+                            new FindOneAndReplaceOptions<Case> { ReturnDocument = ReturnDocument.Before },
+                            transactionCancellationToken
+                        ) ?? throw new CaseConcurrencyException(caseRecord.Id, expectedVersion);
+                    await _auditEvents.RecordEvent(
+                        session,
+                        AuditEventFor(caseRecord, AuditEventOperation.Update, before.ToBsonDocument()),
+                        transactionCancellationToken
+                    );
+                    return true;
+                },
+                transactionName: "replace case",
+                cancellationToken
+            );
+        }
+        catch (CaseConcurrencyException)
         {
             // Roll the in-memory version back so a caller that catches and
             // retries does not double-increment.
             caseRecord.Version = expectedVersion;
-            throw new CaseConcurrencyException(caseRecord.Id, expectedVersion);
+            throw;
         }
 
         Logger.LogInformation(
@@ -279,6 +327,39 @@ public sealed class CasePersistence
             caseRecord.Version
         );
     }
+
+    private static AuditEventRequest AuditEventFor(
+        Case caseRecord,
+        AuditEventOperation operation,
+        BsonDocument? before
+    )
+    {
+        var entry =
+            caseRecord.Timeline.LastOrDefault()
+            ?? throw new InvalidOperationException(
+                $"Case {caseRecord.Id} has no timeline entry to record as an audit event."
+            );
+        return new AuditEventRequest(
+            Actor: AuditActor(entry.PerformedById),
+            Entity: AuditEntity,
+            Operation: operation,
+            EventType: entry.Action,
+            EntityId: $"case_{caseRecord.Id}",
+            Version: caseRecord.Version,
+            Before: before,
+            After: caseRecord.ToBsonDocument(),
+            SchemaVersion: AuditSchemaVersion,
+            OccurredAt: entry.PerformedAt
+        );
+    }
+
+    private static string AuditActor(string? performedById) =>
+        performedById switch
+        {
+            null => "system:waste-regulator-case-management",
+            _ when performedById.StartsWith("service:", StringComparison.Ordinal) => performedById,
+            _ => $"user:{performedById}",
+        };
 
     [ExcludeFromCodeCoverage]
     protected override List<CreateIndexModel<Case>> DefineIndexes(

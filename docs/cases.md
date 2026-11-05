@@ -251,17 +251,15 @@ Notes are append-only: there is no edit or delete endpoint.
 
 ## Timeline (RA-97)
 
-### Single source of truth
+### Timeline and audit events
 
 `Case.Timeline` (the per-document, append-only list described below) is
-the **single authoritative audit trail** for every case. There is no
-parallel database or external audit store. The console-only
-`AuditLogger`/`logger.Audit(...)` helper that previously emitted a second,
-in-memory-only stream of audit events has been retired — it left no durable
-record (lost on log rotation) and produced two divergent histories for the
-same mutation. Service operational logs at `LogInformation` describe what
-the engine did for support purposes, but the auditable record lives on the
-case itself.
+the caseworker's history of a case, read with the case. Every create and
+replace of a case also writes an `auditEvents` document for the case's
+newest timeline entry, with the whole case before and after, in the same
+MongoDB transaction (see
+[ADR-0010](adr/0010-transactional-audit-events.md)). The audit events are
+the outbox from which changes are published to the analytics topic.
 
 ### Mechanism
 

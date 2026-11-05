@@ -1,3 +1,4 @@
+using WasteRegulatorCaseManagement.AuditEvents;
 using WasteRegulatorCaseManagement.Utils.Mongo;
 using WasteRegulatorCaseManagement.Cases;
 using Microsoft.Extensions.DependencyInjection;
@@ -34,7 +35,7 @@ public static class TestServiceCollectionExtensions
         var clientFactory = new TestMongoDbClientFactory(fixture.ConnectionString, databaseName);
         services.AddSingleton<IMongoDbClientFactory>(clientFactory);
         services.AddSingleton<ICasePersistence>(sp =>
-            new CasePersistence(clientFactory, sp.GetRequiredService<ILoggerFactory>(), sp.GetRequiredService<CaseRegistry>()));
+            new CasePersistence(clientFactory, sp.GetRequiredService<ILoggerFactory>(), sp.GetRequiredService<CaseRegistry>(), new AuditEventService(clientFactory, TimeProvider.System)));
 
         return services;
     }

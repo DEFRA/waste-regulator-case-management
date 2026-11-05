@@ -1,3 +1,4 @@
+using WasteRegulatorCaseManagement.AuditEvents;
 using System.Security.Claims;
 using WasteRegulatorCaseManagement.Test.TestSupport;
 using WasteRegulatorCaseManagement.Cases;
@@ -36,7 +37,7 @@ public class CaseServiceTimestampTests
     {
         _databaseName = MongoIntegrationFixture.NewDatabaseName("svc_timestamps");
         _clientFactory = new TestMongoDbClientFactory(fixture.ConnectionString, _databaseName);
-        _persistence = new CasePersistence(_clientFactory, NullLoggerFactory.Instance, new CaseRegistry([]));
+        _persistence = new CasePersistence(_clientFactory, NullLoggerFactory.Instance, new CaseRegistry([]), new AuditEventService(_clientFactory, TimeProvider.System));
     }
 
     public async ValueTask DisposeAsync() =>
@@ -66,7 +67,7 @@ public class CaseServiceTimestampTests
 
     private async Task<Case> SeedAsync(Case caseRecord)
     {
-        await _persistence.CreateAsync(caseRecord, TestContext.Current.CancellationToken);
+        await _clientFactory.GetCollection<Case>("cases").InsertOneAsync(caseRecord, cancellationToken: TestContext.Current.CancellationToken);
         return caseRecord;
     }
 

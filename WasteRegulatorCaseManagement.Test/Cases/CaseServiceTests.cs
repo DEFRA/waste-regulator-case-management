@@ -1,3 +1,4 @@
+using WasteRegulatorCaseManagement.AuditEvents;
 using System.Security.Claims;
 using WasteRegulatorCaseManagement.Test.TestSupport;
 using WasteRegulatorCaseManagement.Cases;
@@ -30,7 +31,7 @@ public class CaseServiceTests : IAsyncDisposable
     {
         _databaseName = MongoIntegrationFixture.NewDatabaseName("svc");
         _clientFactory = new TestMongoDbClientFactory(fixture.ConnectionString, _databaseName);
-        _persistence = new CasePersistence(_clientFactory, NullLoggerFactory.Instance, new CaseRegistry([]));
+        _persistence = new CasePersistence(_clientFactory, NullLoggerFactory.Instance, new CaseRegistry([]), new AuditEventService(_clientFactory, TimeProvider.System));
     }
 
     public async ValueTask DisposeAsync() =>
@@ -102,7 +103,7 @@ public class CaseServiceTests : IAsyncDisposable
             SubmittedBy = "test-client",
         };
         configure?.Invoke(caseRecord);
-        await _persistence.CreateAsync(caseRecord, TestContext.Current.CancellationToken);
+        await _clientFactory.GetCollection<Case>("cases").InsertOneAsync(caseRecord, cancellationToken: TestContext.Current.CancellationToken);
         return caseRecord;
     }
 
@@ -574,7 +575,7 @@ public class CaseServiceTests : IAsyncDisposable
             SubmittedBy = "test-client",
             TemplateSnapshot = null,
         };
-        await _persistence.CreateAsync(caseRecord, TestContext.Current.CancellationToken);
+        await _clientFactory.GetCollection<Case>("cases").InsertOneAsync(caseRecord, cancellationToken: TestContext.Current.CancellationToken);
 
         var result = await BuildService(registeredType)
             .ApplyActionAsync(
@@ -1139,7 +1140,7 @@ public class CaseServiceTests : IAsyncDisposable
             AssignedAt = InitialNow,
             AssignedBy = "old-actor",
         };
-        await _persistence.CreateAsync(caseRecord, TestContext.Current.CancellationToken);
+        await _clientFactory.GetCollection<Case>("cases").InsertOneAsync(caseRecord, cancellationToken: TestContext.Current.CancellationToken);
         return caseRecord;
     }
 
@@ -1932,6 +1933,13 @@ public class CaseServiceTests : IAsyncDisposable
             {
                 var raceLoaded = _persistence.GetByIdAsync(id).GetAwaiter().GetResult();
                 raceLoaded!.LastModifiedAt = raceLoaded.LastModifiedAt.AddMinutes(1);
+                raceLoaded.Timeline.Add(new CaseTimelineEntry
+                {
+                    Action = "note-added",
+                    ActionDisplayName = "Note added",
+                    PerformedAt = raceLoaded.LastModifiedAt,
+                    PerformedById = "competing-user",
+                });
                 _persistence.ReplaceAsync(raceLoaded).GetAwaiter().GetResult();
             }
         );

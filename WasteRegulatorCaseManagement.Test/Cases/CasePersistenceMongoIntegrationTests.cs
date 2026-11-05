@@ -1,3 +1,4 @@
+using WasteRegulatorCaseManagement.AuditEvents;
 using WasteRegulatorCaseManagement.Test.TestSupport;
 using WasteRegulatorCaseManagement.Utils.Mongo;
 using WasteRegulatorCaseManagement.Cases;
@@ -74,7 +75,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
                         .ToArray()
                 ),
             ])
-        );
+        , new AuditEventService(_clientFactory, TimeProvider.System));
     }
 
     /// <summary>
@@ -111,6 +112,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
             SubmittedAt = now,
             LastModifiedAt = now,
             SubmittedBy = "client-1",
+            Timeline = { CreatedEntry(now) },
         };
 
         await _persistence.CreateAsync(caseRecord, TestContext.Current.CancellationToken);
@@ -190,9 +192,9 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
         var factory = new TestMongoDbClientFactory(_fixture.ConnectionString, freshDb);
         try
         {
-            _ = new CasePersistence(factory, NullLoggerFactory.Instance, new CaseRegistry([]));
+            _ = new CasePersistence(factory, NullLoggerFactory.Instance, new CaseRegistry([]), new AuditEventService(factory, TimeProvider.System));
             var ex = Record.Exception(() =>
-                new CasePersistence(factory, NullLoggerFactory.Instance, new CaseRegistry([]))
+                new CasePersistence(factory, NullLoggerFactory.Instance, new CaseRegistry([]), new AuditEventService(factory, TimeProvider.System))
             );
             Assert.Null(ex);
 
@@ -235,7 +237,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
                 },
             },
         };
-        await _persistence.CreateAsync(caseRecord, TestContext.Current.CancellationToken);
+        await _clientFactory.GetCollection<Case>("cases").InsertOneAsync(caseRecord, cancellationToken: TestContext.Current.CancellationToken);
 
         // Sanity: GetByIdAsync still returns the full document.
         var full = await _persistence.GetByIdAsync(
@@ -273,7 +275,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
             SubmittedAt = now.AddMinutes(-submittedMinutesAgo),
             LastModifiedAt = now,
         };
-        await _persistence.CreateAsync(item, TestContext.Current.CancellationToken);
+        await _clientFactory.GetCollection<Case>("cases").InsertOneAsync(item, cancellationToken: TestContext.Current.CancellationToken);
     }
 
     private static string[] OrgOrder(CasePage page) =>
@@ -396,7 +398,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
                 },
             },
         };
-        await _persistence.CreateAsync(item, ct);
+        await _clientFactory.GetCollection<Case>("cases").InsertOneAsync(item, cancellationToken: ct);
 
         var page = await _persistence.QueryAsync(new CaseQuery(Sort: "status"), ct);
 
@@ -415,7 +417,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
             _clientFactory,
             NullLoggerFactory.Instance,
             new CaseRegistry([])
-        );
+        , new AuditEventService(_clientFactory, TimeProvider.System));
         await SeedAsync("only", stateId: "submitted");
 
         var page = await persistence.QueryAsync(new CaseQuery(Sort: "status"), ct);
@@ -428,6 +430,64 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
     // semantics that a render-only test (CasePersistenceBuildFilterTests)
     // cannot — $regex/$not behaviour against a genuinely missing field is
     // exactly what the original version of this filter got wrong.
+
+    [Fact]
+    public async Task ReplaceAsync_that_loses_a_version_race_records_no_audit_event()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var now = _time.GetUtcNow().UtcDateTime;
+        var caseRecord = new Case
+        {
+            SourceSystemId = Ulid.NewUlid().ToString(),
+            CallbackUrl = "https://source-system.test/callback",
+            Nation = "ENGLAND",
+            OrgId = "test-org",
+            CaseType = "test",
+            StateId = "submitted",
+            SubmittedAt = now,
+            LastModifiedAt = now,
+            Timeline = { CreatedEntry(now) },
+        };
+        await _persistence.CreateAsync(caseRecord, cancellationToken);
+        var stale = await _persistence.GetByIdAsync(caseRecord.Id, cancellationToken);
+        var fresh = await _persistence.GetByIdAsync(caseRecord.Id, cancellationToken);
+        fresh!.Timeline.Add(NoteEntry(now));
+        await _persistence.ReplaceAsync(fresh, cancellationToken);
+        stale!.Timeline.Add(NoteEntry(now));
+
+        // Act
+        await Assert.ThrowsAsync<CaseConcurrencyException>(() =>
+            _persistence.ReplaceAsync(stale, cancellationToken)
+        );
+
+        // Assert
+        var auditEvents = await _clientFactory
+            .GetCollection<AuditEvent>("auditEvents")
+            .Find(FilterDefinition<AuditEvent>.Empty)
+            .SortBy(e => e.Sequence)
+            .ToListAsync(cancellationToken);
+        Assert.Equal(["insert", "update"], auditEvents.Select(e => e.Operation).ToArray());
+        Assert.Equal([0, 1], auditEvents.Select(e => e.Version).ToArray());
+    }
+
+    private static CaseTimelineEntry CreatedEntry(DateTime now) =>
+        new()
+        {
+            Action = "case-created",
+            ActionDisplayName = "Case created",
+            PerformedAt = now,
+            PerformedById = "service:client-1",
+        };
+
+    private static CaseTimelineEntry NoteEntry(DateTime now) =>
+        new()
+        {
+            Action = "note-added",
+            ActionDisplayName = "Note added",
+            PerformedAt = now,
+            PerformedById = "alice-1",
+        };
 
     [Fact]
     public async Task ReplaceAsync_throws_concurrency_exception_when_version_does_not_match()
@@ -443,6 +503,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
             StateId = "submitted",
             SubmittedAt = now,
             LastModifiedAt = now,
+            Timeline = { CreatedEntry(now) },
         };
         await _persistence.CreateAsync(caseRecord, TestContext.Current.CancellationToken);
 

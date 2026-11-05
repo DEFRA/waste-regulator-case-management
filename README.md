@@ -24,7 +24,9 @@ service.
 - [.NET SDK 10.0](https://dotnet.microsoft.com/download/dotnet/10.0)
 - [Docker](https://www.docker.com/) and Docker Compose (for the Docker workflow)
 - [MongoDB 7+](https://www.mongodb.com/docs/manual/installation/) running
-  locally on `mongodb://127.0.0.1:27017` (or use the Docker Compose stack)
+  locally on `mongodb://127.0.0.1:27017` as a replica set, because case
+  writes use transactions (or use the Docker Compose stack, which starts a
+  single-node replica set)
 
 ## Local development
 
@@ -193,7 +195,7 @@ Notify-testing walkthrough.
 
 | Variable | Secret? | Description |
 | --- | --- | --- |
-| `Mongo__DatabaseUri` | No | MongoDB connection string (default `mongodb://127.0.0.1:27017`; IAM auth in deployed environments) |
+| `Mongo__DatabaseUri` | No | MongoDB connection string to a replica set (default `mongodb://127.0.0.1:27017/?directConnection=true`; IAM auth in deployed environments) |
 | `Mongo__DatabaseName` | No | MongoDB database name (default `waste-regulator-case-management`) |
 | `Cors__AllowedOrigins` | No | CORS allow-list (array). Empty = deny-all |
 | `ENVIRONMENT` | No | Platform environment name (`local`/`dev`/`test`/`perf-test`/`ext-test`/`prod`) |

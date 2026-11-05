@@ -1,3 +1,4 @@
+using WasteRegulatorCaseManagement.AuditEvents;
 using System.Security.Claims;
 using WasteRegulatorCaseManagement.Test.TestSupport;
 using WasteRegulatorCaseManagement.Cases;
@@ -30,7 +31,7 @@ public class CaseTimelineAppenderTests
     {
         _databaseName = MongoIntegrationFixture.NewDatabaseName("audit-appender");
         _clientFactory = new TestMongoDbClientFactory(fixture.ConnectionString, _databaseName);
-        _persistence = new CasePersistence(_clientFactory, NullLoggerFactory.Instance, new CaseRegistry([]));
+        _persistence = new CasePersistence(_clientFactory, NullLoggerFactory.Instance, new CaseRegistry([]), new AuditEventService(_clientFactory, TimeProvider.System));
     }
 
     public async ValueTask DisposeAsync() =>
@@ -50,7 +51,7 @@ public class CaseTimelineAppenderTests
             CaseType = "test-type",
             StateId = "submitted",
         };
-        await _persistence.CreateAsync(caseRecord, ct);
+        await _clientFactory.GetCollection<Case>("cases").InsertOneAsync(caseRecord, cancellationToken: ct);
         return caseRecord;
     }
 

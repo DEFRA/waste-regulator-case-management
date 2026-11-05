@@ -1,3 +1,4 @@
+using WasteRegulatorCaseManagement.AuditEvents;
 using System.Net;
 using System.Net.Http.Json;
 using WasteRegulatorCaseManagement.Test.TestSupport;
@@ -144,7 +145,10 @@ public class CaseAuthBoundaryTests
         public ICasePersistence Persistence => Services.GetRequiredService<ICasePersistence>();
 
         public Task SeedAsync(Case item, CancellationToken cancellationToken) =>
-            Persistence.CreateAsync(item, cancellationToken);
+            Services
+                .GetRequiredService<IMongoDbClientFactory>()
+                .GetCollection<Case>("cases")
+                .InsertOneAsync(item, cancellationToken: cancellationToken);
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
@@ -155,7 +159,7 @@ public class CaseAuthBoundaryTests
                 var clientFactory = new TestMongoDbClientFactory(_fixture.ConnectionString, _databaseName);
                 services.AddSingleton<IMongoDbClientFactory>(clientFactory);
                 services.AddSingleton<ICasePersistence>(sp =>
-                    new CasePersistence(clientFactory, sp.GetRequiredService<ILoggerFactory>(), sp.GetRequiredService<CaseRegistry>()));
+                    new CasePersistence(clientFactory, sp.GetRequiredService<ILoggerFactory>(), sp.GetRequiredService<CaseRegistry>(), new AuditEventService(clientFactory, TimeProvider.System)));
                 services.UseCaseModuleConfigs(TestCaseType.Create(CaseType, "Test type"));
             });
         }
