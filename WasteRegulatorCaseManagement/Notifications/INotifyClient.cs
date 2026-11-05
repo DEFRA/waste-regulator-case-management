@@ -19,9 +19,8 @@ public interface INotifyClient
     /// an error message — it is a misconfiguration, not an exception.
     /// </summary>
     /// <param name="region">
-    /// RA-211: region/regulator identifier (e.g. a
-    /// <c>ReAccreditationPayload.Nation</c> value such as <c>England</c>)
-    /// used to resolve the Notify <c>reply_to_id</c> via
+    /// RA-211: region/regulator identifier (e.g. a nation such as
+    /// <c>England</c>) used to resolve the Notify <c>reply_to_id</c> via
     /// <see cref="NotifyConfig.GetReplyToId"/>. <c>null</c>/unrecognised
     /// falls back to <see cref="NotifyConfig.DefaultReplyToId"/>.
     /// </param>

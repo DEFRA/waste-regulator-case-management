@@ -105,12 +105,6 @@ public class NotifyConfigTests
         // sender addresses (RA-211) — see NotifyConfig.RegionToReplyToId doc.
         Assert.Empty(notifyConfig.RegionToReplyToId);
         Assert.Null(notifyConfig.DefaultReplyToId);
-
-        // RA102-ust: the Queried template was created in the Notify portal and
-        // its real GUID shipped in appsettings.json — guard against it ever
-        // silently reverting to blank.
-        Assert.True(notifyConfig.Templates.ContainsKey("Queried"));
-        Assert.False(string.IsNullOrWhiteSpace(notifyConfig.Templates["Queried"]));
     }
 
     // Real regulator inboxes are set per environment in cdp-app-config (prod's

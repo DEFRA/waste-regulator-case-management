@@ -25,29 +25,6 @@ public class NoOpNotifyClientTests
         Assert.Null(result.ErrorMessage);
     }
 
-    // RA102-okg: the Queried template key now has a real Notify GUID in
-    // appsettings.json, but the no-op client used locally/in dev never looks
-    // at NotifyConfig.Templates at all, so it must resolve and "send" this
-    // key successfully regardless of how it is configured, exactly as it
-    // does for every other key.
-    [Fact]
-    public async Task SendEmailAsync_resolves_the_Queried_template_key()
-    {
-        var sut = new NoOpNotifyClient(Substitute.For<IStructuredLogger<NoOpNotifyClient>>());
-
-        var result = await sut.SendEmailAsync(
-            templateKey: "Queried",
-            toEmail: "operator@example.com",
-            personalisation: new Dictionary<string, string> { ["organisation_name"] = "Acme" },
-            reference: "ref-1",
-            cancellationToken: TestContext.Current.CancellationToken
-        );
-
-        Assert.True(result.IsSuccess);
-        Assert.Null(result.ProviderMessageId);
-        Assert.Null(result.ErrorMessage);
-    }
-
     [Fact]
     public async Task SendEmailAsync_emits_ecs_success_log_matching_real_client_shape()
     {

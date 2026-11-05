@@ -9,14 +9,9 @@ namespace WasteRegulatorCaseManagement.Notifications;
 public sealed class NotifyConfig
 {
     /// <summary>
-    /// RA-422: central master switch for ALL outbound Case Management email
-    /// (to operators and regulators) AND the <c>notification-*</c> audit-log
-    /// entries the notification flow writes. Defaults to <c>false</c> — emails
-    /// are off on every environment following regulator feedback. When
-    /// <c>false</c>, the no-op Notify client is registered (nothing is sent)
-    /// and the re-accreditation notification post-action hook is not registered
-    /// at all, so no <c>notification-sent/skipped/failed</c> audit entries are
-    /// written either. Re-enable later per environment with the
+    /// RA-422: central master switch for ALL outbound case management email.
+    /// Defaults to <c>false</c>. When <c>false</c>, the no-op Notify client is
+    /// registered (nothing is sent). Re-enable per environment with the
     /// <c>Notify__Enabled=true</c> environment override (CDP injects env vars).
     /// The gate is read once at startup via
     /// <see cref="NotifyFeature.NotificationsEnabled"/>, which reads the raw
@@ -46,8 +41,8 @@ public sealed class NotifyConfig
         new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    /// RA-211: map of region/regulator identifier (e.g. a
-    /// <c>ReAccreditationPayload.Nation</c> value such as <c>England</c>) to
+    /// RA-211: map of region/regulator identifier (e.g. a nation such as
+    /// <c>England</c>) to
     /// the Notify <c>reply_to_id</c> that should be used as the sender
     /// identity for outbound emails relevant to that region, so replies land
     /// in the correct regional regulator's no-reply mailbox.
@@ -101,35 +96,6 @@ public sealed class NotifyConfig
     /// record a <c>missing-regulator-mailbox</c> audit entry (RA-236).
     /// </summary>
     public Dictionary<string, string> RegulatorMailboxes { get; set; } = new(StringComparer.OrdinalIgnoreCase);
-
-    /// <summary>
-    /// RA-581: map of UK nation name (e.g. <c>England</c>) to the regional
-    /// regulator's friendly display name (e.g. <c>Environment Agency (EA)</c>),
-    /// surfaced as the <c>regulator_name</c> Notify placeholder in
-    /// operator-facing lifecycle emails so the operator sees who they
-    /// submitted to, distinct from <see cref="RegulatorMailboxes"/> (the
-    /// address a regulator-facing email is sent TO). An empty/missing entry
-    /// resolves to <c>null</c> — see <see cref="GetRegulatorName"/>.
-    /// </summary>
-    public Dictionary<string, string> RegulatorNames { get; set; } = new(StringComparer.OrdinalIgnoreCase);
-
-    /// <summary>
-    /// Resolve the regulator's friendly display name for
-    /// <paramref name="nation"/>. Never throws: a missing, unrecognised, or
-    /// unconfigured nation returns <c>null</c> rather than a made-up value.
-    /// </summary>
-    public string? GetRegulatorName(string? nation)
-    {
-        if (
-            !string.IsNullOrWhiteSpace(nation)
-            && RegulatorNames.TryGetValue(nation, out var name)
-            && !string.IsNullOrWhiteSpace(name)
-        )
-        {
-            return name;
-        }
-        return null;
-    }
 
     /// <summary>
     /// Per-attempt timeout (seconds) applied around each call into the
