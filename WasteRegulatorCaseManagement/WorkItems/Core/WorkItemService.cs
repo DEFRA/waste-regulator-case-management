@@ -1,6 +1,5 @@
 using System.Security.Claims;
 using MongoDB.Bson;
-using MongoDB.Driver;
 
 namespace WasteRegulatorCaseManagement.WorkItems.Core;
 
@@ -109,29 +108,18 @@ public sealed class WorkItemService : IWorkItemService
 {
     private const string SourceKey = "source";
 
-    /// <summary>
-    /// Maximum number of <c>applicationReference</c> candidates the engine
-    /// tries before giving up on a submission. The suffix keyspace is 10^9,
-    /// so even with a large backlog a collision is rare; five attempts make
-    /// the probability of a spurious failure negligible while bounding the
-    /// work done per submission (RA-219).
-    /// </summary>
-    public const int MaxApplicationReferenceAttempts = 5;
-
     private readonly IWorkItemRegistry _registry;
     private readonly IWorkItemPersistence _persistence;
     private readonly ILogger<WorkItemService> _logger;
     private readonly IReadOnlyCollection<IWorkItemPostActionHook> _postActionHooks;
     private readonly TimeProvider _timeProvider;
-    private readonly IApplicationReferenceGenerator _referenceGenerator;
 
     public WorkItemService(
         IWorkItemRegistry registry,
         IWorkItemPersistence persistence,
         ILogger<WorkItemService> logger,
         TimeProvider? timeProvider = null,
-        IEnumerable<IWorkItemPostActionHook>? postActionHooks = null,
-        IApplicationReferenceGenerator? referenceGenerator = null
+        IEnumerable<IWorkItemPostActionHook>? postActionHooks = null
     )
     {
         this._registry = registry;
@@ -139,7 +127,6 @@ public sealed class WorkItemService : IWorkItemService
         this._logger = logger;
         _postActionHooks = postActionHooks?.ToArray() ?? Array.Empty<IWorkItemPostActionHook>();
         _timeProvider = timeProvider ?? TimeProvider.System;
-        _referenceGenerator = referenceGenerator ?? new ApplicationReferenceGenerator();
     }
 
     public async Task<WorkItemActionResult> SubmitAsync(
@@ -164,9 +151,7 @@ public sealed class WorkItemService : IWorkItemService
         // RA-196: ensure 'source' is in the payload. If the caller provided
         // it in the submission metadata (the standard BFF pattern) it is
         // mirrored here so consumers can find it without parsing the audit
-        // log. RA-219: 'applicationReference' is NO LONGER caller-supplied —
-        // any client-supplied value is ignored; the engine generates it
-        // server-side below.
+        // log.
         if (
             submissionMetadata != null
             && submissionMetadata.TryGetValue(SourceKey, out var sourceVal)
@@ -177,237 +162,75 @@ public sealed class WorkItemService : IWorkItemService
             payload[SourceKey] = sourceVal;
         }
 
-        // RA-311/MBE-3: idempotent submit. The operator backend forwards the
-        // operator's original "submit application" call and may retry it
-        // after the Registration & Accreditation service frontend's client-side timeout even though the first attempt
-        // already succeeded here (CDP logs show a 5s client timeout against
-        // a round-trip that can take up to 100s). When the payload carries
-        // an operatorApplicationId, a submit for one already on file is
-        // treated as a replay: hand back the SAME work item rather than
-        // minting a second one. This up-front lookup handles the common
-        // case (a genuinely sequential retry) cheaply; the unique + sparse
-        // payload.operatorApplicationId index (see WorkItemPersistence)
-        // is the backstop for a true concurrent race between two
-        // simultaneous requests, handled in the catch clause below.
-        var operatorApplicationId =
-            payload.TryGetValue("operatorApplicationId", out var operatorApplicationIdValue)
-            && operatorApplicationIdValue.IsString
-            && !string.IsNullOrWhiteSpace(operatorApplicationIdValue.AsString)
-                ? operatorApplicationIdValue.AsString
-                : null;
-
-        if (operatorApplicationId is not null)
-        {
-            var existingByOperatorApplicationId =
-                await _persistence.FindByOperatorApplicationIdAsync(
-                    type.TypeId,
-                    operatorApplicationId,
-                    cancellationToken
-                );
-            if (existingByOperatorApplicationId is not null)
-            {
-                _logger.LogInformation(
-                    "Submit for operatorApplicationId {OperatorApplicationId} (typeId {TypeId}) is a replay; "
-                        + "returning existing work item {WorkItemId} instead of creating a duplicate.",
-                    operatorApplicationId,
-                    type.TypeId,
-                    existingByOperatorApplicationId.Id
-                );
-                return WorkItemActionResult.IdempotentReplay(existingByOperatorApplicationId);
-            }
-        }
-
         var snapshot = WorkItemTemplateSnapshot.Capture(type);
 
-        // RA-503: the operator backend now sends the operator's real, nation-specific bank
-        // payment reference (buildPaymentReference in epr-register-enrol-frontend, e.g.
-        // PR/PK/REP/500500 - the exact string shown to the operator on their submit-confirmation
-        // and view-payment-details pages) directly in the submission payload. Captured once,
-        // before the retry loop, so a regenerated applicationReference on a later attempt can
-        // never overwrite it - unlike applicationReference, this value doesn't depend on attempt
-        // and must stay exactly what the operator was told to quote.
-        var operatorPaymentReference =
-            payload.TryGetValue("paymentReference", out var operatorPaymentReferenceValue)
-            && operatorPaymentReferenceValue.IsString
-            && !string.IsNullOrWhiteSpace(operatorPaymentReferenceValue.AsString)
-                ? operatorPaymentReferenceValue.AsString
-                : null;
-
-        // RA-219: the backend owns the applicationReference. Generate one
-        // server-side and persist; on the (rare) unique-index collision
-        // regenerate and retry up to MaxApplicationReferenceAttempts times.
-        // The reference is stamped onto both the payload (for consumers /
-        // the BFF, at payload.applicationReference) and the birth audit
-        // entry on each attempt so a retried reference stays consistent
-        // across the document and its audit timeline.
-        WorkItem? workItem = null;
-        for (var attempt = 1; ; attempt++)
+        var workItem = new WorkItem
         {
-            var applicationReference = _referenceGenerator.Generate(payload, attempt);
-            payload[ApplicationReferenceField] = applicationReference;
+            TypeId = type.TypeId,
+            StateId = type.InitialState.Id,
+            SubmittedAt = now,
+            LastModifiedAt = now,
+            SubmittedBy = submittedBy,
+            TemplateSnapshot = snapshot,
+            TemplateVersion = snapshot.TemplateVersion,
+            Payload = payload,
+        };
 
-            // RA-503: prefer the operator-supplied payment reference captured above. Fall back
-            // to applicationReference only when the payload never carried one - a submitter that
-            // predates this (RA-447/CM3, RA-316) or a source that doesn't send it, so this is
-            // never left blank rather than because the two are meant to be interchangeable.
-            payload["paymentReference"] = operatorPaymentReference ?? applicationReference;
-
-            workItem = new WorkItem
+        // Birth event: the audit timeline must start at submission rather
+        // than the first state change. Appended to the in-memory list
+        // before the single CreateAsync call so the document and its first
+        // audit entry land in storage together.
+        //
+        // RA-126: enrich the birth entry with the originating BFF /
+        // application context so audit consumers can reconstruct who
+        // submitted from where without joining back to request logs.
+        // 'source' is caller-supplied (BFF / operator FE forward it);
+        // 'clientId' is the caller-asserted, HMAC-verified client id
+        // (see ClientIdAuthenticationHandler); 'userId' is the end-user
+        // identity claim required for any mutation.
+        AppendAudit(
+            workItem,
+            "work-item-submitted",
+            "Work item submitted",
+            user,
+            now,
+            new()
             {
-                TypeId = type.TypeId,
-                StateId = type.InitialState.Id,
-                SubmittedAt = now,
-                LastModifiedAt = now,
-                SubmittedBy = submittedBy,
-                TemplateSnapshot = snapshot,
-                TemplateVersion = snapshot.TemplateVersion,
-                Payload = payload,
-            };
+                ["typeId"] = type.TypeId,
+                ["stateId"] = workItem.StateId,
+                ["templateVersion"] = snapshot.TemplateVersion,
+                [SourceKey] =
+                    submissionMetadata is not null
+                    && submissionMetadata.TryGetValue(SourceKey, out var src)
+                        ? src
+                        : null,
+                ["clientId"] = user.FindFirstValue("client_id"),
+                ["userId"] = ResolveActorUserId(user),
+            }
+        );
 
-            // Birth event: the audit timeline must start at submission rather
-            // than the first state change. Appended to the in-memory list
-            // before the single CreateAsync call so the document and its first
-            // audit entry land in storage together.
-            //
-            // RA-126: enrich the birth entry with the originating BFF /
-            // application context so audit consumers can reconstruct who
-            // submitted from where without joining back to request logs.
-            // 'source' is caller-supplied (BFF / operator FE forward it);
-            // 'clientId' is the caller-asserted, HMAC-verified client id
-            // (see ClientIdAuthenticationHandler); 'userId' is the end-user
-            // identity claim required for any mutation. RA-219:
-            // 'applicationReference' is the server-generated value.
-            AppendAudit(
-                workItem,
-                "work-item-submitted",
-                "Work item submitted",
-                user,
-                now,
-                new()
-                {
-                    ["typeId"] = type.TypeId,
-                    ["stateId"] = workItem.StateId,
-                    ["templateVersion"] = snapshot.TemplateVersion,
-                    [SourceKey] =
-                        submissionMetadata is not null
-                        && submissionMetadata.TryGetValue(SourceKey, out var src)
-                            ? src
-                            : null,
-                    ["clientId"] = user.FindFirstValue("client_id"),
-                    ["userId"] = ResolveActorUserId(user),
-                    [ApplicationReferenceField] = applicationReference,
-                }
-            );
-
-            _logger.LogInformation(
-                "Persisting work item {WorkItemId} typeId={TypeId} applicationReference={ApplicationReference} submittedBy={SubmittedBy} (attempt {Attempt})",
+        try
+        {
+            await _persistence.CreateAsync(workItem, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "MongoDB write failed for work item {WorkItemId} typeId={TypeId} submittedBy={SubmittedBy}: {ExceptionType}",
                 workItem.Id,
                 type.TypeId,
-                applicationReference,
                 submittedBy,
-                attempt
+                ex.GetType().Name
             );
-
-            try
-            {
-                await _persistence.CreateAsync(workItem, cancellationToken);
-                break;
-            }
-            // RA-311/MBE-3: a genuine race — another request carrying the
-            // same operatorApplicationId won the insert between the
-            // up-front lookup above and this write. Regenerating a fresh
-            // applicationReference and retrying would not help: the
-            // collision is on the caller-supplied operatorApplicationId,
-            // which never changes between attempts. Look up whatever the
-            // winner persisted and hand that back as a replay instead.
-            catch (MongoWriteException ex)
-                when (ex.WriteError?.Category == ServerErrorCategory.DuplicateKey
-                    && IsOperatorApplicationIdDuplicate(ex)
-                )
-            {
-                var winner = operatorApplicationId is null
-                    ? null
-                    : await _persistence.FindByOperatorApplicationIdAsync(
-                        type.TypeId,
-                        operatorApplicationId,
-                        cancellationToken
-                    );
-                if (winner is not null)
-                {
-                    _logger.LogInformation(
-                        "operatorApplicationId {OperatorApplicationId} (typeId {TypeId}) collided on insert; "
-                            + "treating as a submit replay and returning the existing work item {WorkItemId}.",
-                        operatorApplicationId,
-                        type.TypeId,
-                        winner.Id
-                    );
-                    return WorkItemActionResult.IdempotentReplay(winner);
-                }
-                // Extremely unlikely: the winning document is gone by the
-                // time we look for it. Nothing about retrying with a new
-                // applicationReference fixes an operatorApplicationId
-                // collision, so propagate rather than loop forever.
-                throw;
-            }
-            // Only retry on a duplicate-key error that is actually the
-            // applicationReference unique index. Keying on the DuplicateKey
-            // category alone would silently swallow (and misreport as a
-            // reference collision) a future unrelated unique index — so we
-            // also require the write error to name the applicationReference
-            // index; anything else propagates unchanged.
-            catch (MongoWriteException ex)
-                when (ex.WriteError?.Category == ServerErrorCategory.DuplicateKey
-                    && IsApplicationReferenceDuplicate(ex)
-                )
-            {
-                if (attempt >= MaxApplicationReferenceAttempts)
-                {
-                    // RA-219 PR review: surface exhaustion as a structured
-                    // failure the endpoint already maps to a clean
-                    // ProblemDetails response, rather than throwing past the
-                    // endpoint as an unhandled 500.
-                    _logger.LogError(
-                        ex,
-                        "Failed to generate a unique applicationReference after {Attempts} attempts",
-                        MaxApplicationReferenceAttempts
-                    );
-                    return WorkItemActionResult.Failure(
-                        WorkItemActionFailureCode.ApplicationReferenceExhausted,
-                        $"Failed to generate a unique applicationReference after "
-                            + $"{MaxApplicationReferenceAttempts} attempts."
-                    );
-                }
-                _logger.LogWarning(
-                    "applicationReference {ApplicationReference} collided on attempt {Attempt}; regenerating",
-                    applicationReference,
-                    attempt
-                );
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(
-                    ex,
-                    "MongoDB write failed for work item {WorkItemId} typeId={TypeId} applicationReference={ApplicationReference} submittedBy={SubmittedBy}: {ExceptionType}",
-                    workItem.Id,
-                    type.TypeId,
-                    applicationReference,
-                    submittedBy,
-                    ex.GetType().Name
-                );
-                throw;
-            }
+            throw;
         }
 
-        var persistedReference = payload.Contains(ApplicationReferenceField)
-            ? payload[ApplicationReferenceField].AsString
-            : null;
-
         _logger.LogInformation(
-            "Work item {WorkItemId} ({TypeId}) submitted in state {StateId} applicationReference={ApplicationReference} by {User}",
-            workItem!.Id,
+            "Work item {WorkItemId} ({TypeId}) submitted in state {StateId} by {User}",
+            workItem.Id,
             workItem.TypeId,
             workItem.StateId,
-            persistedReference,
             DescribeUser(user)
         );
 
@@ -415,38 +238,6 @@ public sealed class WorkItemService : IWorkItemService
 
         return WorkItemActionResult.Success(workItem);
     }
-
-    /// <summary>
-    /// True when a duplicate-key write error was raised by the
-    /// <c>payload.applicationReference</c> unique index specifically. The
-    /// driver puts the offending index name in the write error message
-    /// (e.g. <c>E11000 duplicate key error ... index: payload.applicationReference_1 ...</c>),
-    /// so a substring match on the field name is sufficient to tell our
-    /// collision apart from any other unique index that might exist now or
-    /// in future. Defensive against a null message.
-    /// </summary>
-    private const string ApplicationReferenceField = "applicationReference";
-
-    private static bool IsApplicationReferenceDuplicate(MongoWriteException ex) =>
-        ex.WriteError?.Message?.Contains(
-            ApplicationReferenceField,
-            StringComparison.OrdinalIgnoreCase
-        ) == true;
-
-    /// <summary>
-    /// True when a duplicate-key write error was raised by the
-    /// <c>payload.operatorApplicationId</c> unique index specifically
-    /// (RA-311/MBE-3) — the same substring-match approach as
-    /// <see cref="IsApplicationReferenceDuplicate"/>, just against a
-    /// different index name.
-    /// </summary>
-    private const string OperatorApplicationIdField = "operatorApplicationId";
-
-    private static bool IsOperatorApplicationIdDuplicate(MongoWriteException ex) =>
-        ex.WriteError?.Message?.Contains(
-            OperatorApplicationIdField,
-            StringComparison.OrdinalIgnoreCase
-        ) == true;
 
     public async Task<WorkItemActionResult> ApplyActionAsync(
         Guid workItemId,

@@ -153,7 +153,7 @@ public sealed class WorkItemPersistenceMongoIntegrationTests : IAsyncDisposable,
     }
 
     [Fact]
-    public async Task DefineIndexes_creates_the_eight_documented_indexes_on_startup()
+    public async Task DefineIndexes_creates_the_five_documented_indexes_on_startup()
     {
         // Constructor of WorkItemPersistence calls EnsureIndexes; we
         // assert what the driver actually wrote (not what we asked for)
@@ -170,7 +170,7 @@ public sealed class WorkItemPersistenceMongoIntegrationTests : IAsyncDisposable,
             .OrderBy(s => s, StringComparer.Ordinal)
             .ToList();
 
-        Assert.Equal(8, keyDocs.Count);
+        Assert.Equal(5, keyDocs.Count);
         Assert.Contains(
             keyDocs,
             k => k.Contains("\"typeId\" : 1") && k.Contains("\"submittedAt\" : -1")
@@ -193,94 +193,6 @@ public sealed class WorkItemPersistenceMongoIntegrationTests : IAsyncDisposable,
         );
         // Text index for org name search — the key doc always contains "_fts":"text".
         Assert.Contains(keyDocs, k => k.Contains("\"_fts\" : \"text\""));
-        // Ascending index for applicationReference prefix search.
-        Assert.Contains(keyDocs, k => k.Contains("\"payload.applicationReference\" : 1"));
-        // RA-311/MBE-3: ascending index backing the operatorApplicationId
-        // idempotent-submit lookup.
-        Assert.Contains(keyDocs, k => k.Contains("\"payload.operatorApplicationId\" : 1"));
-        // epr-r9oy: ascending uniqueness index on the accreditation number
-        // stamped at approval (RA-448 phase 2: now backend-issued).
-        Assert.Contains(keyDocs, k => k.Contains("\"payload.accreditationId\" : 1"));
-
-        // RA-219: that index must be UNIQUE (enforce one ref per work item /
-        // give the engine a collision signal) and SPARSE (legacy docs without
-        // the field are not indexed, so they cannot trip the constraint).
-        var appRefIndex = indexes.Single(i =>
-            i["key"].AsBsonDocument.Contains("payload.applicationReference")
-        );
-        Assert.True(appRefIndex.GetValue("unique", false).ToBoolean());
-        Assert.True(appRefIndex.GetValue("sparse", false).ToBoolean());
-
-        // RA-311/MBE-3: same UNIQUE + SPARSE contract for operatorApplicationId
-        // — one work item per operator application id, but legacy/manual
-        // items without the field are never constrained.
-        var operatorApplicationIdIndex = indexes.Single(i =>
-            i["key"].AsBsonDocument.Contains("payload.operatorApplicationId")
-        );
-        Assert.True(operatorApplicationIdIndex.GetValue("unique", false).ToBoolean());
-        Assert.True(operatorApplicationIdIndex.GetValue("sparse", false).ToBoolean());
-
-        // epr-r9oy: UNIQUE but PARTIAL rather than sparse. Sparse would exclude
-        // only documents where the field is absent, and duly making writes an
-        // explicit null — under sparse the second such write in the collection
-        // fails with E11000 and the regulator gets a 500. Asserting NOT sparse
-        // is the half that stops a well-meaning "make it consistent with the
-        // two above" from reintroducing the outage.
-        var accreditationIdIndex = indexes.Single(i =>
-            i["key"].AsBsonDocument.Contains("payload.accreditationId")
-        );
-        Assert.True(accreditationIdIndex.GetValue("unique", false).ToBoolean());
-        Assert.False(accreditationIdIndex.GetValue("sparse", false).ToBoolean());
-        Assert.True(accreditationIdIndex.Contains("partialFilterExpression"));
-    }
-
-    [Fact]
-    public async Task EnsureIndexes_reconciles_a_pre_existing_non_unique_applicationReference_index_on_startup()
-    {
-        // RA-219 PR review (BLOCKING): on any environment that already carries
-        // the OLD non-unique payload.applicationReference index (RA-196 shipped
-        // it), MongoDB raises IndexOptionsConflict (code 85) when CreateMany is
-        // asked for the new unique+sparse index with the identical key. That
-        // breaks service startup. This test reproduces the deploy condition and
-        // proves the reconcile recovers it.
-        var freshDb = MongoIntegrationFixture.NewDatabaseName("work_items_reconcile");
-        var factory = new TestMongoDbClientFactory(_fixture.ConnectionString, freshDb);
-        try
-        {
-            var collection = factory.GetCollection<WorkItem>("workItems");
-
-            // Stand up the OLD index: same key, NON-unique, NON-sparse — the
-            // exact shape that conflicts with RA-219's tightened definition.
-            collection.Indexes.CreateOne(
-                new CreateIndexModel<WorkItem>(
-                    Builders<WorkItem>.IndexKeys.Ascending("payload.applicationReference"),
-                    new CreateIndexOptions { Unique = false, Sparse = false }
-                ),
-                cancellationToken: TestContext.Current.CancellationToken
-            );
-
-            // Constructing the persistence runs EnsureIndexes in its base ctor.
-            // Before the fix this threw MongoCommandException (code 85); now it
-            // must complete cleanly.
-            var ex = Record.Exception(() =>
-                new WorkItemPersistence(factory, NullLoggerFactory.Instance, new WorkItemRegistry([]))
-            );
-            Assert.Null(ex);
-
-            // And the index must have been migrated to unique + sparse.
-            var indexes = await (
-                await collection.Indexes.ListAsync(TestContext.Current.CancellationToken)
-            ).ToListAsync(TestContext.Current.CancellationToken);
-            var appRefIndex = indexes.Single(i =>
-                i["key"].AsBsonDocument.Contains("payload.applicationReference")
-            );
-            Assert.True(appRefIndex.GetValue("unique", false).ToBoolean());
-            Assert.True(appRefIndex.GetValue("sparse", false).ToBoolean());
-        }
-        finally
-        {
-            await factory.GetClient().DropDatabaseAsync(freshDb, TestContext.Current.CancellationToken);
-        }
     }
 
     [Fact]
@@ -303,65 +215,13 @@ public sealed class WorkItemPersistenceMongoIntegrationTests : IAsyncDisposable,
             var indexes = await (
                 await collection.Indexes.ListAsync(TestContext.Current.CancellationToken)
             ).ToListAsync(TestContext.Current.CancellationToken);
-            var appRefIndex = indexes.Single(i =>
-                i["key"].AsBsonDocument.Contains("payload.applicationReference")
-            );
-            Assert.True(appRefIndex.GetValue("unique", false).ToBoolean());
-            Assert.True(appRefIndex.GetValue("sparse", false).ToBoolean());
+            // Mongo's default _id_ index plus our five.
+            Assert.Equal(6, indexes.Count);
         }
         finally
         {
             await factory.GetClient().DropDatabaseAsync(freshDb, TestContext.Current.CancellationToken);
         }
-    }
-
-    [Fact]
-    public async Task Unique_applicationReference_index_rejects_a_second_document_with_the_same_reference()
-    {
-        // RA-219: prove the unique constraint is live — a duplicate
-        // payload.applicationReference is rejected with a DuplicateKey write
-        // error (the very signal the engine retries on).
-        var now = _time.GetUtcNow().UtcDateTime;
-        WorkItem Build() =>
-            new()
-            {
-                TypeId = "re-accreditation",
-                StateId = "submitted",
-                SubmittedAt = now,
-                LastModifiedAt = now,
-                Payload = new MongoDB.Bson.BsonDocument
-                {
-                    ["applicationReference"] = "RA-123456789",
-                },
-            };
-
-        await _persistence.CreateAsync(Build(), TestContext.Current.CancellationToken);
-
-        var ex = await Assert.ThrowsAsync<MongoDB.Driver.MongoWriteException>(() =>
-            _persistence.CreateAsync(Build(), TestContext.Current.CancellationToken)
-        );
-        Assert.Equal(MongoDB.Driver.ServerErrorCategory.DuplicateKey, ex.WriteError?.Category);
-    }
-
-    [Fact]
-    public async Task Sparse_applicationReference_index_allows_multiple_documents_without_a_reference()
-    {
-        // RA-219: legacy / reference-less documents must coexist — the sparse
-        // option means they are simply not indexed, so two of them do not
-        // collide on the unique constraint.
-        var now = _time.GetUtcNow().UtcDateTime;
-        WorkItem Build() =>
-            new()
-            {
-                TypeId = "re-accreditation",
-                StateId = "submitted",
-                SubmittedAt = now,
-                LastModifiedAt = now,
-            };
-
-        await _persistence.CreateAsync(Build(), TestContext.Current.CancellationToken);
-        await _persistence.CreateAsync(Build(), TestContext.Current.CancellationToken);
-        // No exception: sparse index does not constrain documents missing the key.
     }
 
     [Fact]
@@ -1080,24 +940,6 @@ public sealed class WorkItemPersistenceMongoIntegrationTests : IAsyncDisposable,
     }
 
     // ------------------------- RA-551 payload.nation representation -------------------------
-
-    private async Task SeedWithNationAsync(string organisationName, string nation)
-    {
-        var now = _time.GetUtcNow().UtcDateTime;
-        var item = new WorkItem
-        {
-            TypeId = "re-accreditation",
-            StateId = "submitted",
-            SubmittedAt = now,
-            LastModifiedAt = now,
-            Payload = new BsonDocument
-            {
-                ["organisationName"] = organisationName,
-                ["nation"] = nation,
-            },
-        };
-        await _persistence.CreateAsync(item, TestContext.Current.CancellationToken);
-    }
 
     // ----------------- RA-691 FindByPayloadFieldPrefixAsync / CorrectPayloadFieldAsync -----------------
 

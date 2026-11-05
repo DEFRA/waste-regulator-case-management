@@ -1889,17 +1889,14 @@ public class WorkItemServiceTests : IAsyncDisposable
     [Fact]
     public async Task Submit_records_submission_metadata_on_birth_audit_entry()
     {
-        // RA-126: source / clientId / userId / applicationReference are
-        // appended to the birth entry's Details alongside the existing
-        // typeId / stateId / templateVersion keys. CreatedAt must be the
-        // server-side receipt time from the injected TimeProvider, not a
-        // client-supplied value. RA-219: applicationReference is generated
-        // server-side; a client-supplied value in metadata is ignored.
+        // RA-126: source / clientId / userId are appended to the birth
+        // entry's Details alongside the existing typeId / stateId /
+        // templateVersion keys. CreatedAt must be the server-side receipt
+        // time from the injected TimeProvider, not a client-supplied value.
         var type = BuildType();
         var metadata = new Dictionary<string, string?>
         {
             ["source"] = "operator-fe",
-            ["applicationReference"] = "APP-123",
         };
 
         var result = await BuildService(type)
@@ -1923,19 +1920,13 @@ public class WorkItemServiceTests : IAsyncDisposable
         Assert.Equal("operator-fe", entry.Details["source"]);
         Assert.Equal("test-client", entry.Details["clientId"]);
         Assert.Equal("alice-1", entry.Details["userId"]);
-        // RA-219: generated reference, not the ignored "APP-123" client value.
-        Assert.NotEqual("APP-123", entry.Details["applicationReference"]);
-        Assert.Matches(@"^AP\d{2}EA$", entry.Details["applicationReference"]);
     }
 
     [Fact]
     public async Task Submit_records_null_metadata_keys_when_no_metadata_supplied()
     {
-        // RA-126: when the caller passes no metadata the four keys still
-        // appear on Details. clientId / userId resolve from claims;
-        // source is null. RA-219: applicationReference is always generated
-        // server-side, so it is a real RA-######### value even with no
-        // metadata.
+        // RA-126: when the caller passes no metadata the keys still appear
+        // on Details. clientId / userId resolve from claims; source is null.
         var type = BuildType();
 
         var result = await BuildService(type)
@@ -1953,371 +1944,8 @@ public class WorkItemServiceTests : IAsyncDisposable
         var entry = Assert.Single(fetched.AuditLog);
         Assert.True(entry.Details.ContainsKey("source"));
         Assert.Null(entry.Details["source"]);
-        Assert.True(entry.Details.ContainsKey("applicationReference"));
-        Assert.Matches(@"^AP\d{2}EA$", entry.Details["applicationReference"]);
         Assert.Equal("test-client", entry.Details["clientId"]);
         Assert.Equal("alice-1", entry.Details["userId"]);
-    }
-
-    [Fact]
-    public async Task Submit_generates_a_server_side_applicationReference_into_the_payload()
-    {
-        // RA-219: the engine generates payload.applicationReference itself.
-        var type = BuildType();
-
-        var result = await BuildService(type)
-            .SubmitAsync(
-                type,
-                new BsonDocument(),
-                "test-client",
-                AuditUser(),
-                cancellationToken: TestContext.Current.CancellationToken
-            );
-
-        Assert.True(result.IsSuccess);
-        var fetched = await GetAsync(result.WorkItem!.Id);
-        Assert.True(fetched.Payload.Contains("applicationReference"));
-        Assert.Matches(@"^AP\d{2}EA$", fetched.Payload["applicationReference"].AsString);
-    }
-
-    [Fact]
-    public async Task Submit_NoOperatorSuppliedPaymentReference_FallsBackToTheGeneratedApplicationReference()
-    {
-        // RA-447/CM3: paymentReference used to stay null forever (the operator backend cannot
-        // know applicationReference before management-be generates it). RA-503: the operator
-        // backend now sends its own real bank reference in most cases (see the test below) -
-        // this fallback covers a payload with none, e.g. a submitter that predates that change.
-        var type = BuildType();
-
-        var result = await BuildService(type)
-            .SubmitAsync(
-                type,
-                new BsonDocument(),
-                "test-client",
-                AuditUser(),
-                cancellationToken: TestContext.Current.CancellationToken
-            );
-
-        Assert.True(result.IsSuccess);
-        var fetched = await GetAsync(result.WorkItem!.Id);
-        Assert.True(fetched.Payload.Contains("paymentReference"));
-        Assert.Equal(
-            fetched.Payload["applicationReference"].AsString,
-            fetched.Payload["paymentReference"].AsString
-        );
-    }
-
-    // RA-503: the operator's real, nation-specific bank payment reference (buildPaymentReference
-    // in epr-register-enrol-frontend) must be preserved exactly as sent, never overwritten by the
-    // locally-generated applicationReference - they are different values by design (the operator
-    // already quoted this one on their bank transfer).
-    [Fact]
-    public async Task Submit_OperatorSuppliedPaymentReference_IsPreservedRatherThanOverwritten()
-    {
-        var type = BuildType();
-        var payload = new BsonDocument { ["paymentReference"] = "PR/PK/REP/500500" };
-
-        var result = await BuildService(type)
-            .SubmitAsync(
-                type,
-                payload,
-                "test-client",
-                AuditUser(),
-                cancellationToken: TestContext.Current.CancellationToken
-            );
-
-        Assert.True(result.IsSuccess);
-        var fetched = await GetAsync(result.WorkItem!.Id);
-        Assert.Equal("PR/PK/REP/500500", fetched.Payload["paymentReference"].AsString);
-        Assert.NotEqual(
-            fetched.Payload["applicationReference"].AsString,
-            fetched.Payload["paymentReference"].AsString
-        );
-    }
-
-    // RA-503: the retry loop regenerates applicationReference on each collision attempt, but the
-    // operator-supplied paymentReference must stay fixed across every attempt - it was captured
-    // once, before the loop, precisely so a later attempt's fresh applicationReference can never
-    // leak into it. Uses ScriptedReferenceGenerator (same collision-forcing pattern as
-    // Submit_retries_on_a_unique_reference_collision_and_succeeds below) rather than relying on
-    // the real generator producing two colliding values.
-    [Fact]
-    public async Task Submit_OperatorSuppliedPaymentReference_SurvivesAnApplicationReferenceCollisionRetry()
-    {
-        var type = BuildType();
-        const string Taken = "RA-333333333";
-        const string Free = "RA-444444444";
-        await SeedAsync(configure: w =>
-            w.Payload = new BsonDocument { ["applicationReference"] = Taken }
-        );
-
-        var generator = new ScriptedReferenceGenerator(Taken, Free);
-        var service = new WorkItemService(
-            new WorkItemRegistry([type]),
-            _persistence,
-            NullLogger<WorkItemService>.Instance,
-            _time,
-            referenceGenerator: generator
-        );
-
-        var payload = new BsonDocument { ["paymentReference"] = "PR/PK/REP/500500" };
-        var result = await service.SubmitAsync(
-            type,
-            payload,
-            "test-client",
-            AuditUser(),
-            cancellationToken: TestContext.Current.CancellationToken
-        );
-
-        Assert.True(result.IsSuccess);
-        Assert.Equal(2, generator.CallCount);
-        var fetched = await GetAsync(result.WorkItem!.Id);
-        Assert.Equal(Free, fetched.Payload["applicationReference"].AsString);
-        Assert.Equal("PR/PK/REP/500500", fetched.Payload["paymentReference"].AsString);
-    }
-
-    [Fact]
-    public async Task Submit_ignores_any_client_supplied_applicationReference_in_the_payload()
-    {
-        // RA-219: a value the client smuggles into the payload body must be
-        // overwritten by the server-generated reference, never honoured.
-        var type = BuildType();
-        var payload = new BsonDocument { ["applicationReference"] = "CLIENT-OWNED-REF" };
-
-        var result = await BuildService(type)
-            .SubmitAsync(
-                type,
-                payload,
-                "test-client",
-                AuditUser(),
-                cancellationToken: TestContext.Current.CancellationToken
-            );
-
-        Assert.True(result.IsSuccess);
-        var fetched = await GetAsync(result.WorkItem!.Id);
-        var stored = fetched.Payload["applicationReference"].AsString;
-        Assert.NotEqual("CLIENT-OWNED-REF", stored);
-        Assert.Matches(@"^AP\d{2}EA$", stored);
-    }
-
-    [Fact]
-    public async Task Submit_retries_on_a_unique_reference_collision_and_succeeds()
-    {
-        // RA-219: a collision on the unique payload.applicationReference index
-        // is recovered by regenerating. Seed a document that already holds the
-        // first candidate, then drive the engine with a scripted generator
-        // whose first draw collides and second draw is free.
-        var type = BuildType();
-        const string Taken = "RA-111111111";
-        const string Free = "RA-222222222";
-        await SeedAsync(configure: w =>
-            w.Payload = new BsonDocument { ["applicationReference"] = Taken }
-        );
-
-        var generator = new ScriptedReferenceGenerator(Taken, Free);
-        var service = new WorkItemService(
-            new WorkItemRegistry([type]),
-            _persistence,
-            NullLogger<WorkItemService>.Instance,
-            _time,
-            referenceGenerator: generator
-        );
-
-        var result = await service.SubmitAsync(
-            type,
-            new BsonDocument(),
-            "test-client",
-            AuditUser(),
-            cancellationToken: TestContext.Current.CancellationToken
-        );
-
-        Assert.True(result.IsSuccess);
-        var fetched = await GetAsync(result.WorkItem!.Id);
-        Assert.Equal(Free, fetched.Payload["applicationReference"].AsString);
-        Assert.Equal(2, generator.CallCount);
-    }
-
-    [Fact]
-    public async Task Submit_returns_a_structured_failure_after_exhausting_reference_attempts()
-    {
-        // RA-219 PR review: if every candidate collides, the engine gives up
-        // after MaxApplicationReferenceAttempts and returns a structured
-        // ApplicationReferenceExhausted failure (which the endpoint maps to a
-        // clean 503) rather than throwing past the endpoint as a 500.
-        var type = BuildType();
-        const string Taken = "RA-999999999";
-        await SeedAsync(configure: w =>
-            w.Payload = new BsonDocument { ["applicationReference"] = Taken }
-        );
-
-        // Always returns the already-taken reference, so every attempt collides.
-        var generator = new ScriptedReferenceGenerator(Taken);
-        var service = new WorkItemService(
-            new WorkItemRegistry([type]),
-            _persistence,
-            NullLogger<WorkItemService>.Instance,
-            _time,
-            referenceGenerator: generator
-        );
-
-        var result = await service.SubmitAsync(
-            type,
-            new BsonDocument(),
-            "test-client",
-            AuditUser(),
-            cancellationToken: TestContext.Current.CancellationToken
-        );
-
-        Assert.False(result.IsSuccess);
-        Assert.Equal(WorkItemActionFailureCode.ApplicationReferenceExhausted, result.FailureCode);
-        Assert.Contains("applicationReference", result.Message);
-        Assert.Equal(WorkItemService.MaxApplicationReferenceAttempts, generator.CallCount);
-
-        // Nothing extra was persisted beyond the seeded collision doc.
-        var page = await _persistence.QueryAsync(
-            new WorkItemQuery(TypeIds: [TypeId], Page: 1, PageSize: 10),
-            TestContext.Current.CancellationToken
-        );
-        Assert.Single(page.Items);
-    }
-
-    [Fact]
-    public async Task Submit_is_idempotent_for_a_retried_operatorApplicationId()
-    {
-        // RA-311/MBE-3: the operator backend forwards the operator's
-        // original "submit application" call and may retry it after the
-        // Registration & Accreditation service frontend's 5s client timeout even though the first attempt already
-        // succeeded here (this round trip can take up to 100s). A retried
-        // submit carrying the same operatorApplicationId must hand back
-        // the SAME work item rather than creating a second one.
-        var type = BuildType();
-
-        var first = await BuildService(type)
-            .SubmitAsync(
-                type,
-                new BsonDocument { ["operatorApplicationId"] = "app-001" },
-                "test-client",
-                AuditUser(),
-                cancellationToken: TestContext.Current.CancellationToken
-            );
-        Assert.True(first.IsSuccess);
-        Assert.False(first.IsIdempotentReplay);
-
-        // A fresh payload instance with the same operatorApplicationId,
-        // mirroring a real retried HTTP POST rather than reusing the first
-        // call's (now server-mutated) BsonDocument.
-        var second = await BuildService(type)
-            .SubmitAsync(
-                type,
-                new BsonDocument { ["operatorApplicationId"] = "app-001" },
-                "test-client",
-                AuditUser(),
-                cancellationToken: TestContext.Current.CancellationToken
-            );
-
-        Assert.True(second.IsSuccess);
-        Assert.True(second.IsIdempotentReplay);
-        Assert.Equal(first.WorkItem!.Id, second.WorkItem!.Id);
-
-        // Exactly one document exists for this operatorApplicationId — the
-        // retry did not create a duplicate work item.
-        var page = await _persistence.QueryAsync(
-            new WorkItemQuery(TypeIds: [TypeId], Page: 1, PageSize: 10),
-            TestContext.Current.CancellationToken
-        );
-        Assert.Single(page.Items);
-    }
-
-    [Fact]
-    public async Task Submit_does_not_rerun_submitted_hooks_on_an_idempotent_replay()
-    {
-        // A replay must not re-trigger downstream side effects (e.g. a
-        // notification hook that already fired for the original submission).
-        var type = BuildType();
-        var hook = Substitute.For<IWorkItemPostActionHook>();
-        var service = BuildServiceWithHook(type, hook);
-
-        await service.SubmitAsync(
-            type,
-            new BsonDocument { ["operatorApplicationId"] = "app-002" },
-            "test-client",
-            AuditUser(),
-            cancellationToken: TestContext.Current.CancellationToken
-        );
-        await hook.Received(1)
-            .OnSubmittedAsync(
-                Arg.Any<WorkItem>(),
-                Arg.Any<ClaimsPrincipal>(),
-                Arg.Any<CancellationToken>()
-            );
-
-        var second = await service.SubmitAsync(
-            type,
-            new BsonDocument { ["operatorApplicationId"] = "app-002" },
-            "test-client",
-            AuditUser(),
-            cancellationToken: TestContext.Current.CancellationToken
-        );
-
-        Assert.True(second.IsIdempotentReplay);
-        // Still exactly the one call from the original submission — the
-        // replay path returns before the hook fan-out runs again.
-        await hook.Received(1)
-            .OnSubmittedAsync(
-                Arg.Any<WorkItem>(),
-                Arg.Any<ClaimsPrincipal>(),
-                Arg.Any<CancellationToken>()
-            );
-    }
-
-    [Fact]
-    public async Task Submit_without_an_operatorApplicationId_always_creates_a_new_work_item()
-    {
-        // Sanity check: the idempotency guard only engages when the payload
-        // actually carries an operatorApplicationId. Case-management-created
-        // items (and any legacy submission) never set it, so two otherwise
-        // identical submissions must still create two distinct work items.
-        var type = BuildType();
-
-        var first = await BuildService(type)
-            .SubmitAsync(
-                type,
-                new BsonDocument(),
-                "test-client",
-                AuditUser(),
-                cancellationToken: TestContext.Current.CancellationToken
-            );
-        var second = await BuildService(type)
-            .SubmitAsync(
-                type,
-                new BsonDocument(),
-                "test-client",
-                AuditUser(),
-                cancellationToken: TestContext.Current.CancellationToken
-            );
-
-        Assert.True(first.IsSuccess);
-        Assert.True(second.IsSuccess);
-        Assert.False(second.IsIdempotentReplay);
-        Assert.NotEqual(first.WorkItem!.Id, second.WorkItem!.Id);
-    }
-
-    /// <summary>
-    /// Deterministic generator for the collision tests. Returns the supplied
-    /// values in order; once the script is exhausted it repeats the last
-    /// value (so "always collides" is expressed with a single value).
-    /// </summary>
-    private sealed class ScriptedReferenceGenerator(params string[] values)
-        : IApplicationReferenceGenerator
-    {
-        public int CallCount { get; private set; }
-
-        public string Generate(BsonDocument payload, int attempt)
-        {
-            var value = values[Math.Min(CallCount, values.Length - 1)];
-            CallCount++;
-            return value;
-        }
     }
 
     /// <summary>
@@ -2391,17 +2019,6 @@ public class WorkItemServiceTests : IAsyncDisposable
             Guid id,
             CancellationToken cancellationToken = default
         ) => inner.GetByIdAsync(id, cancellationToken);
-
-        public Task<WorkItem?> FindByOperatorApplicationIdAsync(
-            string typeId,
-            string operatorApplicationId,
-            CancellationToken cancellationToken = default
-        ) =>
-            inner.FindByOperatorApplicationIdAsync(
-                typeId,
-                operatorApplicationId,
-                cancellationToken
-            );
 
         public Task<WorkItemPage> QueryAsync(
             WorkItemQuery query,

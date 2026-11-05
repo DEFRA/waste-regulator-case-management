@@ -27,10 +27,7 @@ public sealed record WorkItemResponse(
     DateTime? AssignedAt = null,
     string? AssignedBy = null,
     IReadOnlyCollection<WorkItemNoteResponse>? Notes = null,
-    IReadOnlyCollection<WorkItemAuditEntryResponse>? AuditLog = null,
-    // RA-318: surfaced as a top-level field (mirroring payload.applicationReference)
-    // so callers don't need to parse the payload JSON to obtain it.
-    string? ApplicationReference = null
+    IReadOnlyCollection<WorkItemAuditEntryResponse>? AuditLog = null
 );
 
 /// <summary>

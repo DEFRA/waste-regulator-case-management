@@ -30,11 +30,6 @@ public class WorkItemEndpointsTests
 {
     private static readonly string[] s_expectedCapturedStateIds = ["submitted"];
     private static readonly string[] s_expectedCapturedTypeIds = ["re-accreditation", "other-type"];
-    private static readonly string[] s_expectedStampedPayloadFields =
-    [
-        "applicationReference",
-        "paymentReference",
-    ];
     private static readonly int[] s_nonObjectPayload = [1, 2, 3];
 
     private const string TypeId = "test-type";
@@ -120,33 +115,6 @@ public class WorkItemEndpointsTests
     }
 
     [Fact]
-    public async Task Post_sets_idempotent_replay_header_when_operatorApplicationId_retried()
-    {
-        // RA-311/MBE-3 at the endpoint layer: a retried submit carrying the
-        // same operatorApplicationId must come back flagged via the
-        // X-Idempotent-Replay header, not just internally on the engine
-        // result (see WorkItemServiceTests for the engine-level assertion).
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using var factory = NewFactory();
-        using var client = factory.CreateClient();
-
-        var payload = new { typeId = TypeId, payload = new { operatorApplicationId = "op-endpoint-1" } };
-
-        var first = await client.PostAsJsonAsync("/work-items", payload, cancellationToken);
-        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
-        Assert.False(first.Headers.Contains("X-Idempotent-Replay"));
-
-        var second = await client.PostAsJsonAsync("/work-items", payload, cancellationToken);
-        Assert.Equal(HttpStatusCode.Created, second.StatusCode);
-        Assert.True(second.Headers.TryGetValues("X-Idempotent-Replay", out var values));
-        Assert.Contains("true", values);
-
-        var firstBody = await first.Content.ReadFromJsonAsync<WorkItemResponse>(cancellationToken);
-        var secondBody = await second.Content.ReadFromJsonAsync<WorkItemResponse>(cancellationToken);
-        Assert.Equal(firstBody!.Id, secondBody!.Id);
-    }
-
-    [Fact]
     public async Task Post_persists_work_item_in_initial_state_with_payload_and_submitter()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -187,13 +155,6 @@ public class WorkItemEndpointsTests
         Assert.Equal("v1", body.TemplateVersion);
         Assert.Equal(JsonValueKind.Object, body.Payload.ValueKind);
         Assert.Equal("Acme", body.Payload.GetProperty("applicantName").GetString());
-
-        // RA-219: the 201 body must carry the server-generated reference at
-        // payload.applicationReference so the BFF can display it. The same
-        // value must be what was persisted.
-        var responseRef = body.Payload.GetProperty("applicationReference").GetString();
-        Assert.Matches(@"^AP\d{2}EA$", responseRef);
-        Assert.Equal(persisted.Payload["applicationReference"].AsString, responseRef);
     }
 
     [Fact]
@@ -262,8 +223,7 @@ public class WorkItemEndpointsTests
     public async Task Post_records_submission_metadata_on_birth_audit_entry()
     {
         // RA-126: birth audit entry must carry source / clientId / userId
-        // / applicationReference alongside the existing typeId / stateId
-        // / templateVersion keys so audit consumers can reconstruct the
+        // alongside the existing typeId / stateId / templateVersion keys so audit consumers can reconstruct the
         // submission origin without joining back to request logs.
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var factory = NewFactory(userId: "alice-1", userName: "Alice Example");
@@ -275,8 +235,6 @@ public class WorkItemEndpointsTests
             {
                 typeId = TypeId,
                 source = "operator-fe",
-                // RA-219: a client-supplied applicationReference is IGNORED.
-                applicationReference = "APP-123",
                 payload = new { applicantName = "Acme" },
             },
             cancellationToken
@@ -294,18 +252,13 @@ public class WorkItemEndpointsTests
         Assert.Equal("operator-fe", entry.Details["source"]);
         Assert.Equal("test-client", entry.Details["clientId"]);
         Assert.Equal("alice-1", entry.Details["userId"]);
-        // RA-219: the server-generated reference, not the ignored client value.
-        var auditedRef = entry.Details["applicationReference"];
-        Assert.NotEqual("APP-123", auditedRef);
-        Assert.Matches(@"^AP\d{2}EA$", auditedRef);
     }
 
     [Fact]
     public async Task Post_records_birth_audit_entry_with_null_metadata_when_omitted()
     {
-        // RA-126: source / applicationReference are optional; when the
-        // caller omits them the keys still appear on Details with a
-        // null value so audit consumers can rely on a fixed shape.
+        // RA-126: source is optional; when the caller omits it the key
+        // still appears on Details with a null value so audit consumers can rely on a fixed shape.
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var factory = NewFactory(userId: "alice-1");
         using var client = factory.CreateClient();
@@ -322,11 +275,6 @@ public class WorkItemEndpointsTests
         var entry = Assert.Single(persisted!.AuditLog);
         Assert.True(entry.Details.ContainsKey("source"));
         Assert.Null(entry.Details["source"]);
-        // RA-219: applicationReference is always generated server-side, so
-        // even with no submission metadata the birth entry carries a real
-        // RA-######### value rather than null.
-        Assert.True(entry.Details.ContainsKey("applicationReference"));
-        Assert.Matches(@"^AP\d{2}EA$", entry.Details["applicationReference"]);
         Assert.Equal("test-client", entry.Details["clientId"]);
         Assert.Equal("alice-1", entry.Details["userId"]);
     }
@@ -340,9 +288,7 @@ public class WorkItemEndpointsTests
     {
         // RA-126: reject malformed metadata up front rather than
         // silently coercing / dropping it — that would leave the audit
-        // record degraded without the caller noticing. RA-219: only
-        // 'source' is caller-supplied now; 'applicationReference' is
-        // generated server-side and any client value is ignored.
+        // record degraded without the caller noticing.
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var factory = NewFactory();
         using var client = factory.CreateClient();
@@ -379,17 +325,7 @@ public class WorkItemEndpointsTests
         var body = await response.Content.ReadFromJsonAsync<WorkItemResponse>(cancellationToken);
         var persisted = await factory.Persistence.GetByIdAsync(body!.Id, cancellationToken);
         Assert.NotNull(persisted);
-        // RA-219: even with no client payload the engine stamps the
-        // server-generated applicationReference, so the payload is no longer
-        // empty. RA-447/CM3: it also stamps paymentReference (the same
-        // value) at creation, so exactly those two fields are present.
-        Assert.Equal(
-            s_expectedStampedPayloadFields,
-            persisted!.Payload.Names);
-        Assert.Matches(@"^AP\d{2}EA$", persisted.Payload["applicationReference"].AsString);
-        Assert.Equal(
-            persisted.Payload["applicationReference"].AsString,
-            persisted.Payload["paymentReference"].AsString);
+        Assert.Empty(persisted!.Payload.Names);
     }
 
     [Fact]
@@ -557,58 +493,6 @@ public class WorkItemEndpointsTests
         var lastQuery = factory.Recording.LastQuery;
         Assert.NotNull(lastQuery);
         Assert.Equal("test-client", lastQuery!.SubmittedBy);
-    }
-
-    [Fact]
-    public async Task Submit_maps_applicationReference_exhaustion_to_a_503_problem()
-    {
-        // RA-219 PR review: when the engine cannot allocate a unique
-        // applicationReference it returns ApplicationReferenceExhausted, which
-        // the Submit endpoint must surface as a clean 503 ProblemDetails — not
-        // let it escape as an unhandled 500.
-        var cancellationToken = TestContext.Current.CancellationToken;
-        var type = new TestWorkItemType(TypeId, "Test type");
-        var registry = new WorkItemRegistry([type]);
-        var engine = Substitute.For<IWorkItemService>();
-        engine
-            .SubmitAsync(
-                Arg.Any<IWorkItemType>(),
-                Arg.Any<MongoDB.Bson.BsonDocument>(),
-                Arg.Any<string?>(),
-                Arg.Any<System.Security.Claims.ClaimsPrincipal>(),
-                Arg.Any<IReadOnlyDictionary<string, string?>?>(),
-                Arg.Any<CancellationToken>()
-            )
-            .Returns(
-                WorkItemActionResult.Failure(
-                    WorkItemActionFailureCode.ApplicationReferenceExhausted,
-                    "Failed to generate a unique applicationReference after 5 attempts."
-                )
-            );
-
-        var body = JsonDocument.Parse($"{{\"typeId\":\"{TypeId}\"}}").RootElement;
-        var httpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext
-        {
-            User = new System.Security.Claims.ClaimsPrincipal(
-                new System.Security.Claims.ClaimsIdentity(authenticationType: "test")
-            ),
-        };
-
-        var result = await WorkItemEndpoints.Submit(
-            body,
-            httpContext,
-            registry,
-            engine,
-            Substitute.For<IStructuredLogger<WorkItemEndpointsLogger>>(),
-            cancellationToken
-        );
-
-        var problem = Assert.IsType<ProblemHttpResult>(result.Result);
-        Assert.Equal(
-            Microsoft.AspNetCore.Http.StatusCodes.Status503ServiceUnavailable,
-            problem.StatusCode
-        );
-        Assert.Contains("applicationReference", problem.ProblemDetails.Detail);
     }
 
     [Fact]
@@ -812,10 +696,9 @@ public class WorkItemEndpointsTests
     [Fact]
     public async Task Submit_maps_an_unrecognised_failure_code_to_a_generic_400_problem()
     {
-        // Every WorkItemActionFailureCode SubmitAsync can plausibly return is
-        // MissingActorIdentity or ApplicationReferenceExhausted, each with
-        // its own named switch arm; this exercises the fallback arm that
-        // catches anything else.
+        // The only WorkItemActionFailureCode SubmitAsync can plausibly return
+        // is MissingActorIdentity, which has its own named switch arm; this
+        // exercises the fallback arm that catches anything else.
         var cancellationToken = TestContext.Current.CancellationToken;
         var type = new TestWorkItemType(TypeId, "Test type");
         var registry = new WorkItemRegistry([type]);
@@ -2037,10 +1920,6 @@ public class WorkItemEndpointsTests
             Guid id,
             CancellationToken cancellationToken = default
         ) => Inner.GetByIdAsync(id, cancellationToken);
-
-        public Task<WorkItem?> FindByOperatorApplicationIdAsync(
-            string typeId, string operatorApplicationId, CancellationToken cancellationToken = default
-        ) => Inner.FindByOperatorApplicationIdAsync(typeId, operatorApplicationId, cancellationToken);
 
         public Task<WorkItemPage> QueryAsync(
             WorkItemQuery query,

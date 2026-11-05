@@ -202,12 +202,6 @@ public static class WorkItemEndpoints
         // RA-126: optional caller-supplied audit context. 'source' is a
         // string when present; reject other JSON types up front so a
         // malformed body cannot silently degrade the audit record.
-        //
-        // RA-219: 'applicationReference' is NO LONGER accepted from the
-        // client. The backend generates it server-side during submission;
-        // any value the client puts in the body is ignored (not validated,
-        // not passed through) so a caller can never spoof or collide a
-        // reference.
         Dictionary<string, string?>? submissionMetadata = null;
         if (body.TryGetProperty("source", out var sourceElement))
         {
@@ -283,14 +277,6 @@ public static class WorkItemEndpoints
                     detail: result.Message,
                     statusCode: StatusCodes.Status401Unauthorized
                 ),
-                // RA-219: applicationReference exhaustion is transient and
-                // server-side, so surface a clean 503 (retryable) rather than
-                // letting the engine throw past this handler as a 500.
-                WorkItemActionFailureCode.ApplicationReferenceExhausted => TypedResults.Problem(
-                    title: "Submission temporarily unavailable",
-                    detail: result.Message,
-                    statusCode: StatusCodes.Status503ServiceUnavailable
-                ),
                 _ => TypedResults.Problem(
                     title: InvalidRequestTitle,
                     detail: result.Message,
@@ -302,7 +288,7 @@ public static class WorkItemEndpoints
         var workItem = result.WorkItem!;
         log.Log(
             LogLevel.Information,
-            result.IsIdempotentReplay ? "Work item submission was an idempotent replay" : "Work item submission succeeded",
+            "Work item submission succeeded",
             new Dictionary<string, object?>
             {
                 ["work_item.id"] = workItem.Id.ToString(),
@@ -310,15 +296,6 @@ public static class WorkItemEndpoints
                 [CallerClientIdField] = submittedBy ?? "(unknown)",
             }
         );
-        // RA-311/MBE-3: a retried "submit application" call for an
-        // operatorApplicationId already on file is handed the existing
-        // work item rather than a new one — surface that via the same
-        // X-Idempotent-Replay header the other idempotent mutations use so
-        // a caller (the operator backend) can tell first-hit from replay.
-        if (result.IsIdempotentReplay)
-        {
-            httpContext.Response.Headers[IdempotentReplayHeader] = "true";
-        }
         var response = ToResponse(engine.Project(workItem));
         return TypedResults.CreatedAtRoute(response, "GetWorkItemById", new { id = workItem.Id });
     }
@@ -641,10 +618,7 @@ public static class WorkItemEndpoints
                     // epr-rr9s: per-event state snapshot (null for pre-change entries).
                     x.Entry.StateId
                 ))
-                .ToList(),
-            w.Payload.TryGetValue("applicationReference", out var reference) && reference.IsString
-                ? reference.AsString
-                : null
+                .ToList()
         );
     }
 

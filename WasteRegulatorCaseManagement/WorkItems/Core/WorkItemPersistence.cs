@@ -143,23 +143,6 @@ public interface IWorkItemPersistence
         WorkItemAuditEntry auditEntry,
         CancellationToken cancellationToken = default
     );
-
-    /// <summary>
-    /// RA-311/MBE-3: find an existing work item of <paramref name="typeId"/>
-    /// whose <c>payload.operatorApplicationId</c> matches
-    /// <paramref name="operatorApplicationId"/>, or <c>null</c> if none
-    /// exists. Backs the idempotent-submit check in
-    /// <see cref="WorkItemService.SubmitAsync"/>: a caller (the operator
-    /// backend, forwarding an operator's original "submit application" call)
-    /// that retries after a client-side timeout must be handed back the
-    /// work item created by the first attempt rather than creating a
-    /// duplicate.
-    /// </summary>
-    Task<WorkItem?> FindByOperatorApplicationIdAsync(
-        string typeId,
-        string operatorApplicationId,
-        CancellationToken cancellationToken = default
-    );
 }
 
 public sealed class WorkItemPersistence
@@ -219,21 +202,6 @@ public sealed class WorkItemPersistence
     )
     {
         return await Collection.Find(w => w.Id == id).FirstOrDefaultAsync(cancellationToken);
-    }
-
-    [ExcludeFromCodeCoverage]
-    public async Task<WorkItem?> FindByOperatorApplicationIdAsync(
-        string typeId,
-        string operatorApplicationId,
-        CancellationToken cancellationToken = default
-    )
-    {
-        var filter = Builders<WorkItem>.Filter.And(
-            Builders<WorkItem>.Filter.Eq(w => w.TypeId, typeId),
-            Builders<WorkItem>.Filter.Eq("payload.operatorApplicationId", operatorApplicationId)
-        );
-
-        return await Collection.Find(filter).FirstOrDefaultAsync(cancellationToken);
     }
 
     [ExcludeFromCodeCoverage]
@@ -660,73 +628,6 @@ public sealed class WorkItemPersistence
         // Search by org name: text index supports word-level case-insensitive $text queries.
         // Only one text index is allowed per collection; scope it to organisationName.
         var orgNameText = new CreateIndexModel<WorkItem>(builder.Text("payload.organisationName"));
-        // Search by org ID / applicationReference: ascending index lets anchored prefix
-        // regex queries avoid a full collection scan.
-        //
-        // RA-219: the backend now owns reference generation, so the index is
-        // UNIQUE to enforce one applicationReference per work item and to give
-        // the engine a duplicate-key signal to retry on. It is SPARSE so legacy
-        // documents that predate server-side generation (and therefore have no
-        // payload.applicationReference) are simply not indexed and cannot trip
-        // the unique constraint — only documents that actually carry the field
-        // are constrained, and every new submission sets it.
-        var applicationReference = new CreateIndexModel<WorkItem>(
-            builder.Ascending("payload.applicationReference"),
-            new CreateIndexOptions { Unique = true, Sparse = true }
-        );
-        // RA-311/MBE-3: the operator backend forwards the operator's own
-        // "submit application" call and may retry it after a client-side
-        // timeout even though the original request already succeeded here
-        // (CDP logs show the Registration & Accreditation service frontend aborting at 5s while this round-trip can take
-        // up to 100s). Unique + sparse on the same principle as
-        // applicationReference above: only documents that actually carry
-        // payload.operatorApplicationId are constrained, so items submitted
-        // without one (e.g. case-management-created items, legacy items)
-        // are unaffected, but two submissions carrying the same operator
-        // application id can never both persist — the engine's retry-lookup
-        // in WorkItemService.SubmitAsync uses this as its duplicate-key
-        // signal to hand back the original work item instead of erroring.
-        var operatorApplicationId = new CreateIndexModel<WorkItem>(
-            builder.Ascending("payload.operatorApplicationId"),
-            new CreateIndexOptions { Unique = true, Sparse = true }
-        );
-        // epr-r9oy: defined here (not on a dedicated MongoService for
-        // payload.accreditationId) because index definitions only take effect
-        // when the owning MongoService is constructed, and WorkItemPersistence
-        // is resolved by WorkItemMigrationHostedService on every boot — so a
-        // definition here reaches every environment on deploy, unlike a lazily
-        // constructed singleton nothing resolves during startup would.
-        // RA-448 phase 2: originally also read by AccreditationIdLookup.ExistsAsync
-        // (the retired local generator's own uniqueness pre-check); that reader
-        // is gone now that accreditation numbers come from the backend, which
-        // guarantees uniqueness itself via its own atomic counters, but this
-        // index stays as a defence-in-depth backstop against two concurrent
-        // approvals stamping the same id onto this collection.
-        //
-        // PARTIAL, not sparse. Sparse excludes only documents where the field is
-        // ABSENT; a document carrying an EXPLICIT null is indexed like any other,
-        // so the second one collides on the unique constraint. That is not
-        // hypothetical: ReAccreditationDulyMakingService round-trips the payload
-        // through ReAccreditationPayload and merges ToBsonDocument(), which
-        // materialises every modelled-but-absent field as an explicit null,
-        // accreditationId among them (it is null until approval). Under Sparse
-        // that made the first duly making in a collection succeed and every one
-        // after it fail with E11000, which reached the regulator as a 500.
-        //
-        // "Is a string" excludes explicit nulls and absent fields alike while
-        // keeping uniqueness over real ids, so the backstop against two
-        // concurrent approvals stamping the same id survives.
-        var accreditationId = new CreateIndexModel<WorkItem>(
-            builder.Ascending("payload.accreditationId"),
-            new CreateIndexOptions<WorkItem>
-            {
-                Unique = true,
-                PartialFilterExpression = Builders<WorkItem>.Filter.Type(
-                    "payload.accreditationId",
-                    BsonType.String
-                ),
-            }
-        );
         return
         [
             typeAndSubmitted,
@@ -734,9 +635,6 @@ public sealed class WorkItemPersistence
             submittedDescending,
             assigneeAndSubmitted,
             orgNameText,
-            applicationReference,
-            operatorApplicationId,
-            accreditationId,
         ];
     }
 }
