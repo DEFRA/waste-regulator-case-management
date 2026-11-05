@@ -9,7 +9,6 @@ COPY . .
 RUN dotnet publish WasteRegulatorCaseManagement -c Release -o /app/publish /p:UseAppHost=false
 
 # Development image: runs `dotnet watch` for hot reload during local development.
-# Used by docker compose --watch via the `develop:` block in compose.yml.
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS development
 WORKDIR /src
 COPY . .

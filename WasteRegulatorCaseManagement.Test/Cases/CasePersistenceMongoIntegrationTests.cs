@@ -11,7 +11,7 @@ using NUlid;
 namespace WasteRegulatorCaseManagement.Test.Cases;
 
 /// <summary>
-/// epr-bqe: real Mongo end-to-end coverage for <see cref="CasePersistence"/>.
+/// Real Mongo end-to-end coverage for <see cref="CasePersistence"/>.
 /// Uses Ephemeral MongoDB (real <c>mongod</c> on a random port, in a
 /// temp data directory, torn down with the fixture) so the BSON
 /// serializers registered by <see cref="MongoConventions"/>, the index definitions in
@@ -42,7 +42,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
 
 	/// <summary>
 	/// Deterministic timestamp seed used for every <see cref="Case"/>
-	/// constructed in this fixture (epr-6e5). Inlined values were
+	/// constructed in this fixture. Inlined values were
 	/// previously <c>DateTime.UtcNow</c>, which is wallclock-coupled
 	/// and obscures which value the contract under test actually
 	/// cares about.
@@ -79,7 +79,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
 	}
 
 	/// <summary>
-	/// epr-6e5: <see cref="MongoClient"/> exposes async DB management
+	/// <see cref="MongoClient"/> exposes async DB management
 	/// APIs and the test runner already drives every other resource
 	/// asynchronously. Prefer the async path; the synchronous
 	/// <see cref="Dispose"/> remains as a safety net for the rare

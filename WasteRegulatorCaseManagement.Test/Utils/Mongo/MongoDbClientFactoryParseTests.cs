@@ -5,7 +5,7 @@ using Microsoft.Extensions.Options;
 namespace WasteRegulatorCaseManagement.Test.Utils.Mongo;
 
 /// <summary>
-/// epr-hb9 — verify that <see cref="MongoDbClientFactory.ParseSettings"/>
+/// Verify that <see cref="MongoDbClientFactory.ParseSettings"/>
 /// never lets the Mongo driver's exception message (which embeds the
 /// raw URI verbatim) escape with the password intact.
 /// </summary>

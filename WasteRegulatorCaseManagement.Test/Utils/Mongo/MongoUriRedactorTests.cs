@@ -3,7 +3,7 @@ using WasteRegulatorCaseManagement.Utils.Mongo;
 namespace WasteRegulatorCaseManagement.Test.Utils.Mongo;
 
 /// <summary>
-/// epr-hb9 — pin the redaction contract that protects the Mongo
+/// Pin the redaction contract that protects the Mongo
 /// password from leaking through exception messages and any other
 /// place a connection string might end up rendered.
 /// </summary>

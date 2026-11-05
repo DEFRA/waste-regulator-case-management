@@ -4,7 +4,7 @@ namespace WasteRegulatorCaseManagement.Cases;
 
 /// <summary>
 /// A possible state of a case. <see cref="IsTerminal"/> marks states from which
-/// no further progress is expected (for example "approved" or "rejected").
+/// no further progress is expected (for example "ACCEPTED" or "CANCELLED").
 ///
 /// Embedded verbatim in a frozen <see cref="CaseTemplateSnapshot"/>, so it
 /// ignores extra BSON elements: a snapshot persisted under an older template

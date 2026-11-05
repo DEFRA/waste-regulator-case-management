@@ -9,7 +9,7 @@ namespace WasteRegulatorCaseManagement.Test.Cases;
 /// Direct unit coverage for <see cref="CasePersistence.BuildFilter"/>.
 /// The class as a whole sits behind a real Mongo driver, but the filter
 /// construction is pure logic and is the highest-leverage thing to keep
-/// inside the coverage gate (epr-036).
+/// inside the coverage gate.
 /// </summary>
 public class CasePersistenceBuildFilterTests
 {

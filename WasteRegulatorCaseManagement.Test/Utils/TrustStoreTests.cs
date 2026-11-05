@@ -5,7 +5,7 @@ using WasteRegulatorCaseManagement.Utils;
 namespace WasteRegulatorCaseManagement.Test.Utils;
 
 /// <summary>
-/// Regression coverage for epr-kf1. The disposal fix in
+/// The disposal fix in
 /// <see cref="TrustStore"/> required pulling the env-var filter out
 /// of <c>GetCertificates</c> into a pure
 /// <see cref="TrustStore.ReadTrustStoreEntries"/> seam. These tests

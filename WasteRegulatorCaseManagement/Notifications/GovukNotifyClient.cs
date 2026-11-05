@@ -169,8 +169,7 @@ internal sealed class GovukNotifyClient : INotifyClient
 			// Only rethrow when the caller's own token fired. A timeout
 			// originating from Polly's per-attempt timeout token must
 			// fall through to the generic catch below so it still
-			// produces a NotifySendResult.Failure (and, upstream, a
-			// notification-failed audit entry) instead of vanishing as
+			// produces a NotifySendResult.Failure instead of vanishing as
 			// an unstructured ERROR log at the caller's boundary.
 			throw;
 		}

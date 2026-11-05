@@ -30,8 +30,8 @@ public static class ClientIdDefaults
 	/// <summary>
 	/// Optional header carrying the caller's role as the BFF sees it (e.g.
 	/// <c>"standard"</c>/<c>"support-readonly"</c>) — becomes claim
-	/// <c>"user:role"</c>. RA-469 groundwork: not folded into the v3 HMAC
-	/// canonical payload — see <see cref="ClientIdAuthenticationHandler.ComputeSignature"/>.
+	/// <c>"user:role"</c>. Signed in the extended v3 payload — see
+	/// <see cref="ClientIdAuthenticationHandler.ComputeSignature"/>.
 	/// </summary>
 	public const string DefaultRoleHeaderName = "x-cdp-user-role";
 
@@ -39,8 +39,8 @@ public static class ClientIdDefaults
 	/// Header carrying the caller's nation scope, one of
 	/// <c>ENGLAND</c>/<c>WALES</c>/<c>SCOTLAND</c>/<c>N_IRELAND</c> — becomes
 	/// claim <c>"user:nation"</c>, which scopes every case read and mutation.
-	/// RA-469 groundwork: not folded into the v3 HMAC canonical payload —
-	/// see <see cref="ClientIdAuthenticationHandler.ComputeSignature"/>.
+	/// Signed in the extended v3 payload — see
+	/// <see cref="ClientIdAuthenticationHandler.ComputeSignature"/>.
 	/// </summary>
 	public const string DefaultNationHeaderName = "x-cdp-user-nation";
 

@@ -25,7 +25,7 @@ public static class CaseEndpoints
 	private const string InvalidRequestTitle = "Invalid request";
 	private const string CaseTypeField = "case.case_type";
 
-	// Request body size caps (epr-rvz). The case endpoints all parse
+	// Request body size caps. The case endpoints all parse
 	// their JSON body manually after .DisableValidation(), so without an
 	// explicit cap an attacker can POST arbitrarily large payloads and
 	// force in-memory JSON / BSON parsing before any size guard fires.
@@ -638,7 +638,7 @@ public static class CaseEndpoints
 			// under FakeTimeProvider, and possible in production when a
 			// single engine call appends two entries back-to-back) keep
 			// their append order reversed on the wire instead of relying on
-			// undefined behaviour from a tied OrderBy (epr-s4y).
+			// undefined behaviour from a tied OrderBy.
 			w.Timeline.Select((e, i) => (Entry: e, Index: i))
 				.OrderByDescending(x => x.Entry.PerformedAt)
 				.ThenByDescending(x => x.Index)
@@ -650,7 +650,7 @@ public static class CaseEndpoints
 					x.Entry.PerformedAt,
 					x.Entry.PerformedById,
 					x.Entry.PerformedByName,
-					// epr-rr9s: per-event state snapshot (null for pre-change entries).
+					// Per-event state snapshot (null for pre-change entries).
 					x.Entry.StateId
 				))
 				.ToList()
@@ -658,7 +658,7 @@ public static class CaseEndpoints
 	}
 
 	/// <summary>
-	/// Slim per-item projection used by the list endpoint (epr-4pf).
+	/// Slim per-item projection used by the list endpoint.
 	/// Identical to <see cref="ToResponse"/>
 	/// except the per-item <c>Timeline</c> is omitted entirely from the wire
 	/// shape — it would otherwise dominate the payload of a 100-row page even

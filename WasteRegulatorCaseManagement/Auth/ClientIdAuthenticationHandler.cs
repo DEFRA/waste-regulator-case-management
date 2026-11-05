@@ -197,10 +197,10 @@ public class ClientIdAuthenticationHandler(
 	}
 
 	/// <summary>
-	/// Reads one optional trust header (userId/userName/role/nation), guards
+	/// Reads one optional trust header (userId/userName/role/nation/email), guards
 	/// its length, and reports the outcome as either a fail result or the
 	/// resolved value via <paramref name="value"/> — the shared shape behind
-	/// all four optional-header checks in <see cref="HandleAuthenticateAsync"/>.
+	/// all five optional-header checks in <see cref="HandleAuthenticateAsync"/>.
 	/// Returns <c>null</c> (with <paramref name="value"/> set) on success;
 	/// the header being entirely absent is success with a <c>null</c> value,
 	/// not a failure.

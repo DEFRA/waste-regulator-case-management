@@ -15,7 +15,7 @@ using NUlid;
 namespace WasteRegulatorCaseManagement.Test.Cases;
 
 /// <summary>
-/// epr-dt2: negative-path coverage for the auth and assignment role
+/// Negative-path coverage for the auth and assignment role
 /// boundaries documented in AGENTS.md. Every test exercises the real
 /// pipeline (ClientIdAuthenticationHandler, routing,
 /// ProblemDetails) against ephemeral MongoDB so it can also assert the

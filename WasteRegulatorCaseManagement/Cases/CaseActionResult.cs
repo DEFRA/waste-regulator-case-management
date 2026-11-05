@@ -12,9 +12,8 @@ public enum CaseActionFailureCode
 	TerminalState,
 
 	/// <summary>
-	/// The caller is not allowed to perform this assignment (e.g. a standard
-	/// user trying to assign someone else, or to take an item that is already
-	/// assigned to a different user).
+	/// The caller is not allowed to act on cases: it carries no
+	/// <c>user:nation</c> claim.
 	/// </summary>
 	NotAuthorized,
 

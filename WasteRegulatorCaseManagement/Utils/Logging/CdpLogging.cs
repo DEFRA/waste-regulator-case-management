@@ -16,7 +16,7 @@ public static class CdpLogging
 	/// merely binds configuration onto a brand-new instance whose
 	/// <see cref="IHttpContextAccessor.HttpContext"/> is always
 	/// <c>null</c>, so the ECS HTTP enricher silently emits no
-	/// request-context fields (epr-3yv).
+	/// request-context fields.
 	/// </summary>
 	public static void Configuration(
 		HostBuilderContext ctx,
@@ -27,7 +27,7 @@ public static class CdpLogging
 		var httpAccessor = services.GetRequiredService<IHttpContextAccessor>();
 		var traceIdHeader = ctx.Configuration.GetValue<string>("TraceHeader");
 
-		// epr-mhi: the deprecated AuditLogger sub-pipeline (and its
+		// The deprecated AuditLogger sub-pipeline (and its
 		// ExcludeAuditEvents filter on the main logger) was removed per
 		// ADR-0004 — the canonical audit record is the on-document
 		// Case.Timeline, not a side-channel Serilog stream. Operational

@@ -38,7 +38,7 @@ public class MongoDbClientFactory : IMongoDbClientFactory
 	/// <see cref="MongoClientSettings.FromConnectionString"/> embeds the
 	/// raw URI in its exception messages — which for a credentialed
 	/// Mongo URI means leaking the database password to whatever logs
-	/// the failure (epr-hb9). Re-wrap with a redacted message; the
+	/// the failure. Re-wrap with a redacted message; the
 	/// original exception is intentionally NOT chained as InnerException
 	/// because its Message also contains the unredacted URI.
 	/// </summary>

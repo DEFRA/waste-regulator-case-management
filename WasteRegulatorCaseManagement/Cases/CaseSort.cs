@@ -18,9 +18,8 @@ internal static class CaseSort
 {
 	internal const string StatusToken = "status";
 
-	// Computed fields injected by an $addFields stage. They must be removed
-	// ($unset) before the aggregation result is deserialised because Case
-	// does not ignore extra BSON elements.
+	// Computed fields injected by an $addFields stage, removed ($unset)
+	// before the aggregation result is deserialised to Case.
 	internal const string RankField = "_sortRank";
 
 	/// <summary>Every computed field name this helper can inject; always $unset before deserialising.</summary>

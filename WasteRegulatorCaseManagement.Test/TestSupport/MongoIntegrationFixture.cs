@@ -13,13 +13,10 @@ namespace WasteRegulatorCaseManagement.Test.TestSupport;
 /// one test do not leak into another, but the (slow) mongod boot is
 /// amortised across the class.
 ///
-/// epr-efp: shared so endpoint suites and service suites can drop
-/// their <c>Substitute.For&lt;ICasePersistence&gt;</c> wholesale
-/// and run against the real driver — the same code path production
-/// uses. The previous mocked implementations let regressions in BSON
-/// conventions, indexes, projections (epr-4pf), case-insensitive
-/// task ids (epr-aq5 / epr-gl6), optimistic concurrency and atomic
-/// compound writes pass CI silently.
+/// Shared so endpoint suites and service suites run against the real
+/// driver — the same code path production uses — and catch regressions
+/// in BSON conventions, indexes, projections, optimistic concurrency and
+/// transactions.
 /// </summary>
 public sealed class MongoIntegrationFixture : IAsyncLifetime
 {
@@ -43,9 +40,7 @@ public sealed class MongoIntegrationFixture : IAsyncLifetime
 	{
 		_runner = await MongoRunner.RunAsync(new MongoRunnerOptions
 		{
-			// A single-node replica set is the closest match to the CDP
-			// production topology and unlocks transactions / change
-			// streams should a future test need them.
+			// Case writes use transactions, which need a replica set.
 			UseSingleNodeReplicaSet = true,
 		});
 	}

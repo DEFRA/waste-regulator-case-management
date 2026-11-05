@@ -5,7 +5,7 @@ namespace WasteRegulatorCaseManagement.Cases;
 /// <c>GET /cases</c>. Mirrors <see cref="CasePage"/> but carries
 /// API-shaped <see cref="CaseListItemResponse"/>s — a slimmer
 /// per-item shape than <see cref="CaseResponse"/> that omits the
-/// per-item <c>Timeline</c> (epr-4pf). A 100-row page of an item with
+/// per-item <c>Timeline</c>. A 100-row page of an item with
 /// chatty caseworker activity would otherwise ship the entire history for
 /// every row even though
 /// the list view never displays them; the slim shape keeps the wire
@@ -22,7 +22,7 @@ public sealed record CaseListResponse(
 	int PageSize);
 
 /// <summary>
-/// Per-item shape returned by the list endpoint (epr-4pf). Mirrors
+/// Per-item shape returned by the list endpoint. Mirrors
 /// <see cref="CaseResponse"/> exactly except that the
 /// <c>Timeline</c> is omitted entirely (the JSON property does not exist on the wire — they are not
 /// emitted-as-null) so list responses stay small. Every other field —

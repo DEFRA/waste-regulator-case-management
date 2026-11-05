@@ -16,7 +16,7 @@ using NUlid;
 namespace WasteRegulatorCaseManagement.Test.Cases;
 
 /// <summary>
-/// epr-efp: persistence is real <see cref="CasePersistence"/>
+/// Persistence is real <see cref="CasePersistence"/>
 /// against ephemeral MongoDB. Tests seed via the exposed
 /// <see cref="EngineFactory.Persistence"/> and re-read for assertions.
 /// </summary>

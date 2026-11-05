@@ -11,7 +11,7 @@ using NUlid;
 namespace WasteRegulatorCaseManagement.Test.Cases;
 
 /// <summary>
-/// epr-efp: backed by ephemeral MongoDB. Persistence is the real
+/// Backed by ephemeral MongoDB. Persistence is the real
 /// <see cref="CasePersistence"/>; assertions are made against the
 /// document fetched back from Mongo, not against the in-memory instance
 /// the test author handed to the engine.
@@ -1301,7 +1301,7 @@ public class CaseServiceTests : IAsyncDisposable
 		Assert.Equal("rejected", entry.Details["toStateId"]);
 		Assert.Equal("alice-1", entry.PerformedById);
 		Assert.Equal(TickedNow, entry.PerformedAt);
-		// epr-rr9s: the entry snapshots the state AS OF the event — the
+		// The entry snapshots the state AS OF the event — the
 		// resulting post-transition state, not the item's live state.
 		Assert.Equal("rejected", entry.StateId);
 	}
@@ -1458,7 +1458,7 @@ public class CaseServiceTests : IAsyncDisposable
 		var entry = Assert.Single(fetched.Timeline);
 		Assert.Equal("note-added", entry.Action);
 		Assert.Equal("Note added", entry.ActionDisplayName);
-		// epr-27o: the entry holds the trimmed note body.
+		// The entry holds the trimmed note body.
 		Assert.Equal("A note.", entry.Details["text"]);
 		Assert.Equal("alice-1", entry.PerformedById);
 		Assert.Equal("Alice Example", entry.PerformedByName);
@@ -1533,7 +1533,7 @@ public class CaseServiceTests : IAsyncDisposable
 		// chronological (insertion) order on disk.
 		Assert.True(fetched.Timeline[0].PerformedAt < fetched.Timeline[1].PerformedAt);
 		Assert.True(fetched.Timeline[1].PerformedAt < fetched.Timeline[2].PerformedAt);
-		// epr-rr9s: each entry snapshots the state AS OF its own event. The
+		// Each entry snapshots the state AS OF its own event. The
 		// note + assign happened while the item was still 'submitted'; only
 		// the state-changed entry carries the post-transition 'approved'.
 		// This is the regression the bug was about: earlier entries must NOT
@@ -1626,7 +1626,7 @@ public class CaseServiceTests : IAsyncDisposable
 		Assert.Equal(CaseType, entry.Details["caseType"]);
 		Assert.Equal("submitted", entry.Details["stateId"]);
 		Assert.Equal("v1", entry.Details["templateVersion"]);
-		// epr-rr9s: the birth entry snapshots the initial state.
+		// The birth entry snapshots the initial state.
 		Assert.Equal("submitted", entry.StateId);
 	}
 
@@ -1715,7 +1715,7 @@ public class CaseServiceTests : IAsyncDisposable
 	/// Produces a service whose persistence wraps the real one so that a
 	/// competing writer bumps the on-disk version between the engine's
 	/// load and replace, triggering the optimistic-concurrency exception
-	/// for real (no mocked throws — see epr-efp).
+	/// for real (no mocked throws).
 	/// </summary>
 	private CaseService BuildRacingService(CaseModuleConfig type, string id)
 	{

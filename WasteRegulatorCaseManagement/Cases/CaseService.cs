@@ -73,10 +73,7 @@ public interface ICaseService
 	/// snapshotted from the supplied <see cref="ClaimsPrincipal"/> at the
 	/// time of the call so the audit narrative survives later directory
 	/// changes. Notes are append-only; this is the only mutation the
-	/// framework offers for them. Audited as <c>note-added</c>. The
-	/// withdraw and decision-rationale flows are the only current callers —
-	/// the standalone FE "add a note" feature and task-scoped notes have
-	/// been removed.
+	/// framework offers for them. Audited as <c>note-added</c>.
 	/// </summary>
 	Task<CaseActionResult> AddNoteAsync(
 		string caseId,
@@ -178,8 +175,7 @@ public sealed class CaseService : ICaseService
 		// submitted from where without joining back to request logs.
 		// 'source' is caller-supplied (the BFF forwards it);
 		// 'clientId' is the caller-asserted, HMAC-verified client id
-		// (see ClientIdAuthenticationHandler); 'userId' is the end-user
-		// identity claim required for any mutation.
+		// (see ClientIdAuthenticationHandler).
 		AppendTimelineEntry(
 			caseRecord,
 			"case-created",
@@ -291,10 +287,9 @@ public sealed class CaseService : ICaseService
 			);
 		}
 
-		// An action id can be declared as a self-loop on more than one state
-		// (e.g. `sla-extend` on both `assessment-in-progress` and `queried`),
-		// so resolve to the transition whose FromStateId matches the work
-		// item's current state — matching on action id alone would always pick
+		// An action id can be declared on more than one from-state, so
+		// resolve to the transition whose FromStateId matches the case's
+		// current state — matching on action id alone would always pick
 		// the first declaration and wrongly reject the action from every other
 		// state it is valid in. Fall back to the first declaration only so the
 		// InvalidTransition message below still names a valid from-state.
@@ -585,7 +580,7 @@ public sealed class CaseService : ICaseService
 		{
 			// Re-assigning to the same user is a no-op: persist nothing,
 			// write no audit entry, but tell the caller this was a replay
-			// (parity with CompleteTaskAsync) so the endpoint can surface
+			// so the endpoint can surface
 			// X-Idempotent-Replay: true and the UI can render an
 			// appropriate state instead of a misleading "newly assigned".
 			return CaseActionResult.IdempotentReplay(caseRecord);
@@ -664,8 +659,8 @@ public sealed class CaseService : ICaseService
 		if (caseRecord.AssignedToId is null)
 		{
 			// Idempotent: already unassigned, nothing to do. Flag as a
-			// replay (parity with CompleteTaskAsync / AssignAsync) so the
-			// endpoint can set X-Idempotent-Replay: true.
+			// replay (as AssignAsync does) so the endpoint can set
+			// X-Idempotent-Replay: true.
 			return CaseActionResult.IdempotentReplay(caseRecord);
 		}
 
@@ -896,26 +891,14 @@ public sealed class CaseService : ICaseService
 		caseRecord.TemplateSnapshot ?? (ICaseTemplate?)_registry.Find(caseRecord.CaseType);
 
 	/// <summary>
-	/// RA-358: refuse an envelope mutation on a closed case. Assignment and
-	/// unassignment are the two operations that reach a case without
-	/// going through <see cref="ApplyActionAsync"/>, so before this check a
-	/// direct POST could still hand a withdrawn / approved / rejected item to
-	/// someone (the front end only hid the buttons). Terminality comes from
-	/// the item's own template via <see cref="TerminalStates.Find"/> — no
-	/// state id is hardcoded here, and an in-flight item is judged by the
-	/// template version it was submitted under.
+	/// Refuse assignment and unassignment of a concluded case. They are the
+	/// two operations that reach a case without going through
+	/// <see cref="ApplyActionAsync"/>, so they check terminality themselves.
+	/// Terminality comes from the case's own template via
+	/// <see cref="TerminalStates.Find"/>, so a case is judged by the template
+	/// version it was submitted under.
 	/// </summary>
 	/// <remarks>
-	/// <para>
-	/// This deliberately reverses RA-295 AC03, which required assignment to
-	/// stay available "all the way through" and is the reason no gate existed.
-	/// That was about hand-over: keeping a closed case reassignable so it can
-	/// be passed to someone else after the fact. RA-358 trades that capability
-	/// away — confirmed with the product owner on 2026-08-04, for every
-	/// terminal state rather than withdrawal alone. If hand-over on closed
-	/// cases is ever wanted back, it needs a route that is explicitly about
-	/// hand-over, not an unguarded assign endpoint.
-	/// </para>
 	/// <para>
 	/// Fails <em>closed</em> when the template cannot be resolved at all,
 	/// matching <see cref="ApplyActionAsync"/>, which refuses the same
@@ -966,11 +949,8 @@ public sealed class CaseService : ICaseService
 			terminal.Id
 		);
 
-		// RA-358: the BFF renders ProblemDetails.detail verbatim in a
-		// user-facing error banner, so the message must name the case in
-		// human terms only. Deliberately no case id here — removing the
-		// system-generated GUID from user-visible errors is the point of this
-		// story. The id stays in the log line above for support.
+		// The frontend shows ProblemDetails.detail to the caseworker, so the
+		// message names no case id; the id is in the log line above.
 		return CaseActionResult.Failure(
 			CaseActionFailureCode.TerminalState,
 			$"This case has been {terminal.DisplayName.ToLowerInvariant()} "
@@ -1037,8 +1017,8 @@ public sealed class CaseService : ICaseService
 				PerformedAt = performedAt,
 				PerformedById = actor.Id,
 				PerformedByName = actor.Name,
-				// epr-rr9s: snapshot the state as of this event. Every
-				// AppendAudit caller invokes this AFTER any state mutation
+				// Snapshot the state as of this event. Every
+				// caller invokes this AFTER any state mutation
 				// (submit sets the initial state, state-changed assigns
 				// transition.ToStateId first), so caseRecord.StateId is the
 				// resulting post-mutation state for this entry.
@@ -1080,10 +1060,8 @@ public sealed class CaseService : ICaseService
 	}
 
 	/// <summary>
-	/// The acting end-user's identifier as forwarded by the BFF. Falls back
-	/// to <c>null</c> when the request only carries a service identity (e.g.
-	/// machine-to-machine calls), which is enough for the service to treat
-	/// the call as "no human acting" for assignment purposes.
+	/// Caseworker operations are scoped to the caller's nation, so a caller
+	/// without a <c>user:nation</c> claim is refused.
 	/// </summary>
 	private static CaseActionResult? RequireCallerNation(ClaimsPrincipal? user)
 	{
@@ -1097,6 +1075,10 @@ public sealed class CaseService : ICaseService
 		);
 	}
 
+	/// <summary>
+	/// The acting end-user's identifier as forwarded by the BFF, or
+	/// <c>null</c> when the request only carries a service identity.
+	/// </summary>
 	private static string? ResolveActorUserId(ClaimsPrincipal? user)
 	{
 		var id = user?.FindFirstValue("user:id");

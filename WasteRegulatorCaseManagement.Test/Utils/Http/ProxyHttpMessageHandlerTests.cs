@@ -7,7 +7,7 @@ using NSubstitute;
 namespace WasteRegulatorCaseManagement.Test.Utils.Http;
 
 /// <summary>
-/// epr-9da: HTTP_PROXY env vars routinely embed user:pass@ credentials.
+/// HTTP_PROXY env vars routinely embed user:pass@ credentials.
 /// The handler's WebProxy.Address must never carry that user-info or it
 /// will surface in any ToString() / serialization / accidental log of
 /// the handler state. These tests pin the strip-and-relocate contract
@@ -91,7 +91,7 @@ public class ProxyHttpMessageHandlerTests
 		Assert.False(handler.UseProxy);
 	}
 
-	// ---------------------- epr-9g6: HTTPS_PROXY / NO_PROXY ----------------------
+	// ---------------------- HTTPS_PROXY / NO_PROXY ----------------------
 
 	[Fact]
 	public void ResolveProxyEnvironmentValue_prefers_HTTPS_PROXY_over_HTTP_PROXY()
@@ -200,7 +200,7 @@ public class ProxyHttpMessageHandlerTests
 		Assert.False(webProxy.IsBypassed(new Uri("https://api.elsewhere.example/")));
 	}
 
-	// ---------------------- epr-cuq: fail-closed in non-Development ----------------------
+	// ---------------------- fail-closed in non-Development ----------------------
 	//
 	// docs/cdp-deployment.md requires HTTP(S)_PROXY for any external HTTP
 	// call outside Development. The historical behaviour was warn-and-
@@ -290,7 +290,7 @@ public class ProxyHttpMessageHandlerTests
 		return env;
 	}
 
-	// ---------------------- epr-0j2: malformed proxy URI redaction ----------------------
+	// ---------------------- malformed proxy URI redaction ----------------------
 
 	[Fact]
 	public void ParseProxyUri_throws_redacted_when_uri_is_malformed_with_credentials()

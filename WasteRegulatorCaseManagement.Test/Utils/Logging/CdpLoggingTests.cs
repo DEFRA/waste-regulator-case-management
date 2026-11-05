@@ -10,7 +10,7 @@ using Serilog;
 namespace WasteRegulatorCaseManagement.Test.Utils.Logging;
 
 /// <summary>
-/// Regression coverage for epr-3yv. The original
+/// The original
 /// <see cref="CdpLogging.Configuration(HostBuilderContext, IServiceProvider, LoggerConfiguration)"/>
 /// resolved the <see cref="IHttpContextAccessor"/> via
 /// <c>IConfiguration.Get&lt;HttpContextAccessor&gt;()</c>, which binds

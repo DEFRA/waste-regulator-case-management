@@ -10,11 +10,10 @@ namespace WasteRegulatorCaseManagement.Cases;
 ///
 /// Embedded verbatim in a frozen <see cref="CaseTemplateSnapshot"/>, so it
 /// ignores extra BSON elements: a snapshot persisted under an older template
-/// (e.g. the role-tiered <c>requiredRoles</c> field dropped in RA-323) must
-/// still deserialise when the worklist is queried rather than throwing a
+/// with since-removed fields must still deserialise when the worklist is queried rather than throwing a
 /// <see cref="System.FormatException"/> for the whole batch.
 /// </summary>
-/// <param name="ActionId">Stable, machine-readable id of the action (e.g. "approve").</param>
+/// <param name="ActionId">Stable, machine-readable id of the action (e.g. "accept").</param>
 /// <param name="DisplayName">Human-readable label shown in UIs and timelines.</param>
 /// <param name="FromStateId">State the case must be in for the action to be allowed.</param>
 /// <param name="ToStateId">State the case moves to when the action succeeds.</param>

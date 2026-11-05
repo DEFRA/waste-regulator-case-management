@@ -16,7 +16,7 @@ using WasteRegulatorCaseManagement.Auth;
 namespace WasteRegulatorCaseManagement.Test;
 
 /// <summary>
-/// epr-efp: this suite exists to prove the global exception handler
+/// This suite exists to prove the global exception handler
 /// turns unhandled exceptions into RFC 7807 <see cref="ProblemDetails"/>
 /// — a middleware contract, not a persistence contract. To force the
 /// exception we wrap a real <see cref="CasePersistence"/>

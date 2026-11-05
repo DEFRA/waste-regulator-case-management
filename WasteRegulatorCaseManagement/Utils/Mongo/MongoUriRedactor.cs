@@ -1,7 +1,7 @@
 namespace WasteRegulatorCaseManagement.Utils.Mongo;
 
 /// <summary>
-/// epr-hb9: MongoClientSettings.FromConnectionString throws exceptions
+/// MongoClientSettings.FromConnectionString throws exceptions
 /// whose Message embeds the entire connection string verbatim — which
 /// for a Mongo URI includes any user:password@ credentials. Anything
 /// catching the exception and logging .Message (or letting it bubble

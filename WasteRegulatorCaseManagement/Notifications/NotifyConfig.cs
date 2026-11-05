@@ -92,8 +92,7 @@ public sealed class NotifyConfig
 	/// (<c>Notify__RegulatorMailboxes__&lt;Nation&gt;</c>), and the real
 	/// regulator inboxes live in prod's config only, so a non-prod
 	/// environment can never fall back to a real regulator. An empty/missing
-	/// entry resolves to <c>null</c> so downstream callers skip the send and
-	/// record a <c>missing-regulator-mailbox</c> audit entry (RA-236).
+	/// entry resolves to <c>null</c> so a caller can skip the send.
 	/// </summary>
 	public Dictionary<string, string> RegulatorMailboxes { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 

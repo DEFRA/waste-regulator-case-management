@@ -23,7 +23,7 @@ internal static class SwaggerUiStubUserAssets
 	/// 1. Add a stub-user picker to the Swagger UI topbar; selection is
 	///    persisted in <c>localStorage</c>.
 	/// 2. Monkey-patch <c>window.fetch</c> so every same-origin Try it out
-	///    call carries the three CDP trust headers that
+	///    call carries the client id and the stub user's trust headers that
 	///    <c>ClientIdAuthenticationHandler</c> consumes in
 	///    header-trust (no-shared-secret) mode. Patching <c>fetch</c>
 	///    directly rather than going through Swashbuckle's
@@ -32,10 +32,8 @@ internal static class SwaggerUiStubUserAssets
 	///    silently dropped, leaving every Try it out as anonymous.
 	///
 	/// Kept as inline source so it ships with the assembly — no
-	/// static-file middleware required. The stub-user list mirrors
-	/// <c>STUB_USERS</c> in the BFF
-	/// (<c>src/server/routes/auth/stub/controller.js</c>); these are dev
-	/// fixtures only and not tied to any real identity.
+	/// static-file middleware required. The stub users are dev fixtures
+	/// only and not tied to any real identity.
 	/// </summary>
 	internal const string ScriptBody = """
         (function () {

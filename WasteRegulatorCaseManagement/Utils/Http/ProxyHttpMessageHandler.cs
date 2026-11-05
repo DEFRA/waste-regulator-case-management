@@ -16,7 +16,7 @@ public class ProxyHttpMessageHandler : HttpClientHandler
 
 	/// <summary>
 	/// Resolve the proxy URI, failing closed in non-Development hosting
-	/// environments (epr-cuq). docs/cdp-deployment.md requires
+	/// environments. docs/cdp-deployment.md requires
 	/// HTTP(S)_PROXY for any external HTTP call outside Development —
 	/// the historical warn-and-continue behaviour meant a misconfigured
 	/// deployment would silently bypass the Squid proxy and egress
@@ -50,7 +50,7 @@ public class ProxyHttpMessageHandler : HttpClientHandler
 	}
 
 	/// <summary>
-	/// Internal seam for tests (epr-9da, extended by epr-9g6, epr-cuq).
+	/// Internal seam for tests.
 	/// Bypasses the fail-closed env-var check so tests can drive every
 	/// proxyUri permutation deterministically without mutating
 	/// process state.
@@ -88,7 +88,7 @@ public class ProxyHttpMessageHandler : HttpClientHandler
 
 	/// <summary>
 	/// Resolve the proxy URI from the CDP-conventional environment
-	/// variables (epr-9g6). HTTPS_PROXY takes precedence because all
+	/// variables. HTTPS_PROXY takes precedence because all
 	/// outbound traffic from this service is HTTPS; HTTP_PROXY is the
 	/// fallback. Lower-case variants are checked too — they are the
 	/// historical Unix convention and several CDP base images set them.
@@ -240,7 +240,7 @@ public class ProxyHttpMessageHandler : HttpClientHandler
 		// "http://user:pass@proxy.local:3128"), so a CDP-injected
 		// HTTP_PROXY value keeps working.
 		//
-		// epr-0j2: a malformed value is the dangerous case. UriBuilder
+		// A malformed value is the dangerous case. UriBuilder
 		// throws UriFormatException whose Message embeds the original
 		// input verbatim — when that input is "http://user:pass@..."
 		// the password ends up in the exception (and therefore in

@@ -48,9 +48,9 @@ public sealed class CaseTimelineEntry
 	public DateTime PerformedAt { get; init; }
 
 	/// <summary>
-	/// Identifier of the actor that performed the action. Snapshotted from
-	/// the <c>user:id</c> claim, falling back to the client id when
-	/// the call carries no end-user identity.
+	/// Identifier of the actor that performed the action: the <c>user:id</c>
+	/// claim for a caseworker, or <c>service:&lt;client id&gt;</c> for the
+	/// Case Intake Processor creating the case.
 	/// </summary>
 	public string? PerformedById { get; init; }
 
@@ -63,20 +63,11 @@ public sealed class CaseTimelineEntry
 
 	/// <summary>
 	/// Case state code as of this event — the state the item was in
-	/// immediately AFTER the event's mutation (epr-rr9s). Persisting a
+	/// immediately AFTER the event's mutation. Persisting a
 	/// per-event snapshot lets a UI render each historical entry with the
 	/// state it was actually in at the time, instead of stapling the live
-	/// current state onto every row.
-	///
-	/// Nullable by design: audit entries written before epr-rr9s carry no
-	/// snapshot and leave this null. That is the defined fallback — the
-	/// frontend omits the State row when this is null. There is deliberately
-	/// no backfill migration.
-	///
-	/// Every runtime producer stamps this, so on current data null means
-	/// "written before epr-rr9s" and nothing else. Keep it that way: if you
-	/// add a new site that constructs a CaseTimelineEntry, set StateId from
-	/// the case AFTER any state mutation.
+	/// current state onto every row. Set it from the case after any state
+	/// mutation.
 	/// </summary>
 	public string? StateId { get; init; }
 }

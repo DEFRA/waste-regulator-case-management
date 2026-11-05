@@ -11,14 +11,14 @@ using NUlid;
 namespace WasteRegulatorCaseManagement.Test.Cases;
 
 /// <summary>
-/// Regression coverage for epr-bwk: every persisted timestamp on
+/// Every persisted timestamp on
 /// <see cref="Case"/> and <see cref="CaseTimelineEntry"/> must come from the injected
 /// <see cref="TimeProvider"/>. The model types must NOT default their
 /// timestamp properties to a wallclock value, otherwise tests that wire
 /// up a <see cref="FakeTimeProvider"/> can be silently undermined when
 /// the engine reads a model field it forgot to assign.
 ///
-/// epr-efp: backed by ephemeral MongoDB so the assertions reflect what
+/// Backed by ephemeral MongoDB so the assertions reflect what
 /// the real driver actually persisted, not what the in-memory mock
 /// captured. The previous implementation substituted
 /// <see cref="ICasePersistence"/> wholesale.

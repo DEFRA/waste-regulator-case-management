@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace WasteRegulatorCaseManagement.Test.Cases;
 
 /// <summary>
-/// epr-rvz: every Case endpoint that calls .DisableValidation() and
+/// Every Case endpoint that calls .DisableValidation() and
 /// parses its body manually must carry an explicit
 /// <see cref="Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute"/> so an
 /// attacker cannot POST an arbitrarily large body and force JSON / BSON
@@ -59,7 +59,7 @@ public class CaseRequestSizeLimitTests
 	}
 
 	/// <summary>
-	/// Generic scan (epr-e5h): any endpoint registered anywhere in the
+	/// Generic scan: any endpoint registered anywhere in the
 	/// service — framework or module — that calls <c>.DisableValidation()</c>
 	/// MUST also carry an explicit <c>RequestSizeLimitAttribute</c>. This
 	/// catches new module endpoints that copy the manual-parse pattern

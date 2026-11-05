@@ -16,10 +16,9 @@ namespace WasteRegulatorCaseManagement.Notifications;
 ///
 /// <para>
 /// Suppression swaps the real client for <see cref="NoOpNotifyClient"/>, which
-/// returns success and logs the intended send with the same ECS shape. The
-/// case's timeline therefore still records a <c>notification-sent</c>
-/// entry and the UI behaves exactly as it does in an environment that really
-/// sends — the only difference is that no HTTP traffic reaches Notify.
+/// returns success and logs the intended send with the same ECS shape, so a
+/// caller behaves exactly as it does in an environment that really sends —
+/// the only difference is that no HTTP traffic reaches Notify.
 /// </para>
 /// </summary>
 public static class NotifySendingPolicy

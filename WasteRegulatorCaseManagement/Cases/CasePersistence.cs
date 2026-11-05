@@ -30,8 +30,8 @@ public interface ICasePersistence
 	/// most-recently-submitted first, together with the total number of
 	/// matches across every page.
 	///
-	/// The per-item <see cref="Case.Timeline"/> is excluded server-side
-	/// (epr-4pf). The returned <see cref="Case"/> instances therefore
+	/// The per-item <see cref="Case.Timeline"/> is excluded server-side.
+	/// The returned <see cref="Case"/> instances therefore
 	/// carry an empty <c>Timeline</c> regardless of
 	/// what is on disk; callers that need the full timeline must
 	/// <see cref="GetByIdAsync"/> the item individually. This keeps the
@@ -150,9 +150,8 @@ public sealed class CasePersistence
 		List<Case> items;
 		if (sortStages is null)
 		{
-			// Default path (RA-324: unchanged from the original behaviour) —
-			// newest submitted first, with the per-item Timeline projected
-			// away (epr-4pf): the list endpoint never renders it and it
+			// Default path: newest submitted first, with the per-item Timeline projected
+			// away: the list endpoint never renders it and it
 			// dominates document size on chatty items.
 			var projection = Builders<Case>.Projection.Exclude(w => w.Timeline);
 
@@ -166,15 +165,12 @@ public sealed class CasePersistence
 		}
 		else
 		{
-			// Explicit RA-324 sort (organisation / status / due-date). Status
-			// and due-date can't be expressed as a plain field sort, so an
-			// aggregation computes the sort key. Two $unset stages: the first
-			// drops the fat Timeline (the same one the default projection
-			// excludes) BEFORE the in-memory $sort so the
-			// sort buffers slim documents; the second drops the computed sort
-			// scratch fields AFTER the $sort that reads them, so the result
-			// still deserialises to Case (which does not ignore extra BSON
-			// elements).
+			// Status sort: the status rank can't be expressed as a plain field
+			// sort, so an aggregation computes the sort key. Two $unset stages:
+			// the first drops the Timeline (the same one the default projection
+			// excludes) BEFORE the in-memory $sort so the sort buffers slim
+			// documents; the second drops the computed sort field AFTER the
+			// $sort that reads it.
 			var (addFields, sort) = sortStages.Value;
 			var serializer =
 				MongoDB.Bson.Serialization.BsonSerializer.SerializerRegistry.GetSerializer<Case>();

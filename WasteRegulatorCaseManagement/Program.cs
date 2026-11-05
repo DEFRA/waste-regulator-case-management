@@ -92,9 +92,8 @@ static void ConfigureServices(WebApplicationBuilder builder)
 	// generic so consumers depend on IStructuredLogger<TTheirComponent>.
 	services.AddSingleton(typeof(IStructuredLogger<>), typeof(StructuredLogger<>));
 
-	// Built-in .NET 10 OpenAPI document generation. Document only — no
-	// Swagger UI is wired up (that ships in a separate package). The
-	// document is exposed unauthenticated at /openapi/v1.json by
+	// Built-in .NET 10 OpenAPI document generation; Swagger UI renders it
+	// outside Production. The document is exposed unauthenticated at /openapi/v1.json by
 	// ConfigureEndpoints, mirroring the health endpoints' posture, since
 	// BFF and platform tooling need to fetch it without credentials.
 	services.AddOpenApi(
@@ -423,7 +422,7 @@ static void ConfigureNotifications(
 	if (!shouldSend)
 	{
 		// A key IS configured, but this environment deliberately does not
-		// send. Callers still get success + a notification-sent audit entry.
+		// send. Callers still get success.
 		services.AddSingleton<INotifyClient>(sp => new NoOpNotifyClient(
 			sp.GetRequiredService<IStructuredLogger<NoOpNotifyClient>>(),
 			NotifySendingPolicy.SuppressedByEnvironmentReason
@@ -608,7 +607,7 @@ static void ConfigureEndpoints(WebApplication app)
 		)
 		.AllowAnonymous()
 		.WithMetadata(new HttpMethodMetadata(new[] { HttpMethods.Get, HttpMethods.Head }));
-	// Readiness: only the "ready"-tagged checks run (currently MongoDB).
+	// Readiness: only the "ready"-tagged checks run (MongoDB and required configuration).
 	// CDP / Kubernetes uses this to decide when to send traffic.
 	app.MapHealthChecks(
 			"/health/ready",

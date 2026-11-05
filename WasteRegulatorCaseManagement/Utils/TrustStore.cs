@@ -19,7 +19,7 @@ public static class TrustStore
 	}
 
 	/// <summary>
-	/// Test seam (epr-kf1). Pure function: takes a snapshot of
+	/// Test seam. Pure function: takes a snapshot of
 	/// environment variables, returns the decoded certificate byte
 	/// arrays for every entry whose key starts with
 	/// <c>TRUSTSTORE_</c> and whose value is valid base64. Pulled out
@@ -40,7 +40,7 @@ public static class TrustStore
 	{
 		if (certificates.Count == 0) return; // to stop trust store access denied issues on Macs
 
-		// epr-kf1: X509Certificate2 owns an unmanaged certificate
+		// X509Certificate2 owns an unmanaged certificate
 		// handle and implements IDisposable. The previous
 		// implementation projected the byte arrays through LINQ into
 		// X509Certificate2 instances and never disposed the

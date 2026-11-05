@@ -46,8 +46,6 @@ public sealed record CaseTimelineEntryResponse(
 	DateTime PerformedAt,
 	string? PerformedById,
 	string? PerformedByName,
-	// epr-rr9s: case state as of this event (serialises to stateId).
-	// Null for pre-epr-rr9s entries with no snapshot; the frontend omits the
-	// State row in that case.
+	// Case state as of this event (serialises to stateId).
 	string? StateId = null
 );

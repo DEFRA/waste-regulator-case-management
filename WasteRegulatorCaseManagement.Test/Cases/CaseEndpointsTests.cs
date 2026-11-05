@@ -22,7 +22,7 @@ using NUlid;
 namespace WasteRegulatorCaseManagement.Test.Cases;
 
 /// <summary>
-/// epr-efp: persistence is real <see cref="CasePersistence"/> backed
+/// Persistence is real <see cref="CasePersistence"/> backed
 /// by ephemeral MongoDB. Tests seed cases via
 /// <see cref="TestApplicationFactory.Persistence"/> and assert on
 /// fetched-back documents rather than on a captured-in-flight reference.
@@ -265,7 +265,7 @@ public class CaseEndpointsTests
 		// ReplaceAsync), so Version is still 0.
 		Assert.Equal(0, persisted.Version);
 
-		// epr-rr9s: the per-event state snapshot must also survive the wire
+		// The per-event state snapshot must also survive the wire
 		// projection so the FE can render each entry against its own state.
 		Assert.NotNull(body.Timeline);
 		var wireEntry = Assert.Single(body.Timeline!);
@@ -1632,7 +1632,7 @@ public class CaseEndpointsTests
 	[Fact]
 	public async Task Get_list_omits_the_timeline_from_each_item()
 	{
-		// epr-4pf: the list endpoint never renders the per-item Timeline,
+		// The list endpoint never renders the per-item Timeline,
 		// so it must not appear on the wire at all (omitted, not nulled) —
 		// even if the persisted document would otherwise have it.
 		var cancellationToken = TestContext.Current.CancellationToken;
@@ -2425,7 +2425,7 @@ public class CaseEndpointsTests
 	[Fact]
 	public async Task Timeline_preserves_insertion_order_for_entries_with_identical_timestamps()
 	{
-		// Regression for epr-s4y: when two entries share an exact PerformedAt
+		// Regression: when two entries share an exact PerformedAt
 		// (common under FakeTimeProvider with the clock held still, and
 		// possible in production when a single engine call appends two
 		// entries back-to-back) the projection must keep their stored
