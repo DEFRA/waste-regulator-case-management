@@ -48,6 +48,22 @@ public class CaseQueryBindingTests
 		Assert.False(query.UnassignedOnly);
 	}
 
+	[Theory]
+	[InlineData("true", true)]
+	[InlineData("TRUE", true)]
+	[InlineData("1", true)]
+	[InlineData("on", true)]
+	[InlineData("Yes", true)]
+	[InlineData(" true ", true)]
+	[InlineData("false", false)]
+	[InlineData("0", false)]
+	public void UnassignedAcceptsTheUsualTruthySpellings(string value, bool expected)
+	{
+		var query = CaseQueryBinding.FromQueryString(Q(("unassigned", value)));
+
+		query.UnassignedOnly.Should().Be(expected);
+	}
+
 	// ───────────────────────── Sort (RA-324) ─────────────────────────
 
 	[Theory]

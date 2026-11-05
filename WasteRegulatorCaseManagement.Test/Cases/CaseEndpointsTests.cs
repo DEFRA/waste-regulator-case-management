@@ -553,6 +553,49 @@ public class CaseEndpointsTests
 		problem!.Detail.Should().Contain("displayData.organisationName");
 	}
 
+	[Theory]
+	[InlineData("callbackUrl", "null", "'callbackUrl' is required and must be a non-empty string.")]
+	[InlineData("callbackUrl", "\"ftp://source-system.test/callback\"", "'callbackUrl' must be an absolute http or https URL.")]
+	[InlineData("nation", "null", "'nation' is required and must be a non-empty string.")]
+	[InlineData("orgId", "\"   \"", "'orgId' is required and must be a non-empty string.")]
+	[InlineData("producerType", "7", "'producerType' must be a string.")]
+	[InlineData("displayData", "\"Acme\"", "'displayData' must be an object.")]
+	[InlineData("initialState", "3", "'initialState' is required and must be a non-empty string.")]
+	[InlineData("createdAt", "\"yesterday\"", "'createdAt' must be an ISO 8601 date-time string.")]
+	[InlineData("createdAt", "1714521600", "'createdAt' must be an ISO 8601 date-time string.")]
+	public async Task Post_returns_problem_when_an_intake_field_has_the_wrong_shape(
+		string field,
+		string value,
+		string expectedDetail
+	)
+	{
+		// Arrange
+		var cancellationToken = TestContext.Current.CancellationToken;
+		await using var factory = NewFactory();
+		using var client = factory.CreateClient();
+		var body = new System.Text.Json.Nodes.JsonObject
+		{
+			["caseType"] = CaseType,
+			["sourceSystemId"] = Ulid.NewUlid().ToString(),
+			["callbackUrl"] = "https://source-system.test/callback",
+			["nation"] = "ENGLAND",
+			["orgId"] = "test-org",
+		};
+		body[field] = System.Text.Json.Nodes.JsonNode.Parse(value);
+
+		// Act
+		var response = await client.PostAsync(
+			"/cases",
+			new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json"),
+			cancellationToken
+		);
+
+		// Assert
+		response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+		var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken);
+		problem!.Detail.Should().Be(expectedDetail);
+	}
+
 	[Fact]
 	public async Task Post_returns_the_existing_case_when_the_source_system_id_was_already_submitted()
 	{
@@ -795,6 +838,48 @@ public class CaseEndpointsTests
 		(await response.Content.ReadAsStringAsync(cancellationToken)).Should().Contain("Decision field 'reason' must be a string");
 	}
 
+	[Theory]
+	[InlineData("[]", "Request body must be a JSON object.")]
+	[InlineData("""{ "decision": "Submitted in error." }""", "'decision' must be a JSON object of string fields.")]
+	public async Task Action_rejects_a_body_that_is_not_a_decision_object(string body, string expectedDetail)
+	{
+		// Arrange
+		var cancellationToken = TestContext.Current.CancellationToken;
+		await using var factory = NewFactory();
+		using var client = factory.CreateClient();
+		var caseId = await SubmitCSoCCaseAsync(client, Ulid.NewUlid().ToString(), cancellationToken);
+
+		// Act
+		var response = await client.PostAsync(
+			$"/cases/{caseId}/actions/cancel",
+			new StringContent(body, Encoding.UTF8, "application/json"),
+			cancellationToken
+		);
+
+		// Assert
+		response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+		var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken);
+		problem!.Detail.Should().Be(expectedDetail);
+	}
+
+	[Fact]
+	public async Task Accept_with_a_body_that_has_no_decision_is_applied()
+	{
+		// Arrange
+		var cancellationToken = TestContext.Current.CancellationToken;
+		await using var factory = NewFactory(userName: "Casey Worker");
+		using var client = factory.CreateClient();
+		var caseId = await SubmitCSoCCaseAsync(client, Ulid.NewUlid().ToString(), cancellationToken);
+
+		// Act
+		var response = await client.PostAsJsonAsync($"/cases/{caseId}/actions/accept", new { }, cancellationToken);
+
+		// Assert
+		response.StatusCode.Should().Be(HttpStatusCode.OK);
+		var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
+		body!.StateId.Should().Be("ACCEPTED");
+	}
+
 	[Fact]
 	public async Task Accept_patches_the_callback_url_with_the_accepted_status_and_the_deciding_user()
 	{
@@ -914,6 +999,52 @@ public class CaseEndpointsTests
 		response.StatusCode.Should().Be(HttpStatusCode.BadGateway);
 		var persisted = await factory.Persistence.GetByIdAsync(caseId, cancellationToken);
 		persisted!.StateId.Should().Be("SUBMITTED");
+	}
+
+	[Fact]
+	public async Task Accept_returns_502_when_the_source_system_refuses_it_and_cannot_be_read_back()
+	{
+		// Arrange
+		var cancellationToken = TestContext.Current.CancellationToken;
+		await using var factory = NewFactory(userName: "Casey Worker");
+		using var client = factory.CreateClient();
+		var caseId = await SubmitCSoCCaseAsync(client, "csoc-2024-eng-00136", cancellationToken);
+		factory.Callbacks.Respond = request =>
+			request.Method == HttpMethod.Patch
+				? new HttpResponseMessage(HttpStatusCode.UnprocessableEntity)
+				: new HttpResponseMessage(HttpStatusCode.NotFound);
+
+		// Act
+		var response = await client.PostAsync($"/cases/{caseId}/actions/accept", content: null, cancellationToken);
+
+		// Assert
+		response.StatusCode.Should().Be(HttpStatusCode.BadGateway);
+		factory.Callbacks.Requests.Select(r => r.Method).Should().Equal([HttpMethod.Patch, HttpMethod.Get]);
+		var persisted = await factory.Persistence.GetByIdAsync(caseId, cancellationToken);
+		persisted!.StateId.Should().Be("SUBMITTED");
+	}
+
+	[Fact]
+	public async Task Accept_returns_502_and_records_the_failure_when_the_source_system_cannot_be_reached()
+	{
+		// Arrange
+		var cancellationToken = TestContext.Current.CancellationToken;
+		await using var factory = NewFactory(userName: "Casey Worker");
+		using var client = factory.CreateClient();
+		var caseId = await SubmitCSoCCaseAsync(client, "csoc-2024-eng-00137", cancellationToken);
+		factory.Callbacks.Respond = _ => throw new HttpRequestException("Connection refused");
+
+		// Act
+		var response = await client.PostAsync($"/cases/{caseId}/actions/accept", content: null, cancellationToken);
+
+		// Assert
+		response.StatusCode.Should().Be(HttpStatusCode.BadGateway);
+		var persisted = await factory.Persistence.GetByIdAsync(caseId, cancellationToken);
+		persisted!.StateId.Should().Be("SUBMITTED");
+		var failure = persisted.Timeline.Should().ContainSingle(e => e.Action == "callback-failed").Subject;
+		failure.Details["reason"].Should().Be(
+			"https://source-system.test/declarations/csoc-2024-eng-00137 could not be reached: Connection refused"
+		);
 	}
 
 	[Fact]
