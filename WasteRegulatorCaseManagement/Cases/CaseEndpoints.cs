@@ -1,6 +1,6 @@
+using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Claims;
-using System.Text.Json;
 using WasteRegulatorCaseManagement.Auth;
 using WasteRegulatorCaseManagement.Utils.Logging;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -46,22 +46,79 @@ public static class CaseEndpoints
 		group
 			.MapPost(string.Empty, Submit)
 			.WithName("SubmitCase")
+			.WithSummary("Create a case for a submission")
+			.WithDescription(
+				"Called by the Case Intake Processor only; any other caller gets 403. Creates a case of `caseType` "
+					+ "in the case type's initial state and returns it with 201. If a case already exists for "
+					+ "`sourceSystemId`, returns that case with 200 and `X-Idempotent-Replay: true`, so a resent "
+					+ "submission can be discarded. `initialState` and `createdAt` are for the bulk load of "
+					+ "existing submissions."
+			)
+			.ProducesProblem(StatusCodes.Status400BadRequest)
+			.ProducesProblem(StatusCodes.Status401Unauthorized)
+			.ProducesProblem(StatusCodes.Status403Forbidden)
 			.DisableValidation()
 			.WithMetadata(new RequestSizeLimitAttribute(MaxSubmitBodyBytes))
 			.RequireAuthorization(CaseIntakePolicy.Name);
 
-		group.MapGet("/{id}", GetById).WithName("GetCaseById").RequireAuthorization();
+		group
+			.MapGet("/{id}", GetById)
+			.WithName("GetCaseById")
+			.WithSummary("Get a case")
+			.WithDescription(
+				"Returns the case with its timeline, newest entry first, and the actions its current state "
+					+ "allows. A case in another nation returns 404, as if it did not exist."
+			)
+			.ProducesProblem(StatusCodes.Status403Forbidden)
+			.ProducesProblem(StatusCodes.Status404NotFound)
+			.RequireAuthorization();
 
-		group.MapGet(string.Empty, GetAll).WithName("ListCases").RequireAuthorization();
+		group
+			.MapGet(string.Empty, GetAll)
+			.WithName("ListCases")
+			.WithSummary("List the cases in the caller's nation")
+			.WithDescription(
+				"Returns a page of the cases in the caller's nation, without their timelines, newest "
+					+ "submission first unless `sort` is given. Filters combine: a case is listed only if it "
+					+ "matches every filter supplied."
+			)
+			.ProducesProblem(StatusCodes.Status400BadRequest)
+			.ProducesProblem(StatusCodes.Status403Forbidden)
+			.RequireAuthorization();
 
 		group
 			.MapPost("/{id}/actions/{actionId}", ApplyAction)
 			.WithName("ApplyCaseAction")
+			.WithSummary("Apply an action to a case")
+			.WithDescription(
+				"Moves the case along the transition named `actionId`, such as `accept` or `cancel`, when its "
+					+ "current state allows it. A transition that requires decision fields, such as CSoC "
+					+ "`cancel` and its `reason`, needs them in `decision`. When the new state concludes the case, "
+					+ "the decision is sent to the case's `callbackUrl` first: if the source system refuses it, "
+					+ "the case keeps its state, a `callback-failed` timeline entry records why, and the response "
+					+ "is 502. A concluded case returns 409."
+			)
+			.ProducesProblem(StatusCodes.Status400BadRequest)
+			.ProducesProblem(StatusCodes.Status401Unauthorized)
+			.ProducesProblem(StatusCodes.Status403Forbidden)
+			.ProducesProblem(StatusCodes.Status404NotFound)
+			.ProducesProblem(StatusCodes.Status409Conflict)
+			.ProducesProblem(StatusCodes.Status502BadGateway)
 			.RequireAuthorization();
 
 		group
 			.MapPost("/{id}/assign", Assign)
 			.WithName("AssignCase")
+			.WithSummary("Assign a case to a caseworker")
+			.WithDescription(
+				"Assigns or reassigns the case. Assigning it to its current assignee changes nothing and "
+					+ "returns `X-Idempotent-Replay: true`. A concluded case cannot be assigned and returns 409."
+			)
+			.ProducesProblem(StatusCodes.Status400BadRequest)
+			.ProducesProblem(StatusCodes.Status401Unauthorized)
+			.ProducesProblem(StatusCodes.Status403Forbidden)
+			.ProducesProblem(StatusCodes.Status404NotFound)
+			.ProducesProblem(StatusCodes.Status409Conflict)
 			.DisableValidation()
 			.WithMetadata(new RequestSizeLimitAttribute(MaxAssignBodyBytes))
 			.RequireAuthorization();
@@ -69,11 +126,30 @@ public static class CaseEndpoints
 		group
 			.MapPost("/{id}/unassign", Unassign)
 			.WithName("UnassignCase")
+			.WithSummary("Unassign a case")
+			.WithDescription(
+				"Removes the case's assignee. Unassigning a case with no assignee changes nothing and returns "
+					+ "`X-Idempotent-Replay: true`. A concluded case cannot be unassigned and returns 409."
+			)
+			.ProducesProblem(StatusCodes.Status401Unauthorized)
+			.ProducesProblem(StatusCodes.Status403Forbidden)
+			.ProducesProblem(StatusCodes.Status404NotFound)
+			.ProducesProblem(StatusCodes.Status409Conflict)
 			.RequireAuthorization();
 
 		group
 			.MapPost("/{id}/notes", AddNote)
 			.WithName("AddCaseNote")
+			.WithSummary("Add a note to a case")
+			.WithDescription(
+				"Adds the note to the case's timeline as a `note-added` entry. Notes cannot be edited or "
+					+ "deleted."
+			)
+			.ProducesProblem(StatusCodes.Status400BadRequest)
+			.ProducesProblem(StatusCodes.Status401Unauthorized)
+			.ProducesProblem(StatusCodes.Status403Forbidden)
+			.ProducesProblem(StatusCodes.Status404NotFound)
+			.ProducesProblem(StatusCodes.Status409Conflict)
 			.DisableValidation()
 			.WithMetadata(new RequestSizeLimitAttribute(MaxNoteBodyBytes))
 			.RequireAuthorization();
@@ -82,7 +158,7 @@ public static class CaseEndpoints
 	}
 
 	internal static async Task<Results<CreatedAtRoute<CaseResponse>, Ok<CaseResponse>, ProblemHttpResult>> Submit(
-		JsonElement body,
+		CaseIntakeRequest body,
 		HttpContext httpContext,
 		[FromServices] CaseRegistry registry,
 		[FromServices] ICaseService engine,
@@ -91,15 +167,6 @@ public static class CaseEndpoints
 	)
 	{
 		var req = httpContext.Request;
-		var bodyText = body.ValueKind != JsonValueKind.Undefined ? body.GetRawText() : "(empty)";
-		// Truncate very large bodies in the log — the 1 MB cap still applies
-		// at the framework level; this is just for readability.
-		const int MaxLoggedBodyChars = 4096;
-		var loggedBody =
-			bodyText.Length > MaxLoggedBodyChars
-				? bodyText[..MaxLoggedBodyChars] + $"…(truncated, total {bodyText.Length} chars)"
-				: bodyText;
-
 		log.Log(
 			LogLevel.Information,
 			"Case submission received",
@@ -107,7 +174,6 @@ public static class CaseEndpoints
 			{
 				["http.request.method"] = req.Method,
 				["url.path"] = req.Path.Value,
-				["http.request.body"] = loggedBody,
 				[CallerClientIdField] = req.Headers.TryGetValue(
 					"x-cdp-client-id",
 					out var cid
@@ -125,29 +191,12 @@ public static class CaseEndpoints
 			}
 		);
 
-		if (body.ValueKind != JsonValueKind.Object)
-		{
-			log.Log(
-				LogLevel.Warning,
-				"Case submission rejected: body is not a JSON object",
-				new Dictionary<string, object?>
-				{
-					[ErrorMessageField] = $"ValueKind was {body.ValueKind}",
-				}
-			);
-			return BadRequest(InvalidRequestTitle, "Request body must be a JSON object.");
-		}
-
-		if (
-			!body.TryGetProperty("caseType", out var caseTypeElement)
-			|| caseTypeElement.ValueKind != JsonValueKind.String
-			|| string.IsNullOrWhiteSpace(caseTypeElement.GetString())
-		)
+		if (string.IsNullOrWhiteSpace(body.CaseType))
 		{
 			log.Log(
 				LogLevel.Warning,
 				"Case submission rejected: missing or empty caseType",
-				new Dictionary<string, object?> { ["http.request.body"] = loggedBody }
+				new Dictionary<string, object?>()
 			);
 			return BadRequest(
 				InvalidRequestTitle,
@@ -155,7 +204,7 @@ public static class CaseEndpoints
 			);
 		}
 
-		var caseType = caseTypeElement.GetString()!;
+		var caseType = body.CaseType;
 		var type = registry.Find(caseType);
 		if (type is null)
 		{
@@ -199,29 +248,10 @@ public static class CaseEndpoints
 			httpContext.User.FindFirstValue("client_id")
 			?? httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
 
-		// RA-126: optional caller-supplied audit context. 'source' is a
-		// string when present; reject other JSON types up front so a
-		// malformed body cannot silently degrade the audit record.
-		Dictionary<string, string?>? submissionMetadata = null;
-		if (body.TryGetProperty("source", out var sourceElement))
-		{
-			if (sourceElement.ValueKind != JsonValueKind.String)
-			{
-				log.Log(
-					LogLevel.Warning,
-					"Case submission rejected: 'source' is not a string",
-					new Dictionary<string, object?>
-					{
-						[CaseTypeField] = caseType,
-						[ErrorMessageField] = $"'source' ValueKind was {sourceElement.ValueKind}",
-					}
-				);
-				return BadRequest("Invalid request body", "'source' must be a string.");
-			}
-			(submissionMetadata ??= new Dictionary<string, string?>(StringComparer.Ordinal))[
-				"source"
-			] = sourceElement.GetString();
-		}
+		// RA-126: optional caller-supplied audit context.
+		var submissionMetadata = body.Source is null
+			? null
+			: new Dictionary<string, string?>(StringComparer.Ordinal) { ["source"] = body.Source };
 
 		// Routed through the engine so the framework owns audit-log
 		// composition for the birth event in the same place it owns every
@@ -325,7 +355,7 @@ public static class CaseEndpoints
 		);
 
 	internal static async Task<Results<Ok<CaseResponse>, NotFound, ProblemHttpResult>> GetById(
-		[FromRoute] string id,
+		[FromRoute, Description("Case id.")] string id,
 		HttpContext httpContext,
 		[FromServices] ICasePersistence persistence,
 		[FromServices] ICaseService engine,
@@ -348,6 +378,28 @@ public static class CaseEndpoints
 	}
 
 	internal static async Task<Results<Ok<CaseListResponse>, ProblemHttpResult>> GetAll(
+		[FromQuery(Name = "caseType"), Description("Only cases of this case type. Repeat to match any of several.")]
+		string[]? caseType,
+		[FromQuery(Name = "stateId"), Description("Only cases in this state. Repeat to match any of several.")]
+		string[]? stateId,
+		[FromQuery(Name = "search"), Description("Only cases whose id starts with this text, ignoring case.")]
+		string? search,
+		[FromQuery(Name = "assigneeId"), Description("Only cases assigned to this user id. With `unassigned=true`, cases assigned to this user id or to no one.")]
+		string? assigneeId,
+		[FromQuery(Name = "unassigned"), Description("`true` for only the cases with no assignee.")]
+		bool? unassigned,
+		[FromQuery(Name = "orgId"), Description("Only cases of this organisation.")]
+		string? orgId,
+		[FromQuery(Name = "isTerminal"), Description("`true` for only concluded cases, `false` for only open ones.")]
+		bool? isTerminal,
+		[FromQuery(Name = "sort"), Description("`status` orders the cases by their case type's states, in the order the case type declares them.")]
+		string? sort,
+		[FromQuery(Name = "dir"), Description("`asc` or `desc`, the direction of `sort`.")]
+		string? dir,
+		[FromQuery(Name = "page"), Description("Page number, from 1 to 1000. Defaults to 1.")]
+		int? page,
+		[FromQuery(Name = "pageSize"), Description("Cases per page, up to 100. Defaults to 20.")]
+		int? pageSize,
 		HttpContext httpContext,
 		[FromServices] ICasePersistence persistence,
 		[FromServices] ICaseService engine,
@@ -359,7 +411,20 @@ public static class CaseEndpoints
 			return NationRequired();
 		}
 
-		var query = CaseQueryBinding.FromQueryString(httpContext.Request.Query) with
+		var request = new CaseListRequest(
+			caseType,
+			stateId,
+			search,
+			assigneeId,
+			unassigned,
+			orgId,
+			isTerminal,
+			sort,
+			dir,
+			page,
+			pageSize
+		);
+		var query = CaseQueryBinding.FromRequest(request) with
 		{
 			Nation = nation,
 		};
@@ -373,14 +438,14 @@ public static class CaseEndpoints
 			);
 		}
 
-		var page = await persistence.QueryAsync(query, cancellationToken);
+		var casePage = await persistence.QueryAsync(query, cancellationToken);
 
-		var items = page
+		var items = casePage
 			.Items.Select(w => ToListItemResponse(engine.Project(w)))
 			.ToList();
 
 		return TypedResults.Ok(
-			new CaseListResponse(items, page.TotalCount, page.Page, page.PageSize)
+			new CaseListResponse(items, casePage.TotalCount, casePage.Page, casePage.PageSize)
 		);
 	}
 
@@ -395,18 +460,17 @@ public static class CaseEndpoints
 	internal static async Task<
 		Results<Ok<CaseResponse>, NotFound, ProblemHttpResult>
 	> ApplyAction(
-		[FromRoute] string id,
-		[FromRoute] string actionId,
-		JsonElement? body,
+		[FromRoute, Description("Case id.")] string id,
+		[FromRoute, Description("The action to apply, one of the case's `availableActions`, such as `accept`.")] string actionId,
+		CaseActionRequest? body,
 		HttpContext httpContext,
 		[FromServices] ICaseService engine,
 		CancellationToken cancellationToken
 	)
 	{
-		if (ReadDecision(body, out var decision) is { } decisionError)
-		{
-			return BadRequest(InvalidRequestTitle, decisionError);
-		}
+		var decision = body?.Decision is { } fields
+			? new Dictionary<string, string>(fields, StringComparer.Ordinal)
+			: null;
 
 		var result = await engine.ApplyActionAsync(
 			id,
@@ -418,64 +482,15 @@ public static class CaseEndpoints
 		return ToHttpResult(result, engine);
 	}
 
-	/// <summary>
-	/// Reads the optional <c>{ "decision": { field: string } }</c> body of an
-	/// action, returning an error message when it is malformed.
-	/// </summary>
-	private static string? ReadDecision(JsonElement? body, out Dictionary<string, string>? decision)
-	{
-		decision = null;
-		if (body is not { ValueKind: not JsonValueKind.Undefined } element)
-		{
-			return null;
-		}
-		if (element.ValueKind != JsonValueKind.Object)
-		{
-			return "Request body must be a JSON object.";
-		}
-		if (!element.TryGetProperty("decision", out var decisionElement))
-		{
-			return null;
-		}
-
-		if (decisionElement.ValueKind != JsonValueKind.Object)
-		{
-			return "'decision' must be a JSON object of string fields.";
-		}
-
-		decision = new Dictionary<string, string>(StringComparer.Ordinal);
-		foreach (var field in decisionElement.EnumerateObject())
-		{
-			if (field.Value.ValueKind != JsonValueKind.String)
-			{
-				return $"Decision field '{field.Name}' must be a string.";
-			}
-			decision[field.Name] = field.Value.GetString()!;
-		}
-		return null;
-	}
-
 	internal static async Task<Results<Ok<CaseResponse>, NotFound, ProblemHttpResult>> Assign(
-		[FromRoute] string id,
-		JsonElement body,
+		[FromRoute, Description("Case id.")] string id,
+		AssignCaseRequest body,
 		HttpContext httpContext,
 		[FromServices] ICaseService engine,
 		CancellationToken cancellationToken
 	)
 	{
-		if (body.ValueKind != JsonValueKind.Object)
-		{
-			return BadRequest(
-				InvalidRequestTitle,
-				"Request body must be a JSON object containing 'assigneeId'."
-			);
-		}
-
-		if (
-			!body.TryGetProperty("assigneeId", out var assigneeIdElement)
-			|| assigneeIdElement.ValueKind != JsonValueKind.String
-			|| string.IsNullOrWhiteSpace(assigneeIdElement.GetString())
-		)
+		if (string.IsNullOrWhiteSpace(body.AssigneeId))
 		{
 			return BadRequest(
 				InvalidRequestTitle,
@@ -483,19 +498,10 @@ public static class CaseEndpoints
 			);
 		}
 
-		string? assigneeName = null;
-		if (
-			body.TryGetProperty("assigneeName", out var assigneeNameElement)
-			&& assigneeNameElement.ValueKind == JsonValueKind.String
-		)
-		{
-			assigneeName = assigneeNameElement.GetString();
-		}
-
 		var result = await engine.AssignAsync(
 			id,
-			assigneeIdElement.GetString()!,
-			assigneeName,
+			body.AssigneeId,
+			body.AssigneeName,
 			httpContext.User,
 			cancellationToken
 		);
@@ -507,7 +513,7 @@ public static class CaseEndpoints
 	}
 
 	internal static async Task<Results<Ok<CaseResponse>, NotFound, ProblemHttpResult>> Unassign(
-		[FromRoute] string id,
+		[FromRoute, Description("Case id.")] string id,
 		HttpContext httpContext,
 		[FromServices] ICaseService engine,
 		CancellationToken cancellationToken
@@ -522,26 +528,14 @@ public static class CaseEndpoints
 	}
 
 	internal static async Task<Results<Ok<CaseResponse>, NotFound, ProblemHttpResult>> AddNote(
-		[FromRoute] string id,
-		JsonElement body,
+		[FromRoute, Description("Case id.")] string id,
+		AddCaseNoteRequest body,
 		HttpContext httpContext,
 		[FromServices] ICaseService engine,
 		CancellationToken cancellationToken
 	)
 	{
-		if (body.ValueKind != JsonValueKind.Object)
-		{
-			return BadRequest(
-				InvalidRequestTitle,
-				"Request body must be a JSON object containing 'text'."
-			);
-		}
-
-		if (
-			!body.TryGetProperty("text", out var textElement)
-			|| textElement.ValueKind != JsonValueKind.String
-			|| string.IsNullOrWhiteSpace(textElement.GetString())
-		)
+		if (string.IsNullOrWhiteSpace(body.Text))
 		{
 			return BadRequest(
 				InvalidRequestTitle,
@@ -551,7 +545,7 @@ public static class CaseEndpoints
 
 		var result = await engine.AddNoteAsync(
 			id,
-			textElement.GetString()!,
+			body.Text,
 			httpContext.User,
 			cancellationToken
 		);

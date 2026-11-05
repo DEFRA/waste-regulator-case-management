@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using MongoDB.Bson.Serialization.Attributes;
 
 namespace WasteRegulatorCaseManagement.Cases;
@@ -23,9 +24,20 @@ namespace WasteRegulatorCaseManagement.Cases;
 /// Absent for most transitions.
 /// </param>
 [BsonIgnoreExtraElements]
+[Description("An action that moves a case from one state to another.")]
 public sealed record CaseTransition(
+	[property: Description("The action's id, used in `POST /cases/{id}/actions/{actionId}`.")]
 	string ActionId,
+
+	[property: Description("The action as a caseworker reads it, such as `Accept`.")]
 	string DisplayName,
+
+	[property: Description("State the case must be in.")]
 	string FromStateId,
+
+	[property: Description("State the case moves to.")]
 	string ToStateId,
-	IReadOnlyCollection<string>? RequiredDecisionFields = null);
+
+	[property: Description("Fields the action's `decision` must supply, such as `reason`.")]
+	IReadOnlyCollection<string>? RequiredDecisionFields = null
+);

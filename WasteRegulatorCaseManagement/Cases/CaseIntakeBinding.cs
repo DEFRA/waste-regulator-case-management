@@ -1,136 +1,81 @@
-using System.Text.Json;
-
 namespace WasteRegulatorCaseManagement.Cases;
 
 /// <summary>
-/// Reads and validates the source system fields of a <c>POST /cases</c>
-/// body into a <see cref="CaseIntake"/>.
+/// Validates the source system fields of a <see cref="CaseIntakeRequest"/>
+/// and turns them into a <see cref="CaseIntake"/>.
 /// </summary>
 internal static class CaseIntakeBinding
 {
 	/// <summary>
-	/// Returns <c>null</c> and sets <paramref name="intake"/> when the body is
-	/// valid; otherwise returns a message describing the first problem.
+	/// Returns <c>null</c> and sets <paramref name="intake"/> when the request
+	/// is valid; otherwise returns a message describing the first problem.
 	/// </summary>
-	public static string? TryRead(JsonElement body, out CaseIntake? intake)
+	public static string? TryRead(CaseIntakeRequest request, out CaseIntake? intake)
 	{
 		intake = null;
 
-		if (ReadRequiredString(body, "sourceSystemId", out var sourceSystemId) is { } error)
+		if (RequireValue(request.SourceSystemId, "sourceSystemId") is { } error)
 		{
 			return error;
 		}
-		if (ReadRequiredString(body, "callbackUrl", out var callbackUrl) is { } callbackError)
+		if (RequireValue(request.CallbackUrl, "callbackUrl") is { } callbackError)
 		{
 			return callbackError;
 		}
 		if (
-			!Uri.TryCreate(callbackUrl, UriKind.Absolute, out var callbackUri)
+			!Uri.TryCreate(request.CallbackUrl.Trim(), UriKind.Absolute, out var callbackUri)
 			|| (callbackUri.Scheme != Uri.UriSchemeHttps && callbackUri.Scheme != Uri.UriSchemeHttp)
 		)
 		{
 			return "'callbackUrl' must be an absolute http or https URL.";
 		}
-		if (ReadRequiredString(body, "nation", out var nation) is { } nationError)
+		if (RequireValue(request.Nation, "nation") is { } nationError)
 		{
 			return nationError;
 		}
-		if (!CaseNations.All.Contains(nation!))
+		if (!CaseNations.All.Contains(request.Nation.Trim()))
 		{
 			return $"'nation' must be one of {string.Join(", ", CaseNations.All)}.";
 		}
-		if (ReadRequiredString(body, "orgId", out var orgId) is { } orgIdError)
+		if (RequireValue(request.OrgId, "orgId") is { } orgIdError)
 		{
 			return orgIdError;
 		}
 
-		string? producerType = null;
-		if (body.TryGetProperty("producerType", out var producerTypeElement))
-		{
-			if (producerTypeElement.ValueKind != JsonValueKind.String)
-			{
-				return "'producerType' must be a string.";
-			}
-			producerType = producerTypeElement.GetString();
-		}
-
 		var displayData = new Dictionary<string, CaseDisplayField>(StringComparer.Ordinal);
-		if (body.TryGetProperty("displayData", out var displayDataElement))
+		foreach (var (name, field) in request.DisplayData ?? new Dictionary<string, CaseDisplayField>())
 		{
-			if (displayDataElement.ValueKind != JsonValueKind.Object)
+			if (field?.Value is null || field.Type is null || !CaseDisplayField.Types.Contains(field.Type))
 			{
-				return "'displayData' must be an object.";
+				return $"'displayData.{name}' must be {{ \"value\": string, \"type\": "
+					+ $"one of {string.Join(", ", CaseDisplayField.Types)} }}.";
 			}
-			foreach (var field in displayDataElement.EnumerateObject())
-			{
-				if (
-					field.Value.ValueKind != JsonValueKind.Object
-					|| !field.Value.TryGetProperty("value", out var value)
-					|| value.ValueKind != JsonValueKind.String
-					|| !field.Value.TryGetProperty("type", out var type)
-					|| type.ValueKind != JsonValueKind.String
-					|| !CaseDisplayField.Types.Contains(type.GetString()!)
-				)
-				{
-					return $"'displayData.{field.Name}' must be {{ \"value\": string, \"type\": "
-						+ $"one of {string.Join(", ", CaseDisplayField.Types)} }}.";
-				}
-				displayData[field.Name] = new CaseDisplayField(value.GetString()!, type.GetString()!);
-			}
+			displayData[name] = field;
 		}
 
-		string? initialStateId = null;
-		if (body.TryGetProperty("initialState", out _))
+		if (request.InitialState is not null && RequireValue(request.InitialState, "initialState") is { } initialStateError)
 		{
-			if (ReadRequiredString(body, "initialState", out initialStateId) is { } initialStateError)
-			{
-				return initialStateError;
-			}
-		}
-
-		DateTime? createdAt = null;
-		if (body.TryGetProperty("createdAt", out var createdAtElement))
-		{
-			if (
-				createdAtElement.ValueKind != JsonValueKind.String
-				|| !DateTimeOffset.TryParse(
-					createdAtElement.GetString(),
-					System.Globalization.CultureInfo.InvariantCulture,
-					System.Globalization.DateTimeStyles.AssumeUniversal,
-					out var parsed
-				)
-			)
-			{
-				return "'createdAt' must be an ISO 8601 date-time string.";
-			}
-			createdAt = parsed.UtcDateTime;
+			return initialStateError;
 		}
 
 		intake = new CaseIntake(
-			sourceSystemId!,
-			callbackUrl!,
-			nation!,
-			orgId!,
-			producerType,
+			request.SourceSystemId.Trim(),
+			request.CallbackUrl.Trim(),
+			request.Nation.Trim(),
+			request.OrgId.Trim(),
+			request.ProducerType,
 			displayData,
-			initialStateId,
-			createdAt
+			request.InitialState?.Trim(),
+			request.CreatedAt is { } createdAt ? AsUtc(createdAt) : null
 		);
 		return null;
 	}
 
-	private static string? ReadRequiredString(JsonElement body, string name, out string? value)
-	{
-		value = null;
-		if (
-			!body.TryGetProperty(name, out var element)
-			|| element.ValueKind != JsonValueKind.String
-			|| string.IsNullOrWhiteSpace(element.GetString())
-		)
-		{
-			return $"'{name}' is required and must be a non-empty string.";
-		}
-		value = element.GetString()!.Trim();
-		return null;
-	}
+	private static string? RequireValue(string? value, string name) =>
+		string.IsNullOrWhiteSpace(value) ? $"'{name}' is required and must be a non-empty string." : null;
+
+	private static DateTime AsUtc(DateTime value) =>
+		value.Kind == DateTimeKind.Unspecified
+			? DateTime.SpecifyKind(value, DateTimeKind.Utc)
+			: value.ToUniversalTime();
 }

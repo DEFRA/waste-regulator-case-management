@@ -35,6 +35,9 @@ internal sealed class CaseOpenApiExampleTransformer : IOpenApiDocumentTransforme
                 }
                 """),
 
+			["ApplyCaseAction"] = JsonNode.Parse(
+				"""{ "decision": { "reason": "Submitted against the wrong obligation year." } }"""),
+
 			["AssignCase"] = JsonNode.Parse(
 				"""{ "assigneeId": "caseworker-abc123", "assigneeName": "Jane Smith" }"""),
 

@@ -87,8 +87,6 @@ public class CaseEndpointsTests
 		);
 
 		Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-		var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken);
-		Assert.Equal("Invalid request", problem?.Title);
 	}
 
 	[Fact]
@@ -105,8 +103,6 @@ public class CaseEndpointsTests
 		);
 
 		Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-		var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken);
-		Assert.Equal("Invalid request", problem?.Title);
 	}
 
 	[Fact]
@@ -391,39 +387,39 @@ public class CaseEndpointsTests
 	}
 
 	[Theory]
-	[InlineData("source", "'source' must be a string.")]
-	public async Task Post_rejects_non_string_submission_metadata_field(
-		string field,
-		string expectedDetail
-	)
+	[InlineData("source", "42")]
+	[InlineData("producerType", "7")]
+	[InlineData("displayData", "\"Acme\"")]
+	[InlineData("displayData", "{ \"organisationName\": \"Acme\" }")]
+	[InlineData("initialState", "3")]
+	[InlineData("createdAt", "\"yesterday\"")]
+	[InlineData("createdAt", "1714521600")]
+	public async Task Post_rejects_an_intake_field_of_the_wrong_json_type(string field, string value)
 	{
-		// RA-126: reject malformed metadata up front rather than
-		// silently coercing / dropping it — that would leave the audit
-		// record degraded without the caller noticing.
+		// Arrange
 		var cancellationToken = TestContext.Current.CancellationToken;
 		await using var factory = NewFactory();
 		using var client = factory.CreateClient();
+		var body = new System.Text.Json.Nodes.JsonObject
+		{
+			["caseType"] = CaseType,
+			["sourceSystemId"] = Ulid.NewUlid().ToString(),
+			["callbackUrl"] = "https://source-system.test/callback",
+			["nation"] = "ENGLAND",
+			["orgId"] = "test-org",
+		};
+		body[field] = System.Text.Json.Nodes.JsonNode.Parse(value);
 
-		// Hand-craft body to inject a non-string value (e.g. a number)
-		// for the field under test.
-		var json = $$"""
-            {
-                "caseType": "{{CaseType}}",
-                "sourceSystemId": "{{Ulid.NewUlid()}}",
-                "callbackUrl": "https://source-system.test/callback",
-                "nation": "ENGLAND",
-                "orgId": "test-org",
-                "{{field}}": 42
-            }
-            """;
-		var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
-		var response = await client.PostAsync("/cases", content, cancellationToken);
+		// Act
+		var response = await client.PostAsync(
+			"/cases",
+			new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json"),
+			cancellationToken
+		);
 
-		Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-		var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken);
-		Assert.Equal("Invalid request body", problem?.Title);
-		Assert.Equal(expectedDetail, problem?.Detail);
-		Assert.Empty(await factory.AllItemsAsync(cancellationToken));
+		// Assert
+		response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+		(await factory.AllItemsAsync(cancellationToken)).Should().BeEmpty();
 	}
 
 	[Fact]
@@ -558,11 +554,7 @@ public class CaseEndpointsTests
 	[InlineData("callbackUrl", "\"ftp://source-system.test/callback\"", "'callbackUrl' must be an absolute http or https URL.")]
 	[InlineData("nation", "null", "'nation' is required and must be a non-empty string.")]
 	[InlineData("orgId", "\"   \"", "'orgId' is required and must be a non-empty string.")]
-	[InlineData("producerType", "7", "'producerType' must be a string.")]
-	[InlineData("displayData", "\"Acme\"", "'displayData' must be an object.")]
-	[InlineData("initialState", "3", "'initialState' is required and must be a non-empty string.")]
-	[InlineData("createdAt", "\"yesterday\"", "'createdAt' must be an ISO 8601 date-time string.")]
-	[InlineData("createdAt", "1714521600", "'createdAt' must be an ISO 8601 date-time string.")]
+	[InlineData("initialState", "\"  \"", "'initialState' is required and must be a non-empty string.")]
 	public async Task Post_returns_problem_when_an_intake_field_has_the_wrong_shape(
 		string field,
 		string value,
@@ -817,31 +809,11 @@ public class CaseEndpointsTests
 		body.Decision.Should().BeNull();
 	}
 
-	[Fact]
-	public async Task Action_rejects_a_decision_field_that_is_not_a_string()
-	{
-		// Arrange
-		var cancellationToken = TestContext.Current.CancellationToken;
-		await using var factory = NewFactory();
-		using var client = factory.CreateClient();
-		var caseId = await SubmitCSoCCaseAsync(client, "csoc-2024-eng-00128", cancellationToken);
-
-		// Act
-		var response = await client.PostAsJsonAsync(
-			$"/cases/{caseId}/actions/cancel",
-			new { decision = new { reason = 42 } },
-			cancellationToken
-		);
-
-		// Assert
-		response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-		(await response.Content.ReadAsStringAsync(cancellationToken)).Should().Contain("Decision field 'reason' must be a string");
-	}
-
 	[Theory]
-	[InlineData("[]", "Request body must be a JSON object.")]
-	[InlineData("""{ "decision": "Submitted in error." }""", "'decision' must be a JSON object of string fields.")]
-	public async Task Action_rejects_a_body_that_is_not_a_decision_object(string body, string expectedDetail)
+	[InlineData("[]")]
+	[InlineData("""{ "decision": "Submitted in error." }""")]
+	[InlineData("""{ "decision": { "reason": 42 } }""")]
+	public async Task Action_rejects_a_body_that_is_not_a_decision_object(string body)
 	{
 		// Arrange
 		var cancellationToken = TestContext.Current.CancellationToken;
@@ -858,8 +830,6 @@ public class CaseEndpointsTests
 
 		// Assert
 		response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-		var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken);
-		problem!.Detail.Should().Be(expectedDetail);
 	}
 
 	[Fact]
@@ -1410,106 +1380,6 @@ public class CaseEndpointsTests
 		};
 
 	[Fact]
-	public async Task Submit_logs_absent_body_when_no_json_body_is_supplied()
-	{
-		// Covers the `body.ValueKind != JsonValueKind.Undefined` branch's
-		// false arm: a JsonElement default(JsonElement) (ValueKind ==
-		// Undefined) is what minimal-API binding hands the handler for a
-		// request with no body at all. It should still be rejected (as
-		// "not a JSON object"), just via the log-friendly "(empty)" path
-		// rather than calling GetRawText() on an undefined element (which
-		// throws).
-		var cancellationToken = TestContext.Current.CancellationToken;
-		var type = TestCaseType.Create(CaseType, "Test type");
-		var registry = new CaseRegistry([type]);
-		var engine = Substitute.For<ICaseService>();
-		var httpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext
-		{
-			User = new System.Security.Claims.ClaimsPrincipal(
-				new System.Security.Claims.ClaimsIdentity(authenticationType: "test")
-			),
-		};
-
-		var result = await CaseEndpoints.Submit(
-			default,
-			httpContext,
-			registry,
-			engine,
-			Substitute.For<IStructuredLogger<CaseEndpointsLogger>>(),
-			cancellationToken
-		);
-
-		var problem = Assert.IsType<ProblemHttpResult>(result.Result);
-		Assert.Equal(
-			Microsoft.AspNetCore.Http.StatusCodes.Status400BadRequest,
-			problem.StatusCode
-		);
-	}
-
-	[Fact]
-	public async Task Submit_truncates_a_very_large_body_in_the_log()
-	{
-		// Covers the `bodyText.Length > MaxLoggedBodyChars` branch's true
-		// arm — a body large enough that logging it verbatim would be
-		// unreasonable. The oversized payload is otherwise valid so the
-		// request succeeds; the assertion is just that it doesn't throw
-		// and completes normally, proving the truncation path ran.
-		var cancellationToken = TestContext.Current.CancellationToken;
-		var type = TestCaseType.Create(CaseType, "Test type");
-		var registry = new CaseRegistry([type]);
-		var engine = Substitute.For<ICaseService>();
-		var submittedCase = new Case
-		{
-			SourceSystemId = Ulid.NewUlid().ToString(),
-			CallbackUrl = "https://source-system.test/callback",
-			Nation = "ENGLAND",
-			OrgId = "test-org",
-			Id = Ulid.NewUlid().ToString(),
-			CaseType = CaseType,
-			StateId = "submitted",
-			SubmittedAt = DateTime.UtcNow,
-			LastModifiedAt = DateTime.UtcNow,
-			SubmittedBy = "test-client",
-		};
-		engine
-			.SubmitAsync(
-				Arg.Any<CaseModuleConfig>(),
-				Arg.Any<CaseIntake>(),
-				Arg.Any<string?>(),
-				Arg.Any<System.Security.Claims.ClaimsPrincipal>(),
-				Arg.Any<IReadOnlyDictionary<string, string?>?>(),
-				Arg.Any<CancellationToken>()
-			)
-			.Returns(CaseActionResult.Success(submittedCase));
-		engine
-			.Project(Arg.Any<Case>())
-			.Returns(new CaseEngineProjection(
-				submittedCase, "v1", Array.Empty<CaseTransition>()));
-
-		var largeValue = new string('x', 5000);
-		var body = JsonDocument
-			.Parse($"{{\"caseType\":\"{CaseType}\",\"payload\":{{\"note\":\"{largeValue}\"}}}}")
-			.RootElement;
-		var httpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext
-		{
-			User = new System.Security.Claims.ClaimsPrincipal(
-				new System.Security.Claims.ClaimsIdentity(authenticationType: "test")
-			),
-		};
-
-		var result = await CaseEndpoints.Submit(
-			body,
-			httpContext,
-			registry,
-			engine,
-			Substitute.For<IStructuredLogger<CaseEndpointsLogger>>(),
-			cancellationToken
-		);
-
-		Assert.NotNull(result.Result);
-	}
-
-	[Fact]
 	public async Task Post_returns_problem_when_body_is_not_a_json_object()
 	{
 		var cancellationToken = TestContext.Current.CancellationToken;
@@ -1519,9 +1389,7 @@ public class CaseEndpointsTests
 		var content = new StringContent("[1,2,3]", System.Text.Encoding.UTF8, "application/json");
 		var response = await client.PostAsync("/cases", content, cancellationToken);
 
-		Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-		var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken);
-		Assert.Equal("Invalid request", problem?.Title);
+		response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
 	}
 
 	[Fact]
@@ -1546,17 +1414,13 @@ public class CaseEndpointsTests
 			)
 			.Returns(Task.FromException<CaseActionResult>(new InvalidOperationException("boom")));
 
-		var body = JsonDocument.Parse(
-			$$"""
-            {
-                "caseType": "{{CaseType}}",
-                "sourceSystemId": "{{Ulid.NewUlid()}}",
-                "callbackUrl": "https://source-system.test/callback",
-                "nation": "ENGLAND",
-                "orgId": "test-org"
-            }
-            """
-		).RootElement;
+		var body = new CaseIntakeRequest(
+			CaseType: CaseType,
+			SourceSystemId: Ulid.NewUlid().ToString(),
+			CallbackUrl: "https://source-system.test/callback",
+			Nation: "ENGLAND",
+			OrgId: "test-org"
+		);
 		var httpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext
 		{
 			User = new System.Security.Claims.ClaimsPrincipal(
@@ -1603,7 +1467,7 @@ public class CaseEndpointsTests
 				)
 			);
 
-		var body = JsonDocument.Parse("""{"assigneeId":"alice-1"}""").RootElement;
+		var body = new AssignCaseRequest(AssigneeId: "alice-1");
 		var httpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext
 		{
 			User = new System.Security.Claims.ClaimsPrincipal(
@@ -1647,17 +1511,13 @@ public class CaseEndpointsTests
 				)
 			);
 
-		var body = JsonDocument.Parse(
-			$$"""
-            {
-                "caseType": "{{CaseType}}",
-                "sourceSystemId": "{{Ulid.NewUlid()}}",
-                "callbackUrl": "https://source-system.test/callback",
-                "nation": "ENGLAND",
-                "orgId": "test-org"
-            }
-            """
-		).RootElement;
+		var body = new CaseIntakeRequest(
+			CaseType: CaseType,
+			SourceSystemId: Ulid.NewUlid().ToString(),
+			CallbackUrl: "https://source-system.test/callback",
+			Nation: "ENGLAND",
+			OrgId: "test-org"
+		);
 		var httpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext
 		{
 			User = new System.Security.Claims.ClaimsPrincipal(
@@ -1937,17 +1797,11 @@ public class CaseEndpointsTests
 		var response = await client.PostAsync($"/cases/{id}/assign", content, cancellationToken);
 
 		Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-		var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken);
-		Assert.Equal("Invalid request", problem?.Title);
 	}
 
 	[Fact]
-	public async Task Assign_ignores_a_non_string_assigneeName()
+	public async Task Assign_rejects_a_non_string_assigneeName()
 	{
-		// Covers the `assigneeNameElement.ValueKind == JsonValueKind.String`
-		// branch's false arm: assigneeName is optional and, when present
-		// but the wrong JSON type, is silently dropped rather than
-		// rejecting the whole request.
 		var cancellationToken = TestContext.Current.CancellationToken;
 		await using var factory = NewFactory(userId: "actor-1");
 		using var client = factory.CreateClient();
@@ -1974,10 +1828,7 @@ public class CaseEndpointsTests
 			cancellationToken
 		);
 
-		Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-		var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
-		Assert.Equal("alice-1", body?.AssignedToId);
-		Assert.Null(body?.AssignedToName);
+		response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
 	}
 
 	[Fact]
@@ -2360,8 +2211,6 @@ public class CaseEndpointsTests
 		var response = await client.PostAsync($"/cases/{id}/notes", content, cancellationToken);
 
 		Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-		var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken);
-		Assert.Equal("Invalid request", problem?.Title);
 	}
 
 	[Fact]

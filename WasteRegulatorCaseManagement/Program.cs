@@ -106,14 +106,7 @@ static void ConfigureServices(WebApplicationBuilder builder)
 			// AddDocumentTransformer<T> registers the transformer in DI, so
 			// no separate AddSingleton call is required.
 			options.AddDocumentTransformer<CaseOpenApiExampleTransformer>();
-			options.AddDocumentTransformer(
-				(document, _, _) =>
-				{
-					document.Info.Title = "Waste Regulator Case Management";
-					document.Info.Version = "0.1.0";
-					return Task.CompletedTask;
-				}
-			);
+			options.AddDocumentTransformer<OpenApiDocumentInfoTransformer>();
 		}
 	);
 

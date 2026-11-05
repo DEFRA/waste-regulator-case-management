@@ -1,78 +1,56 @@
 using WasteRegulatorCaseManagement.Cases;
-using Microsoft.AspNetCore.Http;
 
 namespace WasteRegulatorCaseManagement.Test.Cases;
 
-/// <summary>
-/// Regression coverage for <see cref="CaseQueryBinding.FromQueryString"/>.
-/// <c>submittedBy</c> is an ordinary caller-supplied filter — scoping
-/// decisions are made by the frontend, not enforced by this binder.
-/// </summary>
 public class CaseQueryBindingTests
 {
-
-	private static IQueryCollection Q(params (string Key, string Value)[] pairs)
-	{
-		var dict = new Dictionary<string, Microsoft.Extensions.Primitives.StringValues>(
-			StringComparer.OrdinalIgnoreCase);
-		foreach (var (k, v) in pairs)
-		{
-			dict[k] = v;
-		}
-		return new QueryCollection(dict);
-	}
+	private static readonly CaseListRequest s_noFilters = new(
+		CaseType: null,
+		StateId: null,
+		Search: null,
+		AssigneeId: null,
+		Unassigned: null,
+		OrgId: null,
+		IsTerminal: null,
+		Sort: null,
+		Dir: null,
+		Page: null,
+		PageSize: null
+	);
 
 	[Fact]
 	public void OrgIdIsNullWhenTheQueryValueIsWhitespace()
 	{
-		var query = CaseQueryBinding.FromQueryString(Q(("orgId", "   ")));
+		var query = CaseQueryBinding.FromRequest(s_noFilters with { OrgId = "   " });
 
 		query.OrgId.Should().BeNull();
 	}
 
 	[Fact]
-	public void PageFallsBackToTheDefaultWhenTheQueryValueIsNotAnInteger()
+	public void BlankAndRepeatedCaseTypesAreDropped()
 	{
-		// Covers ReadInt's `int.TryParse` false arm.
-		var query = CaseQueryBinding.FromQueryString(Q(("page", "not-a-number")));
+		var query = CaseQueryBinding.FromRequest(s_noFilters with { CaseType = [" CSoC ", "", "CSoC"] });
 
-		Assert.Equal(1, query.Page);
+		query.CaseTypes.Should().Equal("CSoC");
 	}
 
 	[Fact]
-	public void UnassignedIsFalseWhenTheQueryValueIsWhitespace()
+	public void AbsentPagingAndAssignmentFallBackToTheDefaults()
 	{
-		// Covers ReadBool's `IsNullOrWhiteSpace` true arm.
-		var query = CaseQueryBinding.FromQueryString(Q(("unassigned", "   ")));
+		var query = CaseQueryBinding.FromRequest(s_noFilters);
 
-		Assert.False(query.UnassignedOnly);
+		query.Page.Should().Be(1);
+		query.PageSize.Should().Be(CaseQuery.DefaultPageSize);
+		query.UnassignedOnly.Should().BeFalse();
 	}
-
-	[Theory]
-	[InlineData("true", true)]
-	[InlineData("TRUE", true)]
-	[InlineData("1", true)]
-	[InlineData("on", true)]
-	[InlineData("Yes", true)]
-	[InlineData(" true ", true)]
-	[InlineData("false", false)]
-	[InlineData("0", false)]
-	public void UnassignedAcceptsTheUsualTruthySpellings(string value, bool expected)
-	{
-		var query = CaseQueryBinding.FromQueryString(Q(("unassigned", value)));
-
-		query.UnassignedOnly.Should().Be(expected);
-	}
-
-	// ───────────────────────── Sort (RA-324) ─────────────────────────
 
 	[Theory]
 	[InlineData("status")]
 	public void SortTokenIsBound(string token)
 	{
-		var query = CaseQueryBinding.FromQueryString(Q(("sort", token)));
+		var query = CaseQueryBinding.FromRequest(s_noFilters with { Sort = token });
 
-		Assert.Equal(token, query.Sort);
+		query.Sort.Should().Be(token);
 	}
 
 	[Theory]
@@ -83,9 +61,9 @@ public class CaseQueryBindingTests
 	[InlineData("ascending", false)]
 	public void SortDirectionIsParsed(string dir, bool expectedDescending)
 	{
-		var query = CaseQueryBinding.FromQueryString(Q(("dir", dir)));
+		var query = CaseQueryBinding.FromRequest(s_noFilters with { Dir = dir });
 
-		Assert.Equal(expectedDescending, query.SortDescending);
+		query.SortDescending.Should().Be(expectedDescending);
 	}
 
 	[Theory]
@@ -94,17 +72,17 @@ public class CaseQueryBindingTests
 	[InlineData("   ")]
 	public void UnrecognisedOrBlankSortDirectionIsNull(string dir)
 	{
-		var query = CaseQueryBinding.FromQueryString(Q(("dir", dir)));
+		var query = CaseQueryBinding.FromRequest(s_noFilters with { Dir = dir });
 
-		Assert.Null(query.SortDescending);
+		query.SortDescending.Should().BeNull();
 	}
 
 	[Fact]
 	public void MissingSortAndDirectionDefaultToNull()
 	{
-		var query = CaseQueryBinding.FromQueryString(new QueryCollection());
+		var query = CaseQueryBinding.FromRequest(s_noFilters);
 
-		Assert.Null(query.Sort);
-		Assert.Null(query.SortDescending);
+		query.Sort.Should().BeNull();
+		query.SortDescending.Should().BeNull();
 	}
 }
