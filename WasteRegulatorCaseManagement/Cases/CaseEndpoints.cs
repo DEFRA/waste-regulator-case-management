@@ -596,16 +596,16 @@ public static class CaseEndpoints
             // their append order reversed on the wire instead of relying on
             // undefined behaviour from a tied OrderBy (epr-s4y).
             w.Timeline.Select((e, i) => (Entry: e, Index: i))
-                .OrderByDescending(x => x.Entry.CreatedAt)
+                .OrderByDescending(x => x.Entry.PerformedAt)
                 .ThenByDescending(x => x.Index)
                 .Select(x => new CaseTimelineEntryResponse(
                     x.Entry.Id,
                     x.Entry.Action,
                     x.Entry.ActionDisplayName,
                     x.Entry.Details,
-                    x.Entry.CreatedAt,
-                    x.Entry.CreatedBy,
-                    x.Entry.CreatedByName,
+                    x.Entry.PerformedAt,
+                    x.Entry.PerformedById,
+                    x.Entry.PerformedByName,
                     // epr-rr9s: per-event state snapshot (null for pre-change entries).
                     x.Entry.StateId
                 ))

@@ -77,8 +77,8 @@ public class CaseTimelineAppenderTests
         Assert.Equal("notification-sent", entry.Action);
         Assert.Equal("Email sent", entry.ActionDisplayName);
         Assert.Equal("DulyMade", entry.Details?["templateKey"]);
-        Assert.Equal("user-1", entry.CreatedBy);
-        Assert.Equal("Alice", entry.CreatedByName);
+        Assert.Equal("user-1", entry.PerformedById);
+        Assert.Equal("Alice", entry.PerformedByName);
         // epr-rr9s: out-of-band appends snapshot the case's current state.
         Assert.Equal("submitted", entry.StateId);
     }

@@ -41,9 +41,9 @@ internal sealed class CaseTimelineAppender(
                 Action = action,
                 ActionDisplayName = actionDisplayName,
                 Details = details,
-                CreatedAt = now,
-                CreatedBy = user.FindFirstValue("user:id"),
-                CreatedByName = user.FindFirstValue("user:name"),
+                PerformedAt = now,
+                PerformedById = user.FindFirstValue("user:id"),
+                PerformedByName = user.FindFirstValue("user:name"),
                 // epr-rr9s: snapshot the case's current state at append time.
                 StateId = caseRecord.StateId
             });

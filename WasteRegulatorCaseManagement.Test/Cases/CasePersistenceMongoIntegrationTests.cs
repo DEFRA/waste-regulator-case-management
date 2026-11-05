@@ -224,9 +224,9 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
                 {
                     Action = "submitted",
                     ActionDisplayName = "Submitted",
-                    CreatedAt = now,
-                    CreatedBy = "user-1",
-                    CreatedByName = "Alice",
+                    PerformedAt = now,
+                    PerformedById = "user-1",
+                    PerformedByName = "Alice",
                 },
             },
         };
@@ -385,9 +385,9 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
                 {
                     Action = "submitted",
                     ActionDisplayName = "Submitted",
-                    CreatedAt = now,
-                    CreatedBy = "u",
-                    CreatedByName = "U",
+                    PerformedAt = now,
+                    PerformedById = "u",
+                    PerformedByName = "U",
                 },
             },
         };

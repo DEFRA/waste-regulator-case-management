@@ -406,7 +406,7 @@ public class CaseServiceTests : IAsyncDisposable
         Assert.True(result.IsSuccess, result.Message);
         var fetched = await GetAsync(caseRecord.Id);
         var noteEntry = Assert.Single(fetched.Timeline, a => a.Action == "note-added");
-        Assert.Equal("test-user", noteEntry.CreatedBy);
+        Assert.Equal("test-user", noteEntry.PerformedById);
     }
 
     [Fact]
@@ -1449,9 +1449,9 @@ public class CaseServiceTests : IAsyncDisposable
         var fetched = await GetAsync(caseRecord.Id);
         var note = Assert.Single(fetched.Timeline, e => e.Action == "note-added");
         Assert.Equal("Spoke to applicant; awaiting evidence.", note.Details["text"]);
-        Assert.Equal("alice-1", note.CreatedBy);
-        Assert.Equal("Alice Example", note.CreatedByName);
-        Assert.Equal(TickedNow, note.CreatedAt);
+        Assert.Equal("alice-1", note.PerformedById);
+        Assert.Equal("Alice Example", note.PerformedByName);
+        Assert.Equal(TickedNow, note.PerformedAt);
         Assert.Equal(TickedNow, fetched.LastModifiedAt);
         Assert.Equal(1, fetched.Version);
     }
@@ -1581,8 +1581,8 @@ public class CaseServiceTests : IAsyncDisposable
         Assert.Equal("Withdraw", entry.Details["actionDisplayName"]);
         Assert.Equal("submitted", entry.Details["fromStateId"]);
         Assert.Equal("rejected", entry.Details["toStateId"]);
-        Assert.Equal("alice-1", entry.CreatedBy);
-        Assert.Equal(TickedNow, entry.CreatedAt);
+        Assert.Equal("alice-1", entry.PerformedById);
+        Assert.Equal(TickedNow, entry.PerformedAt);
         // epr-rr9s: the entry snapshots the state AS OF the event — the
         // resulting post-transition state, not the item's live state.
         Assert.Equal("rejected", entry.StateId);
@@ -1642,7 +1642,7 @@ public class CaseServiceTests : IAsyncDisposable
         Assert.Equal("Carol Example", entry.Details["assigneeName"]);
         Assert.Equal("bob-1", entry.Details["previousAssigneeId"]);
         Assert.Equal("Bob Example", entry.Details["previousAssigneeName"]);
-        Assert.Equal("alice-1", entry.CreatedBy);
+        Assert.Equal("alice-1", entry.PerformedById);
     }
 
     [Fact]
@@ -1704,7 +1704,7 @@ public class CaseServiceTests : IAsyncDisposable
         Assert.Equal("Unassigned", entry.ActionDisplayName);
         Assert.Equal("alice-1", entry.Details["previousAssigneeId"]);
         Assert.Equal("Alice", entry.Details["previousAssigneeName"]);
-        Assert.Equal("actor-1", entry.CreatedBy);
+        Assert.Equal("actor-1", entry.PerformedById);
     }
 
     [Fact]
@@ -1741,9 +1741,9 @@ public class CaseServiceTests : IAsyncDisposable
         Assert.Equal("Note added", entry.ActionDisplayName);
         // epr-27o: the entry holds the trimmed note body.
         Assert.Equal("A note.", entry.Details["text"]);
-        Assert.Equal("alice-1", entry.CreatedBy);
-        Assert.Equal("Alice Example", entry.CreatedByName);
-        Assert.Equal(TickedNow, entry.CreatedAt);
+        Assert.Equal("alice-1", entry.PerformedById);
+        Assert.Equal("Alice Example", entry.PerformedByName);
+        Assert.Equal(TickedNow, entry.PerformedAt);
     }
 
     [Fact]
@@ -1810,8 +1810,8 @@ public class CaseServiceTests : IAsyncDisposable
         );
         // Strictly increasing timestamps — entries are appended in
         // chronological (insertion) order on disk.
-        Assert.True(fetched.Timeline[0].CreatedAt < fetched.Timeline[1].CreatedAt);
-        Assert.True(fetched.Timeline[1].CreatedAt < fetched.Timeline[2].CreatedAt);
+        Assert.True(fetched.Timeline[0].PerformedAt < fetched.Timeline[1].PerformedAt);
+        Assert.True(fetched.Timeline[1].PerformedAt < fetched.Timeline[2].PerformedAt);
         // epr-rr9s: each entry snapshots the state AS OF its own event. The
         // note + assign happened while the item was still 'submitted'; only
         // the state-changed entry carries the post-transition 'approved'.
@@ -1898,10 +1898,10 @@ public class CaseServiceTests : IAsyncDisposable
         var entry = Assert.Single(fetched.Timeline);
         Assert.Equal("case-created", entry.Action);
         Assert.Equal("Case submitted", entry.ActionDisplayName);
-        Assert.Equal("alice-1", entry.CreatedBy);
-        Assert.Equal("Alice Example", entry.CreatedByName);
-        Assert.Equal(fetched.SubmittedAt, entry.CreatedAt);
-        Assert.Equal(TickedNow, entry.CreatedAt);
+        Assert.Equal("alice-1", entry.PerformedById);
+        Assert.Equal("Alice Example", entry.PerformedByName);
+        Assert.Equal(fetched.SubmittedAt, entry.PerformedAt);
+        Assert.Equal(TickedNow, entry.PerformedAt);
         Assert.Equal(TypeId, entry.Details["typeId"]);
         Assert.Equal("submitted", entry.Details["stateId"]);
         Assert.Equal("v1", entry.Details["templateVersion"]);
@@ -1939,7 +1939,7 @@ public class CaseServiceTests : IAsyncDisposable
     {
         // RA-126: source / clientId / userId are appended to the birth
         // entry's Details alongside the existing typeId / stateId /
-        // templateVersion keys. CreatedAt must be the server-side receipt
+        // templateVersion keys. PerformedAt must be the server-side receipt
         // time from the injected TimeProvider, not a client-supplied value.
         var type = BuildType();
         var metadata = new Dictionary<string, string?>
@@ -1961,7 +1961,7 @@ public class CaseServiceTests : IAsyncDisposable
         var fetched = await GetAsync(result.Case!.Id);
         var entry = Assert.Single(fetched.Timeline);
         Assert.Equal("case-created", entry.Action);
-        Assert.Equal(TickedNow, entry.CreatedAt);
+        Assert.Equal(TickedNow, entry.PerformedAt);
         Assert.Equal(TypeId, entry.Details["typeId"]);
         Assert.Equal("submitted", entry.Details["stateId"]);
         Assert.Equal("v1", entry.Details["templateVersion"]);

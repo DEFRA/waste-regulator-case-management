@@ -100,7 +100,7 @@ public class CaseServiceTimestampTests
         Assert.Equal(expected, fetched.LastModifiedAt);
         var birth = Assert.Single(fetched.Timeline);
         Assert.Equal("case-created", birth.Action);
-        Assert.Equal(expected, birth.CreatedAt);
+        Assert.Equal(expected, birth.PerformedAt);
     }
 
     [Fact]
@@ -132,7 +132,7 @@ public class CaseServiceTimestampTests
         Assert.Equal(expected, fetched.LastModifiedAt);
         var audit = Assert.Single(fetched.Timeline);
         Assert.Equal("note-added", audit.Action);
-        Assert.Equal(expected, audit.CreatedAt);
+        Assert.Equal(expected, audit.PerformedAt);
     }
 
     [Fact]
@@ -151,6 +151,6 @@ public class CaseServiceTimestampTests
         Assert.Equal(default, caseRecord.LastModifiedAt);
 
         var entry = new CaseTimelineEntry { Action = "x", ActionDisplayName = "X" };
-        Assert.Equal(default, entry.CreatedAt);
+        Assert.Equal(default, entry.PerformedAt);
     }
 }

@@ -867,7 +867,7 @@ public sealed class CaseService : ICaseService
         string action,
         string actionDisplayName,
         ClaimsPrincipal? user,
-        DateTime createdAt,
+        DateTime performedAt,
         Dictionary<string, string?> details
     )
     {
@@ -877,9 +877,9 @@ public sealed class CaseService : ICaseService
                 Action = action,
                 ActionDisplayName = actionDisplayName,
                 Details = details,
-                CreatedAt = createdAt,
-                CreatedBy = ResolveActorUserId(user)!,
-                CreatedByName = user?.FindFirstValue("user:name"),
+                PerformedAt = performedAt,
+                PerformedById = ResolveActorUserId(user)!,
+                PerformedByName = user?.FindFirstValue("user:name"),
                 // epr-rr9s: snapshot the state as of this event. Every
                 // AppendAudit caller invokes this AFTER any state mutation
                 // (submit sets the initial state, state-changed assigns

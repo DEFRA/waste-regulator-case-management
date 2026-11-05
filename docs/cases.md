@@ -203,8 +203,8 @@ optionally reads two headers forwarded by the BFF and turns them into
 | `x-cdp-user-id` | `user:id` (used by `ResolveActorUserId`) |
 | `x-cdp-user-name` | `user:name` |
 
-These are used for audit attribution only (`Case.Timeline.CreatedBy` /
-`CreatedByName` and similar). Role membership is not part of the trust
+These are used for audit attribution only (`Case.Timeline.PerformedById` /
+`PerformedByName` and similar). Role membership is not part of the trust
 contract — see ADR-0005.
 
 ### Storage
@@ -305,9 +305,9 @@ the case document. An entry carries:
 | `Action` | Stable machine id of the action: `case-created`, `state-changed`, `assigned`, `unassigned`, `note-added`. Modules append their own alongside these (e.g. `notification-sent`). |
 | `ActionDisplayName` | Human-readable description (e.g. `Note added`). |
 | `Details` | `Dictionary<string, string?>` of contextual fields per action: `typeId`/`stateId`/`templateVersion` (submission); `actionId`/`actionDisplayName`/`fromStateId`/`toStateId`; `assigneeId`/`assigneeName`/`previousAssigneeId`/`previousAssigneeName` (unassigned); `text` (note). |
-| `CreatedAt` | UTC timestamp from the injected `TimeProvider`. |
-| `CreatedBy` | Snapshot of the actor's user id (`user:id` claim, required — mutations without it are rejected with 401). |
-| `CreatedByName` | Snapshot of the actor's display name (`user:name`) at write time. |
+| `PerformedAt` | UTC timestamp from the injected `TimeProvider`. |
+| `PerformedById` | Snapshot of the actor's user id (`user:id` claim, required — mutations without it are rejected with 401). |
+| `PerformedByName` | Snapshot of the actor's display name (`user:name`) at write time. |
 
 ### Wire format
 
@@ -326,5 +326,5 @@ timeline without re-sorting.
 - **No module-specific entry shape.** If a module needs richer details,
   extend the framework's `Details` keys rather than introducing a parallel
   audit channel.
-- **Snapshot identity at write time.** `CreatedBy` / `CreatedByName` are
+- **Snapshot identity at write time.** `PerformedById` / `PerformedByName` are
   not live foreign keys — the audit narrative survives directory changes.

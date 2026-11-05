@@ -217,9 +217,9 @@ public class CaseEndpointsTests
         var entry = Assert.Single(persisted!.Timeline);
         Assert.Equal("case-created", entry.Action);
         Assert.Equal("Case submitted", entry.ActionDisplayName);
-        Assert.Equal("alice-1", entry.CreatedBy);
-        Assert.Equal("Alice Example", entry.CreatedByName);
-        Assert.Equal(persisted.SubmittedAt, entry.CreatedAt);
+        Assert.Equal("alice-1", entry.PerformedById);
+        Assert.Equal("Alice Example", entry.PerformedByName);
+        Assert.Equal(persisted.SubmittedAt, entry.PerformedAt);
         Assert.Equal(TypeId, entry.Details["typeId"]);
         Assert.Equal("submitted", entry.Details["stateId"]);
         Assert.Equal("submitted", entry.StateId);
@@ -1063,8 +1063,8 @@ public class CaseEndpointsTests
                 {
                     Action = "assigned",
                     ActionDisplayName = "Assigned",
-                    CreatedAt = assignedAt,
-                    CreatedBy = "manager-1",
+                    PerformedAt = assignedAt,
+                    PerformedById = "manager-1",
                 },
             },
         };
@@ -1683,8 +1683,8 @@ public class CaseEndpointsTests
         Assert.NotNull(body?.Timeline);
         var note = Assert.Single(body!.Timeline!, a => a.Action == "note-added");
         Assert.Equal("Reviewed evidence; awaiting confirmation.", note.Details["text"]);
-        Assert.Equal("alice-1", note.CreatedBy);
-        Assert.Equal("Alice Example", note.CreatedByName);
+        Assert.Equal("alice-1", note.PerformedById);
+        Assert.Equal("Alice Example", note.PerformedByName);
 
         var persisted = await factory.Persistence.GetByIdAsync(id, cancellationToken);
         Assert.Single(persisted!.Timeline, a => a.Action == "note-added");
@@ -1785,18 +1785,18 @@ public class CaseEndpointsTests
                     {
                         Action = "note-added",
                         ActionDisplayName = "Note added",
-                        CreatedAt = newer,
-                        CreatedBy = "alice-1",
-                        CreatedByName = "Alice",
+                        PerformedAt = newer,
+                        PerformedById = "alice-1",
+                        PerformedByName = "Alice",
                     },
                     new CaseTimelineEntry
                     {
                         Action = "task-completed",
                         ActionDisplayName = "Task completed",
                         Details = new() { ["taskId"] = "check-eligibility" },
-                        CreatedAt = older,
-                        CreatedBy = "bob-1",
-                        CreatedByName = "Bob",
+                        PerformedAt = older,
+                        PerformedById = "bob-1",
+                        PerformedByName = "Bob",
                     },
                 },
             },
@@ -1813,14 +1813,14 @@ public class CaseEndpointsTests
             first =>
             {
                 Assert.Equal("note-added", first.Action);
-                Assert.Equal(newer, first.CreatedAt);
+                Assert.Equal(newer, first.PerformedAt);
             },
             second =>
             {
                 Assert.Equal("task-completed", second.Action);
                 Assert.Equal("Task completed", second.ActionDisplayName);
                 Assert.Equal("check-eligibility", second.Details["taskId"]);
-                Assert.Equal(older, second.CreatedAt);
+                Assert.Equal(older, second.PerformedAt);
             }
         );
     }
@@ -1828,7 +1828,7 @@ public class CaseEndpointsTests
     [Fact]
     public async Task Timeline_preserves_insertion_order_for_entries_with_identical_timestamps()
     {
-        // Regression for epr-s4y: when two entries share an exact CreatedAt
+        // Regression for epr-s4y: when two entries share an exact PerformedAt
         // (common under FakeTimeProvider with the clock held still, and
         // possible in production when a single engine call appends two
         // entries back-to-back) the projection must keep their stored
@@ -1858,21 +1858,21 @@ public class CaseEndpointsTests
                         Action = "note-added",
                         ActionDisplayName = "Note added",
                         Details = new() { ["sequence"] = "1" },
-                        CreatedAt = t,
+                        PerformedAt = t,
                     },
                     new CaseTimelineEntry
                     {
                         Action = "task-completed",
                         ActionDisplayName = "Task completed",
                         Details = new() { ["sequence"] = "2" },
-                        CreatedAt = t,
+                        PerformedAt = t,
                     },
                     new CaseTimelineEntry
                     {
                         Action = "state-changed",
                         ActionDisplayName = "Action applied",
                         Details = new() { ["sequence"] = "3" },
-                        CreatedAt = t,
+                        PerformedAt = t,
                     },
                 },
             },

@@ -46,21 +46,21 @@ public sealed class CaseTimelineEntry
     /// so tests with a <c>FakeTimeProvider</c> are not silently undermined
     /// by a wallclock fallback.
     /// </summary>
-    public DateTime CreatedAt { get; init; }
+    public DateTime PerformedAt { get; init; }
 
     /// <summary>
     /// Identifier of the actor that performed the action. Snapshotted from
     /// the <c>user:id</c> claim, falling back to the client id when
     /// the call carries no end-user identity.
     /// </summary>
-    public string? CreatedBy { get; init; }
+    public string? PerformedById { get; init; }
 
     /// <summary>
     /// Human-readable name of the actor at the time the entry was recorded
     /// (<c>user:name</c> claim) so list views do not need a separate user
     /// lookup.
     /// </summary>
-    public string? CreatedByName { get; init; }
+    public string? PerformedByName { get; init; }
 
     /// <summary>
     /// Case state code as of this event — the state the item was in
