@@ -1,13 +1,17 @@
-# EPR Register Enrol Management Backend
+# Waste Regulator Case Management
 
-A .NET 10 backend API for the EPR Register case management service. Built
-from
+A .NET 10 API that holds the cases regulators work through. A source system's
+Case Intake Processor creates a case for each submission; caseworkers, through
+the regulator frontend, assign it, add notes and conclude it; the service then
+sends the decision back to the source system. Every change is recorded on the
+case's timeline and published to the platform's analytics topic.
+
+The first case type is CSoC, for compliance declarations held by the Waste
+Obligations API. Case types are configured in JSON, not code — see
+[docs/cases.md](docs/cases.md).
+
+Built from
 [cdp-dotnet-backend-template](https://github.com/DEFRA/cdp-dotnet-backend-template).
-
-The backend exposes a JSON HTTP API and persists data in MongoDB. It is
-designed to run alongside the
-[`epr-register-enrol-management-fe`](../epr-register-enrol-management-fe/)
-service.
 
 - [Requirements](#requirements)
 - [Local development](#local-development)
@@ -16,7 +20,7 @@ service.
 - [Authentication](#authentication)
 - [Configuration](#configuration)
 - [Testing](#testing)
-- [Frontend integration](#frontend-integration)
+- [Deployment](#deployment)
 - [Licence](#licence)
 
 ## Requirements
@@ -43,59 +47,6 @@ The API listens on `http://localhost:8085`. Verify it is up:
 curl http://localhost:8085/health
 ```
 
-Outside the Production environment (or with `Swagger__Enabled=true`) the
-Swagger UI explorer is available at <http://localhost:8085/swagger>.
-
-The explorer ships with a dev-only **"Authenticate as:"** dropdown in the
-topbar that mirrors the BFF's stub login fixtures
-(`stub-caseworker-1`, `stub-caseworker-2`, `stub-caseworker-3`). Pick a
-user and every "Try it out" call will be sent with the three CDP trust
-headers (`x-cdp-client-id`, `x-cdp-user-id`, `x-cdp-user-name`)
-for that user. The selection persists in the browser's `localStorage`.
-Picking "— anonymous —" clears it.
-
-> The cURL preview Swagger UI shows in the response panel is generated
-> *before* the request is sent and does **not** include the headers
-> attached by the picker. The actual XHR over the wire does — check the
-> server response, not the cURL snippet, to confirm authentication.
-
-The MongoDB connection is configured in
-[`WasteRegulatorCaseManagement/appsettings.Development.json`](WasteRegulatorCaseManagement/appsettings.Development.json)
-and can be overridden via the `Mongo__DatabaseUri` and `Mongo__DatabaseName`
-environment variables.
-
-Outbound GOV.UK Notify email is disabled by default (RA-422): the master switch
-`Notify__Enabled` defaults to `false`, so the notification hook is not registered
-and a no-op client is used — nothing is sent and no `notification-*` audit
-entries are written. To send real notifications you need **both**
-`Notify__Enabled=true` **and** a `NOTIFY_API_KEY` from the
-[Notify dashboard](https://www.notifications.service.gov.uk/); with the flag on
-but no key the service still starts and uses the no-op client (calls logged, no
-HTTP traffic to Notify).
-
-Even with the flag on and a key set, notification calls are logged but **never**
-sent to GOV.UK Notify when running locally: the no-op client is registered on a
-Development host and whenever `ENVIRONMENT` is `local` or `dev`. It returns
-success, so the case's timeline still records a `notification-sent` entry
-and the UI behaves as it does in a sending environment. The non-production
-Notify team key can only reach team-registered addresses plus five guests, and
-those slots are used up — see
-[docs/cdp-deployment.md](./docs/cdp-deployment.md#notify-sending-by-environment).
-
-To smoke-test the real integration locally, set `NOTIFY_API_KEY` to a key from
-the [Notify dashboard](https://www.notifications.service.gov.uk/), enable
-`Notify__Enabled=true` **and** `NOTIFY_SENDEMAILS=true`, and make sure the
-recipient address is registered on the Notify team.
-
-Regulator-facing emails go to the nation's `Notify:RegulatorMailboxes` entry.
-`appsettings.json` ships all four nations blank, so with `Notify__Enabled=true`
-locally they are skipped with a `missing-regulator-mailbox` audit entry. To
-exercise them, set
-`Notify__RegulatorMailboxes__<Nation>` (e.g. `Notify__RegulatorMailboxes__England`)
-to a Notify-team-registered address. Each deployed environment sets its own
-addresses in cdp-app-config; the real regulator inboxes are in prod's config
-only (see [docs/cdp-deployment.md](./docs/cdp-deployment.md#required-environment-variables)).
-
 If you do not have MongoDB installed locally, start just the database from
 the Compose stack:
 
@@ -103,10 +54,34 @@ the Compose stack:
 docker compose up -d mongodb
 ```
 
+The MongoDB connection is configured in
+[`WasteRegulatorCaseManagement/appsettings.Development.json`](WasteRegulatorCaseManagement/appsettings.Development.json)
+and can be overridden via the `Mongo__DatabaseUri` and `Mongo__DatabaseName`
+environment variables.
+
+Outside the Production environment (or with `Swagger__Enabled=true`) the
+Swagger UI explorer is available at <http://localhost:8085/swagger>.
+
+The explorer has a dev-only **"Authenticate as:"** dropdown in the topbar
+(`stub-caseworker-1`, `stub-caseworker-2`, `stub-caseworker-3`). Pick a user
+and every "Try it out" call is sent with that user's trust headers:
+`x-cdp-client-id`, `x-cdp-user-id`, `x-cdp-user-name`, `x-cdp-user-nation`
+(`ENGLAND`) and `x-cdp-user-email`. The selection persists in the browser's
+`localStorage`. Picking "— anonymous —" clears it.
+
+> The cURL preview Swagger UI shows in the response panel is generated
+> *before* the request is sent and does **not** include the headers
+> attached by the picker. The actual XHR over the wire does — check the
+> server response, not the cURL snippet, to confirm authentication.
+
+Concluding a CSoC case calls its `callbackUrl`, so locally a case can only be
+accepted or cancelled when that URL points at something that answers.
+
 ## Running with Docker Compose
 
 The repository ships a Compose stack that builds the API image and starts
-its dependencies (MongoDB and a Floci-based AWS emulator):
+its dependencies: MongoDB as a single-node replica set, and Floci, an AWS
+emulator with the analytics SNS topic created and publishing enabled:
 
 ```bash
 docker compose up --build -d
@@ -121,42 +96,47 @@ docker compose down -v
 
 ## Endpoints
 
-| Method | Path                                         | Description                            |
-| ------ | -------------------------------------------- | -------------------------------------- |
-| GET    | `/health`                                    | Health probe used by CDP               |
-| GET    | `/openapi/v1.json`                           | OpenAPI document (anonymous)           |
-| GET    | `/swagger`                                   | Swagger UI explorer (non-Production)   |
-| POST   | `/cases`                                | Submit a new case                 |
-| GET    | `/cases`                                | List/search cases                 |
-| GET    | `/cases/{id}`                           | Get a single case by id           |
-| POST   | `/cases/{id}/tasks/{taskId}/complete`   | Complete a task on a case         |
-| POST   | `/cases/{id}/actions/{actionId}`        | Apply an action / state transition     |
-| POST   | `/cases/{id}/assign`                    | Assign a case to a user           |
-| POST   | `/cases/{id}/unassign`                  | Unassign a case                   |
-| POST   | `/cases/{id}/notes`                     | Add a note to a case              |
+| Method | Path                             | Caller                    | Description                            |
+| ------ | -------------------------------- | ------------------------- | -------------------------------------- |
+| GET    | `/health`                        | Anyone                    | Liveness probe used by CDP             |
+| GET    | `/health/ready`                  | Anyone                    | Readiness probe                        |
+| GET    | `/openapi/v1.json`               | Anyone                    | OpenAPI document                       |
+| GET    | `/swagger`                       | Anyone                    | Swagger UI explorer (non-Production)   |
+| POST   | `/cases`                         | Case Intake Processor     | Create a case for a submission         |
+| GET    | `/cases`                         | Caseworker                | List cases in the caller's nation      |
+| GET    | `/cases/{id}`                    | Caseworker                | Get a case                             |
+| POST   | `/cases/{id}/actions/{actionId}` | Caseworker                | Apply an action, such as `accept`      |
+| POST   | `/cases/{id}/assign`             | Caseworker                | Assign a case to a caseworker          |
+| POST   | `/cases/{id}/unassign`           | Caseworker                | Unassign a case                        |
+| POST   | `/cases/{id}/notes`              | Caseworker                | Add a note to a case                   |
+
+The request and response shapes are in [docs/cases.md](docs/cases.md) and the
+OpenAPI document.
 
 ## Authentication
 
-All non-health endpoints require a client ID supplied in the
-`x-cdp-client-id` request header. This is NOT verified by CDP itself —
-outside Development, the caller must also sign the request with an
-HMAC-SHA256 signature over a canonical payload, using a secret registered
-for that client ID (see [BFF signing contract](docs/cdp-deployment.md#bff-signing-contract)
-and RA-345/ADR-0006). In Development only, with no client secrets
-configured, the handler falls back to trusting the header's presence alone:
+Every case endpoint requires a client id in the `x-cdp-client-id` header.
+CDP does not verify it: outside Development the caller must also sign the
+request with HMAC-SHA256 over a canonical payload, using the secret
+registered for that client id (see
+[BFF signing contract](docs/cdp-deployment.md#bff-signing-contract)). Two
+callers are registered:
+
+- **The Case Intake Processor** is the only caller that can create cases.
+- **The regulator frontend** acts for a caseworker, forwarding the user's id,
+  name, nation and email as signed headers. A caseworker sees and acts on the
+  cases of their own nation only.
+
+In Development only, with no client secrets configured, the handler trusts
+the headers without a signature:
 
 ```bash
-curl -H 'x-cdp-client-id: my-upstream-service' \
-  http://localhost:8085/cases
+curl -H 'x-cdp-client-id: frontend' -H 'x-cdp-user-id: stub-caseworker-1' \
+  -H 'x-cdp-user-nation: ENGLAND' http://localhost:8085/cases
 ```
 
 Requests without the header (or, outside Development, without a valid
-signature) receive `401 Unauthorized`. The `/health`
-endpoint is anonymous and remains reachable without authentication.
-
-For local exploration without crafting cURL commands by hand, use the
-Swagger UI explorer at <http://localhost:8085/swagger> with its built-in
-stub-user picker — see [Local development](#local-development) above.
+signature) receive `401 Unauthorized`.
 
 ## Configuration
 
@@ -171,10 +151,10 @@ per-environment list — the tables below summarise it.
 | Variable | Secret? | Description |
 | --- | --- | --- |
 | `AUTH_SHARED_SECRET__CASE_INTAKE` | Yes | Verifies inbound signed requests from the Case Intake Processor — must match the secret it signs with exactly |
-| `AUTH_SHARED_SECRET__MANAGEMENT_FE` | Yes | Verifies inbound signed requests from `epr-register-enrol-management-fe` — must match management-fe's `BACKEND_API_SHARED_SECRET` exactly |
+| `AUTH_SHARED_SECRET__MANAGEMENT_FE` | Yes | Verifies inbound signed requests from the regulator frontend — must match the secret it signs with exactly |
 | `CALLBACK_AUTH__CSOC` | Yes | `clientId:clientSecret` for the Waste Obligations API, sent as Basic auth on the CSoC decision callback |
 | `Auth__CaseIntakeClientId` | No | Expected `x-cdp-client-id` on inbound calls from the Case Intake Processor (default `case-intake-processor`) |
-| `Auth__ManagementFeClientId` | No | Expected `x-cdp-client-id` on inbound calls from management-fe (default `frontend`) — must differ from `Auth__CaseIntakeClientId` or the service throws at first request |
+| `Auth__ManagementFeClientId` | No | Expected `x-cdp-client-id` on inbound calls from the regulator frontend (default `frontend`) — must differ from `Auth__CaseIntakeClientId` or the service throws at first request |
 
 The `CASE_INTAKE` and `MANAGEMENT_FE` secrets are optional in Development (the
 handler falls back to header-trust mode while no caller secret at all is
@@ -185,12 +165,9 @@ registered) but required in every other environment.
 | Variable | Secret? | Description |
 | --- | --- | --- |
 | `NOTIFY_API_KEY` | Yes | GOV.UK Notify API key |
-| `Notify__Enabled` | No | Master switch for all outbound Notify email + `notification-*` audit entries. `false` in every environment today (RA-422) |
+| `Notify__Enabled` | No | Master switch for all outbound Notify email (default `false`) |
 | `Notify__BaseUri` | No | Optional override for the Notify SDK base URI |
 | `NOTIFY_SENDEMAILS` | No | Force-overrides the `ENVIRONMENT`-derived decision on whether Notify sends are actually dispatched — used to smoke-test a real send locally |
-
-See [Local development](#local-development) above for the full local
-Notify-testing walkthrough.
 
 ### Analytics
 
@@ -262,17 +239,6 @@ git config core.hooksPath .githooks
 ```
 
 Bypass in an emergency with `git commit --no-verify`.
-
-## Frontend integration
-
-The companion frontend
-([`epr-register-enrol-management-fe`](../epr-register-enrol-management-fe/))
-calls this API server-to-server. With both services running locally the
-frontend at `http://localhost:3000/backend-status` reports the backend's
-`/health` response, providing an end-to-end smoke test.
-
-To run both services together via Docker Compose, see the
-[frontend README](../epr-register-enrol-management-fe/README.md#running-the-full-stack).
 
 ## Deployment
 

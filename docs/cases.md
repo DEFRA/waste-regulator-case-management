@@ -16,13 +16,12 @@ Defined in `WasteRegulatorCaseManagement/Cases/`:
 
 | Type | Purpose |
 | --- | --- |
-| `CaseState` | Identifier + display name for a state. `IsTerminal` marks completion states (e.g. approved/rejected). |
-| `CaseTask` | Identifier + display name for a unit of work to be completed in a state. |
-| `CaseTransition` | A named action (`approve`, `reject`, `withdraw`) that moves a case from one state to another. |
-| `CaseModuleConfig` | A case type: `CaseType`, `DisplayName`, `TemplateVersion`, `InitialStateId`, `States` and `Transitions`. Stored in the `caseModuleConfig` collection with the case type as its id. |
+| `CaseState` | Identifier + display name for a state. `IsTerminal` marks completion states (e.g. accepted/cancelled). |
+| `CaseTransition` | A named action (`accept`, `cancel`) that moves a case from one state to another. |
+| `CaseModuleConfig` | A case type: `CaseType`, `DisplayName`, `TemplateVersion`, `InitialStateId`, `States`, `Transitions` and `CallbackMappings`. Stored in the `caseModuleConfig` collection with the case type as its id. |
 | `CaseModuleConfigLoader` | Startup hosted service: writes the configurations embedded under `Cases/CaseModuleConfigs/` to the database, then loads every case type in the database into the registry. |
 | `CaseRegistry` | Lookup of every loaded case type. |
-| `ICaseService` | Framework service object that drives state transitions. Resolves the case, validates the request against the type, persists the change and writes an timeline. |
+| `ICaseService` | Framework service object that drives state transitions. Resolves the case, validates the request against the type, calls back the source system when a case concludes, persists the change and appends a timeline entry. |
 | `Case` | The persisted case: id, case type, state id, terminal flag, submitted-at, last-modified-at, submitted-by (CDP client id), the intake fields (source system id, callback URL, nation, org id, producer type, display data) and the timeline. |
 | `ICasePersistence` | Framework-owned MongoDB persistence for `Case`s. |
 | `CaseModuleExtensions` | `AddCaseFramework()`. |
@@ -254,12 +253,11 @@ If both are supplied, `assigneeId` wins.
 ```
 POST /cases/{id}/assign
   Body: { "assigneeId": "<userId>", "assigneeName": "<display name>" }
-  Authorization: any authenticated user; backend enforces the
-                 self-assign-only rule for non-`assign` callers.
+  Authorization: a caseworker in the case's nation.
 
 POST /cases/{id}/unassign
   Body: (none)
-  Authorization: caller must hold the `assign` role.
+  Authorization: a caseworker in the case's nation.
 ```
 
 Both endpoints are idempotent: assigning an item to its current assignee
@@ -330,9 +328,9 @@ the case document. An entry carries:
 | Field | Purpose |
 | --- | --- |
 | `Id` | Server-generated ULID. |
-| `Action` | Stable machine id of the action: `case-created`, `state-changed`, `assigned`, `unassigned`, `note-added`. Post-action hooks append their own alongside these (e.g. `notification-sent`). |
+| `Action` | Stable machine id of the action: `case-created`, `state-changed`, `assigned`, `unassigned`, `note-added`, `callback-failed`. |
 | `ActionDisplayName` | Human-readable description (e.g. `Note added`). |
-| `Details` | `Dictionary<string, string?>` of contextual fields per action: `caseType`/`stateId`/`templateVersion` (submission); `actionId`/`actionDisplayName`/`fromStateId`/`toStateId`; `assigneeId`/`assigneeName`/`previousAssigneeId`/`previousAssigneeName` (unassigned); `text` (note). |
+| `Details` | `Dictionary<string, string?>` of contextual fields per action: `caseType`/`stateId`/`templateVersion` (submission); `actionId`/`actionDisplayName`/`fromStateId`/`toStateId`; `assigneeId`/`assigneeName`/`previousAssigneeId`/`previousAssigneeName` (unassigned); `text` (note); `actionId`/`toStateId`/`reason` (callback failed). |
 | `PerformedAt` | UTC timestamp from the injected `TimeProvider`. |
 | `PerformedById` | Snapshot of the actor's user id (`user:id` claim, required — mutations without it are rejected with 401). |
 | `PerformedByName` | Snapshot of the actor's display name (`user:name`) at write time. |
