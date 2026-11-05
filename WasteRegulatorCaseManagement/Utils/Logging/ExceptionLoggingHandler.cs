@@ -21,7 +21,12 @@ public sealed class ExceptionLoggingHandler(
 	{
 		logger.LogError(exception, "Unhandled exception");
 
-		httpContext.Response.StatusCode = StatusCodes.Status500InternalServerError;
+		// Outside Production a request the framework cannot bind, such as a
+		// malformed JSON body, throws instead of returning 400; it keeps its
+		// status here so every environment answers it the same way.
+		httpContext.Response.StatusCode = exception is BadHttpRequestException badRequest
+			? badRequest.StatusCode
+			: StatusCodes.Status500InternalServerError;
 
 		return await problemDetailsService.TryWriteAsync(new ProblemDetailsContext
 		{
