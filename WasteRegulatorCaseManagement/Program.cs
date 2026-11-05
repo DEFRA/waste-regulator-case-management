@@ -106,6 +106,14 @@ static void ConfigureServices(WebApplicationBuilder builder)
 			// AddDocumentTransformer<T> registers the transformer in DI, so
 			// no separate AddSingleton call is required.
 			options.AddDocumentTransformer<CaseOpenApiExampleTransformer>();
+			options.AddDocumentTransformer(
+				(document, _, _) =>
+				{
+					document.Info.Title = "Waste Regulator Case Management";
+					document.Info.Version = "0.1.0";
+					return Task.CompletedTask;
+				}
+			);
 		}
 	);
 
@@ -644,7 +652,7 @@ static void ConfigureEndpoints(WebApplication app)
 
 		app.UseSwaggerUI(options =>
 		{
-			options.SwaggerEndpoint("/openapi/v1.json", "Waste Regulator Case Management v1");
+			options.SwaggerEndpoint("/openapi/v1.json", "Waste Regulator Case Management");
 			options.RoutePrefix = "swagger";
 			// Inject the stub-user picker into the topbar. The script
 			// also monkey-patches window.fetch so every Try it out call
