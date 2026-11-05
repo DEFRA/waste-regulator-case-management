@@ -214,8 +214,7 @@ static void ConfigureAuth(IServiceCollection services, IConfiguration configurat
 // RA-345: per-caller secrets, keyed by the clientId each caller is expected
 // to assert. Each caller gets its own secret env var so one can be rotated
 // without touching the other — see ADR-0005's "Follow-up: per-caller
-// shared secrets" section and CaseManagementAuthConfig in
-// epr-register-enrol-backend for the single-caller precedent this mirrors.
+// shared secrets" section.
 [ExcludeFromCodeCoverage]
 static IReadOnlyDictionary<string, string> BuildClientSecrets(IConfiguration config)
 {
@@ -236,10 +235,10 @@ static IReadOnlyDictionary<string, string> BuildClientSecrets(IConfiguration con
     AddCallerSecret(
         map,
         config,
-        callerName: "Backend",
-        clientIdKey: "Auth:BackendClientId",
-        clientIdDefault: "epr-register-enrol-backend",
-        secretKey: "AUTH_SHARED_SECRET:BACKEND"
+        callerName: "CaseIntake",
+        clientIdKey: "Auth:CaseIntakeClientId",
+        clientIdDefault: "case-intake-processor",
+        secretKey: "AUTH_SHARED_SECRET:CASE_INTAKE"
     );
     return map;
 }

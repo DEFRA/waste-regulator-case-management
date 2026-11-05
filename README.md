@@ -176,12 +176,12 @@ per-environment list — the tables below summarise it.
 
 | Variable | Secret? | Description |
 | --- | --- | --- |
-| `AUTH_SHARED_SECRET__BACKEND` | Yes | Verifies inbound signed requests from `epr-register-enrol-backend` — must match backend's `CASE_MANAGEMENT_API_SHARED_SECRET` exactly |
+| `AUTH_SHARED_SECRET__CASE_INTAKE` | Yes | Verifies inbound signed requests from the Case Intake Processor — must match the secret it signs with exactly |
 | `AUTH_SHARED_SECRET__MANAGEMENT_FE` | Yes | Verifies inbound signed requests from `epr-register-enrol-management-fe` — must match management-fe's `BACKEND_API_SHARED_SECRET` exactly |
-| `Auth__BackendClientId` | No | Expected `x-cdp-client-id` on inbound calls from backend (default `epr-register-enrol-backend`) |
-| `Auth__ManagementFeClientId` | No | Expected `x-cdp-client-id` on inbound calls from management-fe (default `frontend`) — must differ from `Auth__BackendClientId` or the service throws at first request |
+| `Auth__CaseIntakeClientId` | No | Expected `x-cdp-client-id` on inbound calls from the Case Intake Processor (default `case-intake-processor`) |
+| `Auth__ManagementFeClientId` | No | Expected `x-cdp-client-id` on inbound calls from management-fe (default `frontend`) — must differ from `Auth__CaseIntakeClientId` or the service throws at first request |
 
-The `BACKEND` and `MANAGEMENT_FE` secrets are optional in Development (the
+The `CASE_INTAKE` and `MANAGEMENT_FE` secrets are optional in Development (the
 handler falls back to header-trust mode while no caller secret at all is
 registered) but required in every other environment.
 
@@ -210,7 +210,7 @@ Notify-testing walkthrough.
 ### Example local/testing values
 
 ```bash
-AUTH_SHARED_SECRET__BACKEND=local-fake-backend-shared-secret-do-not-use
+AUTH_SHARED_SECRET__CASE_INTAKE=local-fake-case-intake-shared-secret-do-not-use
 AUTH_SHARED_SECRET__MANAGEMENT_FE=local-fake-managementfe-shared-secret-do-not-use
 NOTIFY_API_KEY=local-dev-not-a-real-notify-key
 ```

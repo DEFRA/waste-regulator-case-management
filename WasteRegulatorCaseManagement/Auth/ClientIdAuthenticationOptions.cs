@@ -54,7 +54,7 @@ public class ClientIdAuthenticationOptions : AuthenticationSchemeOptions
     /// back to header-trust mode (development/local only). See RA-345 and
     /// ADR-0005's "Follow-up: per-caller shared secrets" section — this
     /// replaces the single <c>AUTH_SHARED_SECRET</c> that both callers
-    /// (management-fe and epr-register-enrol-backend) previously shared.
+    /// previously shared.
     /// </summary>
     public IReadOnlyDictionary<string, string> ClientSecrets { get; set; } =
         new Dictionary<string, string>(StringComparer.Ordinal);

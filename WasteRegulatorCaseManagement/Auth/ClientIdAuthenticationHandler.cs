@@ -14,7 +14,7 @@ namespace WasteRegulatorCaseManagement.Auth;
 /// Authentication handler that accepts a CDP client ID supplied in a
 /// request header. Despite the header's original name, this is NOT a CDP-
 /// verified identity — CDP does not validate a JWT or inject this header
-/// itself; the caller (management-fe or epr-register-enrol-backend) asserts
+/// itself; the caller (management-fe or the Case Intake Processor) asserts
 /// its own client ID and proves it via the HMAC signature described below.
 ///
 /// When <see cref="ClientIdAuthenticationOptions.ClientSecrets"/> is
@@ -33,8 +33,8 @@ namespace WasteRegulatorCaseManagement.Auth;
 /// AC17 authorization is deliberately enforced backend-side too, so the
 /// two claims it gates on must carry the same signed-integrity guarantee
 /// as userId/userName rather than arriving as bare, tamperable headers.
-/// Callers that have no role/nation to send — epr-register-enrol-backend,
-/// in both directions — keep signing the original six-line v3 form, and
+/// Callers that have no role/nation to send — the Case Intake Processor —
+/// keep signing the original six-line v3 form, and
 /// this handler accepts either form when no role/nation header is present;
 /// see ADR-0007 and <see cref="VerifySignature"/>.
 ///
@@ -173,7 +173,7 @@ public class ClientIdAuthenticationHandler(
             // client secrets configured. Emit a single warning per process
             // so the downgrade is visible without spamming the log.
             Logger.LogWarning(
-                "ClientIdAuthentication: no ClientSecrets configured — operating in header-trust mode. This is allowed only because the host environment is '{Environment}'. Set AUTH_SHARED_SECRET__MANAGEMENT_FE / AUTH_SHARED_SECRET__BACKEND in any non-Development deployment.",
+                "ClientIdAuthentication: no ClientSecrets configured — operating in header-trust mode. This is allowed only because the host environment is '{Environment}'. Set AUTH_SHARED_SECRET__MANAGEMENT_FE / AUTH_SHARED_SECRET__CASE_INTAKE in any non-Development deployment.",
                 hostEnvironment.EnvironmentName
             );
         }
@@ -322,7 +322,7 @@ public class ClientIdAuthenticationHandler(
         // could in principle distinguish the two. Accepted as
         // negligible here because the only client ids that could ever
         // be confirmed "known" this way are the documented public
-        // defaults (frontend and epr-register-enrol-backend) — there is
+        // defaults (frontend and case-intake-processor) — there is
         // nothing secret left to enumerate.
         if (!Options.ClientSecrets.TryGetValue(clientId, out var secret))
         {
@@ -465,19 +465,17 @@ public class ClientIdAuthenticationHandler(
 
     /// <summary>
     /// Canonical signing payload (v3). Order and field separators are part
-    /// of the contract with EVERY caller — management-fe and
-    /// epr-register-enrol-backend, the latter in both directions — so any
-    /// change here is a breaking change that needs a coordinated deploy of
-    /// all three services (ADR-0007 records the dev outage that made this
+    /// of the contract with EVERY caller — management-fe and the Case Intake
+    /// Processor — so any change here is a breaking change that needs a
+    /// coordinated deploy of every caller (ADR-0007 records the dev outage that made this
     /// explicit). The timestamp and nonce are non-optional — see ADR-0003.
     ///
     /// Two wire forms exist (ADR-0007):
     /// <list type="bullet">
     /// <item><b>Legacy</b> (original v3, ADR-0005):
     /// <c>v3\nclientId\nuserId\nuserName\ntimestamp\nnonce</c>. This is
-    /// what epr-register-enrol-backend signs on its calls to this service
-    /// and what its inbound CaseManagementAuthenticationHandler verifies on
-    /// our pushes back to it — so this method produces it whenever
+    /// what a service caller with no user role or nation (the Case Intake
+    /// Processor) signs — so this method produces it whenever
     /// <see cref="ClientIdSignaturePayload.Role"/> and
     /// <see cref="ClientIdSignaturePayload.Nation"/> are both null.</item>
     /// <item><b>Extended</b> (RA-469):
@@ -555,8 +553,8 @@ public class ClientIdAuthenticationHandler(
     /// form this request could legitimately have been signed with. When a
     /// role or nation header is present there is exactly one: the extended
     /// form over the values actually sent. When neither is present BOTH
-    /// forms are acceptable — the legacy six-line form (what
-    /// epr-register-enrol-backend signs) and the extended form with empty
+    /// forms are acceptable — the legacy six-line form (what the Case Intake
+    /// Processor signs) and the extended form with empty
     /// role/nation (what management-fe signs on every call, including the
     /// ones that never forward role/nation). Accepting both is safe because
     /// in that case each form binds the same semantic content and the two

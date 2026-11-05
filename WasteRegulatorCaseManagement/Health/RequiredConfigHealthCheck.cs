@@ -10,8 +10,7 @@ namespace WasteRegulatorCaseManagement.Health;
 /// secret as "caller not configured yet" and silently no-ops — intentional for
 /// local development (see appsettings.Development.json, which never sets any of
 /// these), but dangerous left unset in a deployed environment where nothing else
-/// reports it. Mirrors <c>RequiredConfigHealthCheck</c> in the sibling
-/// epr-register-enrol-backend repo (RA-441).
+/// reports it (RA-441).
 /// </summary>
 public sealed class RequiredConfigHealthCheck(IConfiguration configuration, IHostEnvironment environment)
     : IHealthCheck
@@ -35,10 +34,10 @@ public sealed class RequiredConfigHealthCheck(IConfiguration configuration, IHos
                 missing.Add("AUTH_SHARED_SECRET__MANAGEMENT_FE");
             if (
                 string.IsNullOrWhiteSpace(
-                    configuration.GetValue<string>("AUTH_SHARED_SECRET:BACKEND")
+                    configuration.GetValue<string>("AUTH_SHARED_SECRET:CASE_INTAKE")
                 )
             )
-                missing.Add("AUTH_SHARED_SECRET__BACKEND");
+                missing.Add("AUTH_SHARED_SECRET__CASE_INTAKE");
         }
 
         return Task.FromResult(

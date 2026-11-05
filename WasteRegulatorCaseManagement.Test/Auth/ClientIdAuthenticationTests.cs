@@ -203,7 +203,7 @@ public class ClientIdAuthenticationTests
     [Fact]
     public async Task Colliding_caller_client_ids_fail_loudly_on_first_options_resolution()
     {
-        // RA-345: Auth:ManagementFeClientId and Auth:BackendClientId must
+        // RA-345: Auth:ManagementFeClientId and Auth:CaseIntakeClientId must
         // resolve to distinct clientIds — a misconfiguration that points
         // both at the same value would let one caller's secret silently
         // overwrite the other's in the resolved ClientSecrets map
@@ -228,8 +228,8 @@ public class ClientIdAuthenticationTests
             configOverrides: new Dictionary<string, string?>
             {
                 ["AUTH_SHARED_SECRET:MANAGEMENT_FE"] = Secret,
-                ["AUTH_SHARED_SECRET:BACKEND"] = OtherSecret,
-                ["Auth:BackendClientId"] = "frontend", // collides with ManagementFe's default clientId
+                ["AUTH_SHARED_SECRET:CASE_INTAKE"] = OtherSecret,
+                ["Auth:CaseIntakeClientId"] = "frontend", // collides with ManagementFe's default clientId
             }
         );
 
@@ -947,12 +947,12 @@ public class ClientIdAuthenticationTests
     [Fact]
     public async Task Legacy_six_line_v3_signature_without_role_or_nation_is_accepted()
     {
-        // ADR-0007 — regression for the 2026-08-22 dev outage.
-        // epr-register-enrol-backend signs the ORIGINAL v3 canonical string
-        // (v3\nclientId\nuserId\nuserName\ntimestamp\nnonce) and never sends
-        // x-cdp-user-role / x-cdp-user-nation. Folding role/nation into the
-        // payload as empty strings (PR #142) silently broke every call from
-        // that service with a 401. The signature here is built by
+        // ADR-0007 — regression for the 2026-08-22 dev outage. A service
+        // caller with no user role or nation signs the ORIGINAL v3 canonical
+        // string (v3\nclientId\nuserId\nuserName\ntimestamp\nnonce) and
+        // never sends x-cdp-user-role / x-cdp-user-nation. Folding
+        // role/nation into the payload as empty strings (PR #142) silently
+        // broke every call from such a service with a 401. The signature here is built by
         // WireFormatReference from the documented wire format, NOT via
         // ComputeSignature, so a future change to the production canonical
         // string fails this test instead of being self-consistently wrong
@@ -1097,7 +1097,7 @@ public class ClientIdAuthenticationTests
 
 /// <summary>
 /// RA-345 regression: proves AUTH_SHARED_SECRET__MANAGEMENT_FE /
-/// AUTH_SHARED_SECRET__BACKEND actually bind through the REAL
+/// AUTH_SHARED_SECRET__CASE_INTAKE actually bind through the REAL
 /// EnvironmentVariablesConfigurationProvider (which rewrites "__" to ":"
 /// while loading), not just through a hand-built config-key dictionary.
 /// A prior version of BuildClientSecrets read these with the literal
@@ -1114,20 +1114,20 @@ public class ClientIdAuthenticationTests
 public class ClientIdAuthenticationEnvVarTests
 {
     private const string ManagementFeSecret = "management-fe-env-secret";
-    private const string BackendSecret = "backend-env-secret";
+    private const string CaseIntakeSecret = "case-intake-env-secret";
 
     [Fact]
     public async Task ClientSecrets_bind_from_real_double_underscore_environment_variables()
     {
         var previousFe = Environment.GetEnvironmentVariable("AUTH_SHARED_SECRET__MANAGEMENT_FE");
-        var previousBackend = Environment.GetEnvironmentVariable("AUTH_SHARED_SECRET__BACKEND");
+        var previousCaseIntake = Environment.GetEnvironmentVariable("AUTH_SHARED_SECRET__CASE_INTAKE");
         try
         {
             Environment.SetEnvironmentVariable(
                 "AUTH_SHARED_SECRET__MANAGEMENT_FE",
                 ManagementFeSecret
             );
-            Environment.SetEnvironmentVariable("AUTH_SHARED_SECRET__BACKEND", BackendSecret);
+            Environment.SetEnvironmentVariable("AUTH_SHARED_SECRET__CASE_INTAKE", CaseIntakeSecret);
 
             // No configOverrides/clientSecrets bypass here — this factory
             // boots exactly as a real deployment would, reading whatever
@@ -1170,7 +1170,7 @@ public class ClientIdAuthenticationEnvVarTests
         finally
         {
             Environment.SetEnvironmentVariable("AUTH_SHARED_SECRET__MANAGEMENT_FE", previousFe);
-            Environment.SetEnvironmentVariable("AUTH_SHARED_SECRET__BACKEND", previousBackend);
+            Environment.SetEnvironmentVariable("AUTH_SHARED_SECRET__CASE_INTAKE", previousCaseIntake);
         }
     }
 }
@@ -1216,7 +1216,7 @@ internal sealed class BareFactory(
                 // Set the resolved option directly (after Program.cs's
                 // own env-var-driven Configure<> runs) — the test
                 // client ids don't necessarily match the real
-                // management-fe/backend clientId defaults, so we
+                // management-fe/case intake clientId defaults, so we
                 // bypass env-var binding entirely here.
                 services.PostConfigure<ClientIdAuthenticationOptions>(
                     ClientIdDefaults.AuthenticationScheme,

@@ -18,7 +18,7 @@ public class ClientIdSignaturePayloadFormatTests
     private const string Secret = "format-test-secret";
 
     private static readonly ClientIdSignaturePayload WithoutRoleOrNation = new(
-        "epr-register-enrol-backend",
+        "case-intake-processor",
         "applicant@example.test",
         "An Applicant",
         "2026-08-22T18:00:00Z",
@@ -148,10 +148,9 @@ public class ClientIdSignaturePayloadFormatTests
 /// Independent re-implementation of the two documented v3 wire forms
 /// (docs/cdp-deployment.md, ADR-0007) — deliberately NOT delegating to
 /// <see cref="ClientIdAuthenticationHandler"/>, which is the thing under
-/// test. <see cref="LegacyV3"/> is byte-for-byte what
-/// epr-register-enrol-backend's HttpCaseWorkingApiAdapter signs and what its
-/// CaseManagementAuthenticationHandler verifies; <see cref="ExtendedV3"/> is
-/// what management-fe's sign-request.js emits.
+/// test. <see cref="LegacyV3"/> is the six-line form a service caller with
+/// no user role or nation signs; <see cref="ExtendedV3"/> is what
+/// management-fe's sign-request.js emits.
 /// </summary>
 internal static class WireFormatReference
 {

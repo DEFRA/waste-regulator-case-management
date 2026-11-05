@@ -33,7 +33,7 @@ public class RequiredConfigHealthCheckTests
 
     [Theory]
     [InlineData("AUTH_SHARED_SECRET:MANAGEMENT_FE", "AUTH_SHARED_SECRET__MANAGEMENT_FE")]
-    [InlineData("AUTH_SHARED_SECRET:BACKEND", "AUTH_SHARED_SECRET__BACKEND")]
+    [InlineData("AUTH_SHARED_SECRET:CASE_INTAKE", "AUTH_SHARED_SECRET__CASE_INTAKE")]
     public async Task Reports_unhealthy_when_a_caller_secret_is_missing_outside_development(
         string configKey,
         string expectedReportedKey
@@ -51,7 +51,7 @@ public class RequiredConfigHealthCheckTests
 
     [Theory]
     [InlineData("AUTH_SHARED_SECRET:MANAGEMENT_FE")]
-    [InlineData("AUTH_SHARED_SECRET:BACKEND")]
+    [InlineData("AUTH_SHARED_SECRET:CASE_INTAKE")]
     public async Task Reports_healthy_when_a_caller_secret_is_missing_in_development(string configKey)
     {
         var config = CompleteConfig();
@@ -69,7 +69,7 @@ public class RequiredConfigHealthCheckTests
         var config = new Dictionary<string, string?>
         {
             ["AUTH_SHARED_SECRET:MANAGEMENT_FE"] = "",
-            ["AUTH_SHARED_SECRET:BACKEND"] = ""
+            ["AUTH_SHARED_SECRET:CASE_INTAKE"] = ""
         };
         var check = MakeCheck(config, isDevelopment: false);
 
@@ -77,14 +77,14 @@ public class RequiredConfigHealthCheckTests
 
         Assert.Equal(HealthStatus.Unhealthy, result.Status);
         Assert.Contains("AUTH_SHARED_SECRET__MANAGEMENT_FE", result.Description);
-        Assert.Contains("AUTH_SHARED_SECRET__BACKEND", result.Description);
+        Assert.Contains("AUTH_SHARED_SECRET__CASE_INTAKE", result.Description);
     }
 
     private static Dictionary<string, string?> CompleteConfig() =>
         new()
         {
             ["AUTH_SHARED_SECRET:MANAGEMENT_FE"] = "management-fe-secret",
-            ["AUTH_SHARED_SECRET:BACKEND"] = "backend-secret"
+            ["AUTH_SHARED_SECRET:CASE_INTAKE"] = "case-intake-secret"
         };
 
     private static Task<HealthCheckResult> CheckHealth(RequiredConfigHealthCheck check) =>
