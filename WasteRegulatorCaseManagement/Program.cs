@@ -16,22 +16,7 @@ using Notify.Interfaces;
 using Serilog;
 
 var app = BuildApp(args);
-await RunStartupMigrations(app);
 await app.RunAsync();
-
-// One-shot, best-effort data migrations that run BEFORE the host starts (and
-// therefore before WorkItemPersistence builds its indexes). Register migrations
-// in the array below — each runs once per boot, should be idempotent, and must
-// be removed once it has run in every environment. The harness is kept in place
-// even when empty so the next correction is a one-line change. See the
-// "Startup migrations" section of the README.
-[ExcludeFromCodeCoverage]
-static Task RunStartupMigrations(WebApplication app) =>
-    StartupMigrationRunner.RunAsync(
-        app.Services,
-        app.Logger,
-        migrations: []
-    );
 
 [ExcludeFromCodeCoverage]
 static WebApplication BuildApp(string[] args)
