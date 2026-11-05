@@ -26,30 +26,16 @@ public sealed record CaseResponse(
     string? AssignedToName = null,
     DateTime? AssignedAt = null,
     string? AssignedBy = null,
-    IReadOnlyCollection<CaseNoteResponse>? Notes = null,
-    IReadOnlyCollection<CaseAuditEntryResponse>? AuditLog = null
+    IReadOnlyCollection<CaseTimelineEntryResponse>? Timeline = null
 );
 
 /// <summary>
-/// Wire shape for a single note attached to a case (RA-96). Returned
-/// newest-first as part of <see cref="CaseResponse.Notes"/> so a UI can
-/// render the audit narrative without a second round-trip.
-/// </summary>
-public sealed record CaseNoteResponse(
-    Guid Id,
-    string Text,
-    DateTime CreatedAt,
-    string? CreatedBy,
-    string? CreatedByName
-);
-
-/// <summary>
-/// Wire shape for a single audit log entry (RA-97). Returned in
+/// Wire shape for a single timeline entry (RA-97). Returned in
 /// reverse-chronological (newest-first) order as part of
-/// <see cref="CaseResponse.AuditLog"/> so a UI can render a top-to-
+/// <see cref="CaseResponse.Timeline"/> so a UI can render a top-to-
 /// bottom timeline, most recent first, without re-sorting (RA-568).
 /// </summary>
-public sealed record CaseAuditEntryResponse(
+public sealed record CaseTimelineEntryResponse(
     string Id,
     string Action,
     string ActionDisplayName,

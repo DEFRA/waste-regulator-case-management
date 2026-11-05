@@ -10,8 +10,7 @@ namespace WasteRegulatorCaseManagement.Test.Cases;
 
 /// <summary>
 /// Regression coverage for epr-bwk: every persisted timestamp on
-/// <see cref="Case"/>, <see cref="CaseNote"/> and
-/// <see cref="CaseAuditEntry"/> must come from the injected
+/// <see cref="Case"/> and <see cref="CaseTimelineEntry"/> must come from the injected
 /// <see cref="TimeProvider"/>. The model types must NOT default their
 /// timestamp properties to a wallclock value, otherwise tests that wire
 /// up a <see cref="FakeTimeProvider"/> can be silently undermined when
@@ -91,8 +90,8 @@ public class CaseServiceTimestampTests
         var expected = T.UtcDateTime;
         Assert.Equal(expected, fetched.SubmittedAt);
         Assert.Equal(expected, fetched.LastModifiedAt);
-        var birth = Assert.Single(fetched.AuditLog);
-        Assert.Equal("work-item-submitted", birth.Action);
+        var birth = Assert.Single(fetched.Timeline);
+        Assert.Equal("case-created", birth.Action);
         Assert.Equal(expected, birth.CreatedAt);
     }
 
@@ -118,10 +117,8 @@ public class CaseServiceTimestampTests
         Assert.True(result.IsSuccess, result.Message);
 
         var fetched = await GetAsync(caseRecord.Id);
-        var note = Assert.Single(fetched.Notes);
-        Assert.Equal(expected, note.CreatedAt);
         Assert.Equal(expected, fetched.LastModifiedAt);
-        var audit = Assert.Single(fetched.AuditLog);
+        var audit = Assert.Single(fetched.Timeline);
         Assert.Equal("note-added", audit.Action);
         Assert.Equal(expected, audit.CreatedAt);
     }
@@ -133,10 +130,7 @@ public class CaseServiceTimestampTests
         Assert.Equal(default, caseRecord.SubmittedAt);
         Assert.Equal(default, caseRecord.LastModifiedAt);
 
-        var note = new CaseNote { Text = "x" };
-        Assert.Equal(default, note.CreatedAt);
-
-        var entry = new CaseAuditEntry { Action = "x", ActionDisplayName = "X" };
+        var entry = new CaseTimelineEntry { Action = "x", ActionDisplayName = "X" };
         Assert.Equal(default, entry.CreatedAt);
     }
 }

@@ -17,8 +17,8 @@ public interface ICaseService
     /// Create a brand-new case of <paramref name="type"/> and persist
     /// it. Captures a frozen template snapshot, stamps a server-side
     /// submission timestamp from the injected <see cref="TimeProvider"/>,
-    /// and appends a single <c>work-item-submitted</c> entry to the new
-    /// case's audit log so the audit timeline starts at the
+    /// and appends a single <c>case-created</c> entry to the new
+    /// case's timeline so the timeline starts at the
     /// document's birth event rather than the first state change. The
     /// audit entry and the document body are written in the same
     /// <see cref="ICasePersistence.CreateAsync"/> call. Mutations
@@ -176,7 +176,7 @@ public sealed class CaseService : ICaseService
             Payload = payload,
         };
 
-        // Birth event: the audit timeline must start at submission rather
+        // Birth event: the timeline must start at submission rather
         // than the first state change. Appended to the in-memory list
         // before the single CreateAsync call so the document and its first
         // audit entry land in storage together.
@@ -188,9 +188,9 @@ public sealed class CaseService : ICaseService
         // 'clientId' is the caller-asserted, HMAC-verified client id
         // (see ClientIdAuthenticationHandler); 'userId' is the end-user
         // identity claim required for any mutation.
-        AppendAudit(
+        AppendTimelineEntry(
             caseRecord,
-            "work-item-submitted",
+            "case-created",
             "Case submitted",
             user,
             now,
@@ -309,9 +309,9 @@ public sealed class CaseService : ICaseService
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         caseRecord.StateId = transition.ToStateId;
         caseRecord.LastModifiedAt = now;
-        AppendAudit(
+        AppendTimelineEntry(
             caseRecord,
-            "action-applied",
+            "state-changed",
             "Action applied",
             user,
             now,
@@ -415,7 +415,7 @@ public sealed class CaseService : ICaseService
         caseRecord.AssignedAt = _timeProvider.GetUtcNow().UtcDateTime;
         caseRecord.AssignedBy = actorUserId!;
         caseRecord.LastModifiedAt = caseRecord.AssignedAt.Value;
-        AppendAudit(
+        AppendTimelineEntry(
             caseRecord,
             "assigned",
             "Assigned",
@@ -501,7 +501,7 @@ public sealed class CaseService : ICaseService
         caseRecord.AssignedAt = null;
         caseRecord.AssignedBy = null;
         caseRecord.LastModifiedAt = now;
-        AppendAudit(
+        AppendTimelineEntry(
             caseRecord,
             "unassigned",
             "Unassigned",
@@ -579,30 +579,16 @@ public sealed class CaseService : ICaseService
             );
         }
 
-        var note = new CaseNote
-        {
-            Text = trimmed!,
-            CreatedAt = _timeProvider.GetUtcNow().UtcDateTime,
-            CreatedBy = ResolveActorUserId(user)!,
-            CreatedByName = user?.FindFirstValue("user:name"),
-        };
-        caseRecord.Notes.Add(note);
-        caseRecord.LastModifiedAt = note.CreatedAt;
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+        caseRecord.LastModifiedAt = now;
 
-        AppendAudit(
+        AppendTimelineEntry(
             caseRecord,
             "note-added",
             "Note added",
             user,
-            note.CreatedAt,
-            new()
-            {
-                ["noteId"] = note.Id.ToString(),
-                // Snapshot the trimmed body so the audit log is self-describing —
-                // a reader does not need to cross-reference Notes by id to see
-                // what was written. Already capped by MaxNoteLength.
-                ["noteText"] = note.Text,
-            }
+            now,
+            new() { ["text"] = trimmed }
         );
 
         try
@@ -614,8 +600,7 @@ public sealed class CaseService : ICaseService
             return ConcurrencyConflict(caseRecord.Id);
         }
         _logger.LogInformation(
-            "Note {NoteId} added to case {CaseId} ({TypeId}) by {User}",
-            note.Id,
+            "Note added to case {CaseId} ({TypeId}) by {User}",
             caseRecord.Id,
             caseRecord.TypeId,
             DescribeUser(user)
@@ -847,13 +832,13 @@ public sealed class CaseService : ICaseService
         ?? "unknown";
 
     /// <summary>
-    /// Append a single entry to the case's audit log (RA-97). Called
+    /// Append a single entry to the case's timeline (RA-97). Called
     /// from every engine method on the success path so modules inherit a
     /// complete, automatic audit trail without writing any audit code
     /// themselves. Identity is snapshotted from the supplied principal at
     /// write time.
     /// </summary>
-    private static void AppendAudit(
+    private static void AppendTimelineEntry(
         Case caseRecord,
         string action,
         string actionDisplayName,
@@ -862,8 +847,8 @@ public sealed class CaseService : ICaseService
         Dictionary<string, string?> details
     )
     {
-        caseRecord.AuditLog.Add(
-            new CaseAuditEntry
+        caseRecord.Timeline.Add(
+            new CaseTimelineEntry
             {
                 Action = action,
                 ActionDisplayName = actionDisplayName,
@@ -873,7 +858,7 @@ public sealed class CaseService : ICaseService
                 CreatedByName = user?.FindFirstValue("user:name"),
                 // epr-rr9s: snapshot the state as of this event. Every
                 // AppendAudit caller invokes this AFTER any state mutation
-                // (submit sets the initial state, action-applied assigns
+                // (submit sets the initial state, state-changed assigns
                 // transition.ToStateId first), so caseRecord.StateId is the
                 // resulting post-mutation state for this entry.
                 StateId = caseRecord.StateId,

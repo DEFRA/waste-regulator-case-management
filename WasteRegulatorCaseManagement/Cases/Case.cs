@@ -112,26 +112,17 @@ public sealed class Case
     internal void ReplacePayload(BsonDocument payload) => Payload = payload;
 
     /// <summary>
-    /// Append-only audit narrative attached to the case by assessors
-    /// (RA-96). Stored in insertion order; projected newest-first by the
-    /// engine. Framework-owned so every type behaves identically. The
-    /// standalone "add a note" FE feature and task-scoped notes have been
-    /// removed; the withdraw and decision-rationale flows are the only
-    /// current callers of the underlying add-note API.
-    /// </summary>
-    public List<CaseNote> Notes { get; init; } = new();
-
-    /// <summary>
-    /// Append-only system audit log (RA-97). The framework writes one entry
-    /// here for every successful state-changing engine call (action
-    /// application, assignment / unassignment, note added). Entries are
+    /// Append-only system timeline (RA-97). The framework writes one entry
+    /// here for every successful state-changing engine call (case created,
+    /// state changed, assigned / unassigned, note added — a note's text lives
+    /// on its note-added entry). Entries are
     /// stored in chronological (insertion) order and projected
     /// reverse-chronologically (newest-first, RA-568) on the wire so a UI
     /// renders the most recent activity at the top of the timeline.
     /// Framework-owned so every case type inherits the same audit
     /// behaviour without writing any audit code.
     /// </summary>
-    public List<CaseAuditEntry> AuditLog { get; init; } = new();
+    public List<CaseTimelineEntry> Timeline { get; init; } = new();
 
     /// <summary>
     /// Optimistic concurrency token. Incremented by

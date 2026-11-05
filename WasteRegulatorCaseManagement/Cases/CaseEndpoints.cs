@@ -226,7 +226,7 @@ public static class CaseEndpoints
         // Routed through the engine so the framework owns audit-log
         // composition for the birth event in the same place it owns every
         // other state-changing entry. The engine writes the document and
-        // its first 'work-item-submitted' audit entry in a single
+        // its first 'case-created' audit entry in a single
         // CreateAsync call.
         CaseActionResult result;
         try
@@ -356,7 +356,7 @@ public static class CaseEndpoints
     /// Header name set on a response whose operation was a no-op because the
     /// case was already in the requested condition. Lets clients
     /// distinguish "first hit" from "replay" without needing to introspect the
-    /// audit log.
+    /// timeline.
     /// </summary>
     public const string IdempotentReplayHeader = "X-Idempotent-Replay";
 
@@ -582,18 +582,7 @@ public static class CaseEndpoints
             w.AssignedToName,
             w.AssignedAt,
             w.AssignedBy,
-            // Notes are stored append-only but rendered newest-first so the
-            // most relevant context is at the top of an assessor's screen.
-            w.Notes.OrderByDescending(n => n.CreatedAt)
-                .Select(n => new CaseNoteResponse(
-                    n.Id,
-                    n.Text,
-                    n.CreatedAt,
-                    n.CreatedBy,
-                    n.CreatedByName
-                ))
-                .ToList(),
-            // Audit log (RA-97) is projected in reverse-chronological
+            // Timeline (RA-97) is projected in reverse-chronological
             // (newest-first) order so a UI renders the most recent activity
             // at the top of the timeline (RA-568). Insertion index is the
             // secondary key so entries written within the same tick (common
@@ -601,10 +590,10 @@ public static class CaseEndpoints
             // single engine call appends two entries back-to-back) keep
             // their append order reversed on the wire instead of relying on
             // undefined behaviour from a tied OrderBy (epr-s4y).
-            w.AuditLog.Select((e, i) => (Entry: e, Index: i))
+            w.Timeline.Select((e, i) => (Entry: e, Index: i))
                 .OrderByDescending(x => x.Entry.CreatedAt)
                 .ThenByDescending(x => x.Index)
-                .Select(x => new CaseAuditEntryResponse(
+                .Select(x => new CaseTimelineEntryResponse(
                     x.Entry.Id,
                     x.Entry.Action,
                     x.Entry.ActionDisplayName,
@@ -622,10 +611,9 @@ public static class CaseEndpoints
     /// <summary>
     /// Slim per-item projection used by the list endpoint (epr-4pf).
     /// Identical to <see cref="ToResponse"/>
-    /// except the per-item <c>Notes</c> and <c>AuditLog</c> collections
-    /// are omitted entirely from the wire shape — they would otherwise
-    /// dominate the payload of a 100-row page even though no list view
-    /// renders them.
+    /// except the per-item <c>Timeline</c> is omitted entirely from the wire
+    /// shape — it would otherwise dominate the payload of a 100-row page even
+    /// though no list view renders it.
     /// </summary>
     internal static CaseListItemResponse ToListItemResponse(CaseEngineProjection projection)
     {

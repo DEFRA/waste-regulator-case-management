@@ -162,8 +162,8 @@ public class CaseEndpointsTests
     [Fact]
     public async Task Post_records_case_submitted_audit_entry_as_birth_event()
     {
-        // RA-97: the audit timeline must start at submission. The framework
-        // appends one 'work-item-submitted' entry inside the same
+        // RA-97: the timeline must start at submission. The framework
+        // appends one 'case-created' entry inside the same
         // CreateAsync call that persists the new document, attributed to
         // the forwarded user:id and stamped with Case.SubmittedAt.
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -180,8 +180,8 @@ public class CaseEndpointsTests
         var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
         var persisted = await factory.Persistence.GetByIdAsync(body!.Id, cancellationToken);
         Assert.NotNull(persisted);
-        var entry = Assert.Single(persisted!.AuditLog);
-        Assert.Equal("work-item-submitted", entry.Action);
+        var entry = Assert.Single(persisted!.Timeline);
+        Assert.Equal("case-created", entry.Action);
         Assert.Equal("Case submitted", entry.ActionDisplayName);
         Assert.Equal("alice-1", entry.CreatedBy);
         Assert.Equal("Alice Example", entry.CreatedByName);
@@ -195,9 +195,9 @@ public class CaseEndpointsTests
 
         // epr-rr9s: the per-event state snapshot must also survive the wire
         // projection so the FE can render each entry against its own state.
-        Assert.NotNull(body.AuditLog);
-        var wireEntry = Assert.Single(body.AuditLog!);
-        Assert.Equal("work-item-submitted", wireEntry.Action);
+        Assert.NotNull(body.Timeline);
+        var wireEntry = Assert.Single(body.Timeline!);
+        Assert.Equal("case-created", wireEntry.Action);
         Assert.Equal("submitted", wireEntry.StateId);
     }
 
@@ -246,8 +246,8 @@ public class CaseEndpointsTests
         var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
         var persisted = await factory.Persistence.GetByIdAsync(body!.Id, cancellationToken);
         Assert.NotNull(persisted);
-        var entry = Assert.Single(persisted!.AuditLog);
-        Assert.Equal("work-item-submitted", entry.Action);
+        var entry = Assert.Single(persisted!.Timeline);
+        Assert.Equal("case-created", entry.Action);
         Assert.Equal(TypeId, entry.Details["typeId"]);
         Assert.Equal("submitted", entry.Details["stateId"]);
         Assert.Equal("v1", entry.Details["templateVersion"]);
@@ -274,7 +274,7 @@ public class CaseEndpointsTests
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
         var persisted = await factory.Persistence.GetByIdAsync(body!.Id, cancellationToken);
-        var entry = Assert.Single(persisted!.AuditLog);
+        var entry = Assert.Single(persisted!.Timeline);
         Assert.True(entry.Details.ContainsKey("source"));
         Assert.Null(entry.Details["source"]);
         Assert.Equal("test-client", entry.Details["clientId"]);
@@ -804,12 +804,11 @@ public class CaseEndpointsTests
     }
 
     [Fact]
-    public async Task Get_list_omits_notes_and_audit_log_from_each_item()
+    public async Task Get_list_omits_the_timeline_from_each_item()
     {
-        // epr-4pf: the list endpoint never renders the per-item Notes /
-        // AuditLog collections, so they must not appear on the wire at
-        // all (omitted, not nulled) — even if the persisted document
-        // would otherwise have them.
+        // epr-4pf: the list endpoint never renders the per-item Timeline,
+        // so it must not appear on the wire at all (omitted, not nulled) —
+        // even if the persisted document would otherwise have it.
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var factory = NewFactory();
         using var client = factory.CreateClient();
@@ -825,18 +824,9 @@ public class CaseEndpointsTests
             AssignedToName = "Alice Example",
             AssignedAt = assignedAt,
             AssignedBy = "manager-1",
-            Notes =
+            Timeline =
             {
-                new CaseNote
-                {
-                    Text = "should not be on the wire",
-                    CreatedAt = assignedAt,
-                    CreatedBy = "alice-1",
-                },
-            },
-            AuditLog =
-            {
-                new CaseAuditEntry
+                new CaseTimelineEntry
                 {
                     Action = "assigned",
                     ActionDisplayName = "Assigned",
@@ -851,13 +841,12 @@ public class CaseEndpointsTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         // Property-level assertion: the JSON must not even mention
-        // 'notes' or 'auditLog' on a list item.
+        // 'timeline' on a list item.
         var rawJson = await response.Content.ReadAsStringAsync(cancellationToken);
         var root = System.Text.Json.Nodes.JsonNode.Parse(rawJson);
         Assert.NotNull(root);
         var firstItem = root!["items"]!.AsArray()[0]!.AsObject();
-        Assert.False(firstItem.ContainsKey("notes"), "list item must not include 'notes'");
-        Assert.False(firstItem.ContainsKey("auditLog"), "list item must not include 'auditLog'");
+        Assert.False(firstItem.ContainsKey("timeline"), "list item must not include 'timeline'");
 
         var body = System.Text.Json.JsonSerializer.Deserialize<CaseListResponse>(
             rawJson,
@@ -1261,7 +1250,7 @@ public class CaseEndpointsTests
         var persisted = await factory.Persistence.GetByIdAsync(id, cancellationToken);
         Assert.Null(persisted!.AssignedToId);
         Assert.Equal(0, persisted.Version);
-        Assert.Empty(persisted.AuditLog);
+        Assert.Empty(persisted.Timeline);
     }
 
     [Theory]
@@ -1306,7 +1295,7 @@ public class CaseEndpointsTests
         var persisted = await factory.Persistence.GetByIdAsync(id, cancellationToken);
         Assert.Equal("alice-1", persisted!.AssignedToId);
         Assert.Equal(0, persisted.Version);
-        Assert.Empty(persisted.AuditLog);
+        Assert.Empty(persisted.Timeline);
     }
 
     [Fact]
@@ -1402,72 +1391,15 @@ public class CaseEndpointsTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
-        Assert.NotNull(body?.Notes);
-        var note = Assert.Single(body!.Notes!);
-        Assert.Equal("Reviewed evidence; awaiting confirmation.", note.Text);
+        Assert.NotNull(body?.Timeline);
+        var note = Assert.Single(body!.Timeline!, a => a.Action == "note-added");
+        Assert.Equal("Reviewed evidence; awaiting confirmation.", note.Details["text"]);
         Assert.Equal("alice-1", note.CreatedBy);
         Assert.Equal("Alice Example", note.CreatedByName);
 
-        // epr-27o: the audit-log entry on the wire surfaces the trimmed
-        // note body via Details["noteText"] so a UI rendering the
-        // timeline does not have to cross-reference the Notes
-        // collection by id.
-        Assert.NotNull(body.AuditLog);
-        var noteAudit = Assert.Single(body.AuditLog!, a => a.Action == "note-added");
-        Assert.Equal("Reviewed evidence; awaiting confirmation.", noteAudit.Details["noteText"]);
-        Assert.Equal(note.Id.ToString(), noteAudit.Details["noteId"]);
-
         var persisted = await factory.Persistence.GetByIdAsync(id, cancellationToken);
-        Assert.Single(persisted!.Notes);
+        Assert.Single(persisted!.Timeline, a => a.Action == "note-added");
         Assert.Equal(1, persisted.Version);
-    }
-
-    [Fact]
-    public async Task AddNote_projects_notes_newest_first()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using var factory = NewFactory(userId: "alice-1");
-        using var client = factory.CreateClient();
-
-        var id = Ulid.NewUlid().ToString();
-        var older = new DateTime(2026, 4, 27, 9, 0, 0, DateTimeKind.Utc);
-        var newer = new DateTime(2026, 4, 27, 11, 0, 0, DateTimeKind.Utc);
-        await factory.SeedAsync(
-            new Case
-            {
-                Id = id,
-                TypeId = TypeId,
-                StateId = "submitted",
-                SubmittedBy = "test-client",
-                Notes =
-                {
-                    new CaseNote
-                    {
-                        Text = "older",
-                        CreatedAt = older,
-                        CreatedBy = "earlier",
-                    },
-                    new CaseNote
-                    {
-                        Text = "newer",
-                        CreatedAt = newer,
-                        CreatedBy = "earlier",
-                    },
-                },
-            },
-            cancellationToken
-        );
-
-        var response = await client.GetAsync($"/cases/{id}", cancellationToken);
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
-        Assert.NotNull(body?.Notes);
-        Assert.Collection(
-            body!.Notes!,
-            first => Assert.Equal("newer", first.Text),
-            second => Assert.Equal("older", second.Text)
-        );
     }
 
     [Fact]
@@ -1531,7 +1463,7 @@ public class CaseEndpointsTests
     }
 
     [Fact]
-    public async Task AuditLog_is_projected_newest_first_on_the_wire()
+    public async Task Timeline_is_projected_newest_first_on_the_wire()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var factory = NewFactory();
@@ -1547,12 +1479,12 @@ public class CaseEndpointsTests
                 TypeId = TypeId,
                 StateId = "submitted",
                 SubmittedBy = "test-client",
-                AuditLog =
+                Timeline =
                 {
                     // Insert out of order on purpose so we know the newest-first
                     // ordering on the wire is enforced by the projection rather
                     // than by storage order.
-                    new CaseAuditEntry
+                    new CaseTimelineEntry
                     {
                         Action = "note-added",
                         ActionDisplayName = "Note added",
@@ -1560,7 +1492,7 @@ public class CaseEndpointsTests
                         CreatedBy = "alice-1",
                         CreatedByName = "Alice",
                     },
-                    new CaseAuditEntry
+                    new CaseTimelineEntry
                     {
                         Action = "task-completed",
                         ActionDisplayName = "Task completed",
@@ -1578,9 +1510,9 @@ public class CaseEndpointsTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
-        Assert.NotNull(body?.AuditLog);
+        Assert.NotNull(body?.Timeline);
         Assert.Collection(
-            body!.AuditLog!,
+            body!.Timeline!,
             first =>
             {
                 Assert.Equal("note-added", first.Action);
@@ -1597,7 +1529,7 @@ public class CaseEndpointsTests
     }
 
     [Fact]
-    public async Task AuditLog_preserves_insertion_order_for_entries_with_identical_timestamps()
+    public async Task Timeline_preserves_insertion_order_for_entries_with_identical_timestamps()
     {
         // Regression for epr-s4y: when two entries share an exact CreatedAt
         // (common under FakeTimeProvider with the clock held still, and
@@ -1618,25 +1550,25 @@ public class CaseEndpointsTests
                 TypeId = TypeId,
                 StateId = "submitted",
                 SubmittedBy = "test-client",
-                AuditLog =
+                Timeline =
                 {
-                    new CaseAuditEntry
+                    new CaseTimelineEntry
                     {
                         Action = "note-added",
                         ActionDisplayName = "Note added",
                         Details = new() { ["sequence"] = "1" },
                         CreatedAt = t,
                     },
-                    new CaseAuditEntry
+                    new CaseTimelineEntry
                     {
                         Action = "task-completed",
                         ActionDisplayName = "Task completed",
                         Details = new() { ["sequence"] = "2" },
                         CreatedAt = t,
                     },
-                    new CaseAuditEntry
+                    new CaseTimelineEntry
                     {
-                        Action = "action-applied",
+                        Action = "state-changed",
                         ActionDisplayName = "Action applied",
                         Details = new() { ["sequence"] = "3" },
                         CreatedAt = t,
@@ -1650,9 +1582,9 @@ public class CaseEndpointsTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
-        Assert.NotNull(body?.AuditLog);
+        Assert.NotNull(body?.Timeline);
         Assert.Collection(
-            body!.AuditLog!,
+            body!.Timeline!,
             first => Assert.Equal("3", first.Details["sequence"]),
             second => Assert.Equal("2", second.Details["sequence"]),
             third => Assert.Equal("1", third.Details["sequence"])

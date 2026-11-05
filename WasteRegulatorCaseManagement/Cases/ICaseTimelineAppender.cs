@@ -8,10 +8,10 @@ namespace WasteRegulatorCaseManagement.Cases;
 /// appends an entry, and saves with one optimistic-concurrency retry
 /// so a race with another writer does not silently drop the entry.
 /// </summary>
-public interface ICaseAuditAppender
+public interface ICaseTimelineAppender
 {
     /// <summary>
-    /// Append a single <see cref="CaseAuditEntry"/> to the work
+    /// Append a single <see cref="CaseTimelineEntry"/> to the work
     /// item identified by <paramref name="caseId"/>. Returns
     /// <c>true</c> when the entry was persisted; <c>false</c> when the
     /// case could not be found or the write was abandoned after

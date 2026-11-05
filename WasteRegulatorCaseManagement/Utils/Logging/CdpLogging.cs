@@ -30,7 +30,7 @@ public static class CdpLogging
         // epr-mhi: the deprecated AuditLogger sub-pipeline (and its
         // ExcludeAuditEvents filter on the main logger) was removed per
         // ADR-0004 — the canonical audit record is the on-document
-        // Case.AuditLog, not a side-channel Serilog stream. Operational
+        // Case.Timeline, not a side-channel Serilog stream. Operational
         // logs flow through the single configured logger.
         var mainLogger = new LoggerConfiguration()
             .ReadFrom.Configuration(ctx.Configuration)

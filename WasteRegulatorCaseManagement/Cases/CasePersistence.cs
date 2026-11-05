@@ -23,10 +23,9 @@ public interface ICasePersistence
     /// most-recently-submitted first, together with the total number of
     /// matches across every page.
     ///
-    /// The per-item <see cref="Case.Notes"/> and
-    /// <see cref="Case.AuditLog"/> collections are excluded server-side
+    /// The per-item <see cref="Case.Timeline"/> is excluded server-side
     /// (epr-4pf). The returned <see cref="Case"/> instances therefore
-    /// carry empty <c>Notes</c> / <c>AuditLog</c> lists regardless of
+    /// carry an empty <c>Timeline</c> regardless of
     /// what is on disk; callers that need the full timeline must
     /// <see cref="GetByIdAsync"/> the item individually. This keeps the
     /// list path's bandwidth bounded by the document envelope rather
@@ -38,7 +37,7 @@ public interface ICasePersistence
     );
 
     /// <summary>
-    /// Persist updates made by the engine (state transitions, assignment, notes).
+    /// Persist updates made by the engine (state transitions, assignment, timeline entries).
     /// Implementations replace the document in its entirety so callers can
     /// mutate any field on the supplied <see cref="Case"/> before saving.
     /// </summary>
@@ -107,12 +106,10 @@ public sealed class CasePersistence
         if (sortStages is null)
         {
             // Default path (RA-324: unchanged from the original behaviour) —
-            // newest submitted first, with the per-item Notes / AuditLog
-            // collections projected away (epr-4pf): the list endpoint never
-            // renders them and they dominate document size on chatty items.
-            var projection = Builders<Case>
-                .Projection.Exclude(w => w.Notes)
-                .Exclude(w => w.AuditLog);
+            // newest submitted first, with the per-item Timeline projected
+            // away (epr-4pf): the list endpoint never renders it and it
+            // dominates document size on chatty items.
+            var projection = Builders<Case>.Projection.Exclude(w => w.Timeline);
 
             items = await Collection
                 .Find(filter)
@@ -127,8 +124,8 @@ public sealed class CasePersistence
             // Explicit RA-324 sort (organisation / status / due-date). Status
             // and due-date can't be expressed as a plain field sort, so an
             // aggregation computes the sort key. Two $unset stages: the first
-            // drops the fat Notes / AuditLog collections (the same ones the
-            // default projection excludes) BEFORE the in-memory $sort so the
+            // drops the fat Timeline (the same one the default projection
+            // excludes) BEFORE the in-memory $sort so the
             // sort buffers slim documents; the second drops the computed sort
             // scratch fields AFTER the $sort that reads them, so the result
             // still deserialises to Case (which does not ignore extra BSON
@@ -146,7 +143,7 @@ public sealed class CasePersistence
             var stages = new List<BsonDocument>
             {
                 new("$match", matchDoc),
-                new("$unset", new BsonArray { "notes", "auditLog" }),
+                new("$unset", "timeline"),
             };
             if (addFields is not null)
             {

@@ -3,7 +3,7 @@ using NUlid;
 namespace WasteRegulatorCaseManagement.Cases;
 
 /// <summary>
-/// A single entry in a case's audit log (RA-97). The framework appends
+/// A single entry in a case's timeline (RA-97). The framework appends
 /// one of these for every successful state-changing engine call (action
 /// application, assignment, unassignment, note added) so modules inherit a complete audit trail without writing any audit code
 /// themselves.
@@ -14,13 +14,13 @@ namespace WasteRegulatorCaseManagement.Cases;
 /// (newest-first, RA-568) on the wire so a UI renders the most recent
 /// activity at the top of the timeline.
 /// </summary>
-public sealed class CaseAuditEntry
+public sealed class CaseTimelineEntry
 {
     public string Id { get; init; } = Ulid.NewUlid().ToString();
 
     /// <summary>
     /// Stable machine-readable identifier of the action that produced this
-    /// entry (e.g. <c>action-applied</c>, <c>note-added</c>,
+    /// entry (e.g. <c>state-changed</c>, <c>note-added</c>,
     /// <c>assigned</c>, <c>unassigned</c>, <c>note-added</c>). Useful for
     /// filtering / styling without parsing the display name.
     /// </summary>
@@ -76,7 +76,7 @@ public sealed class CaseAuditEntry
     ///
     /// Every runtime producer stamps this, so on current data null means
     /// "written before epr-rr9s" and nothing else. Keep it that way: if you
-    /// add a new site that constructs a CaseAuditEntry, set StateId from
+    /// add a new site that constructs a CaseTimelineEntry, set StateId from
     /// the case AFTER any state mutation.
     /// </summary>
     public string? StateId { get; init; }

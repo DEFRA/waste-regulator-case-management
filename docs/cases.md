@@ -26,7 +26,7 @@ Defined in `WasteRegulatorCaseManagement/Cases/`:
 | `ICaseType` | Declares a type's `TypeId`, `DisplayName`, `InitialState`, `States`, `GetTasksForState(stateId)` and `Transitions`. Pure & side-effect free. |
 | `ICaseModule` | A module's entry point. Exposes the `Type` and contributes `RegisterServices(services)` and `MapEndpoints(endpoints)`. |
 | `ICaseRegistry` | DI-resolvable lookup of every registered type. |
-| `ICaseService` | Framework service object that drives state transitions. Resolves the case, validates the request against the type, persists the change and writes an audit log. |
+| `ICaseService` | Framework service object that drives state transitions. Resolves the case, validates the request against the type, persists the change and writes an timeline. |
 | `Case` | The persisted case envelope: id, type id, state id, submitted-at, last-modified-at, submitted-by (CDP client id), free-form payload. |
 | `ICasePersistence` | Framework-owned MongoDB persistence for `Case`s. |
 | `CaseModuleExtensions` | `AddCaseFramework()`, `AddCaseModule<T>()`, `MapCaseModules()`, `MapCaseFrameworkEndpoints()`. |
@@ -193,7 +193,7 @@ optionally reads two headers forwarded by the BFF and turns them into
 | `x-cdp-user-id` | `user:id` (used by `ResolveActorUserId`) |
 | `x-cdp-user-name` | `user:name` |
 
-These are used for audit attribution only (`Case.AuditLog.CreatedBy` /
+These are used for audit attribution only (`Case.Timeline.CreatedBy` /
 `CreatedByName` and similar). Role membership is not part of the trust
 contract — see ADR-0005.
 
@@ -239,59 +239,31 @@ no audit churn.
 
 ## Notes (RA-96)
 
-Every case carries an append-only list of free-text **notes** —
-short narratives an assessor records to explain context or decisions.
-Notes are framework-level so every type behaves identically; modules do
-not opt in.
-
-### Storage
-
-`Case.Notes` is a `List<CaseNote>` persisted inline on the work
-item document. A `CaseNote` carries:
-
-| Field | Purpose |
-| --- | --- |
-| `Id` | Server-generated GUID. |
-| `Text` | Note body. Trimmed at write; rendered verbatim by clients (templates must escape). |
-| `CreatedAt` | UTC timestamp set by `CaseService` from the injected `TimeProvider`. |
-| `CreatedBy` | Snapshot of the actor's user id (`user:id` claim, falling back to the client id). |
-| `CreatedByName` | Snapshot of the actor's display name (`user:name` claim) at write time, so the audit narrative survives directory changes. |
-
-Notes are stored in insertion order. The wire projection in
-`CaseResponse.Notes` is sorted **newest-first** so a UI can render
-without re-sorting.
-
-### Endpoint
+Caseworkers add free-text notes at any point. A note is not a separate
+collection: it is a `note-added` entry on the case timeline (below), with
+the trimmed text in `Details["text"]`, so notes and every other action
+share one append-only, attributed history.
 
 ```
 POST /cases/{id}/notes
   Body: { "text": "<note body>" }
-  Authorization: any authenticated user (notes are an audit narrative;
-                 no role gate beyond authentication).
+  Authorization: any authenticated user.
 
   Validation:
    - `text` required, non-blank, ≤ CaseService.MaxNoteLength (4000)
      characters. Server trims leading/trailing whitespace before storing.
 
-  Returns: the updated CaseResponse (with the new note included
-  newest-first under `notes`).
+  Returns: the updated CaseResponse, with the new note-added entry first
+  in `timeline`.
 ```
 
-### Conventions
+Notes are append-only: there is no edit or delete endpoint.
 
-- **Append-only.** The framework deliberately does not expose edit or
-  delete endpoints — notes are part of the audit trail.
-- **No module-specific note types.** If a module needs structured per-note
-  metadata, lift the requirement into the framework rather than modelling
-  it on the payload.
-- The note's author identity is **always** snapshotted on write. Do not
-  rely on `CreatedBy` being a live foreign key into a user directory.
-
-## Audit log (RA-97)
+## Timeline (RA-97)
 
 ### Single source of truth
 
-`Case.AuditLog` (the per-document, append-only list described below) is
+`Case.Timeline` (the per-document, append-only list described below) is
 the **single authoritative audit trail** for every case. There is no
 parallel database or external audit store. The console-only
 `AuditLogger`/`logger.Audit(...)` helper that previously emitted a second,
@@ -305,7 +277,7 @@ case itself.
 
 Every state-changing engine call (`SubmitAsync`, `CompleteTaskAsync`,
 `ApplyActionAsync`, `AssignAsync`, `UnassignAsync`, `AddNoteAsync`)
-automatically appends a `CaseAuditEntry` to `Case.AuditLog` on
+automatically appends a `CaseTimelineEntry` to `Case.Timeline` on
 success. The framework owns this — modules do not opt in and cannot opt
 out, so every type inherits an identical audit trail. The submission entry
 is the case's birth event: it is appended to the in-memory document
@@ -314,22 +286,22 @@ audit entry land in storage together.
 
 ### Storage
 
-`Case.AuditLog` is a `List<CaseAuditEntry>` persisted inline on
+`Case.Timeline` is a `List<CaseTimelineEntry>` persisted inline on
 the case document. An entry carries:
 
 | Field | Purpose |
 | --- | --- |
 | `Id` | Server-generated ULID. |
-| `Action` | Stable machine id of the action: `work-item-submitted`, `action-applied`, `assigned`, `unassigned`, `note-added`. Modules append their own alongside these (e.g. `accreditation-issued`, `sla-clock-stopped`). |
-| `ActionDisplayName` | Human-readable description (e.g. `Action applied`). |
-| `Details` | `Dictionary<string, string?>` of contextual fields per action: `typeId`/`stateId`/`templateVersion` (submission); `actionId`/`actionDisplayName`/`fromStateId`/`toStateId`; `assigneeId`/`assigneeName`/`previousAssigneeId`/`previousAssigneeName`; `previousAssigneeId`/`previousAssigneeName`; `noteId`. |
+| `Action` | Stable machine id of the action: `case-created`, `state-changed`, `assigned`, `unassigned`, `note-added`. Modules append their own alongside these (e.g. `notification-sent`). |
+| `ActionDisplayName` | Human-readable description (e.g. `Note added`). |
+| `Details` | `Dictionary<string, string?>` of contextual fields per action: `typeId`/`stateId`/`templateVersion` (submission); `actionId`/`actionDisplayName`/`fromStateId`/`toStateId`; `assigneeId`/`assigneeName`/`previousAssigneeId`/`previousAssigneeName` (unassigned); `text` (note). |
 | `CreatedAt` | UTC timestamp from the injected `TimeProvider`. |
 | `CreatedBy` | Snapshot of the actor's user id (`user:id` claim, required — mutations without it are rejected with 401). |
 | `CreatedByName` | Snapshot of the actor's display name (`user:name`) at write time. |
 
 ### Wire format
 
-`CaseResponse.AuditLog` is sorted **reverse-chronologically (newest-first,
+`CaseResponse.Timeline` is sorted **reverse-chronologically (newest-first,
 RA-568)** so a UI renders the most recent activity at the top of the
 timeline without re-sorting.
 

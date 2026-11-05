@@ -156,7 +156,7 @@ public class CaseEngineEndpointsTests
         // unchanged and carries no audit entry for the blocked action.
         var persisted = await factory.Persistence.GetByIdAsync(caseId, cancellationToken);
         Assert.Equal("submitted", persisted!.StateId);
-        Assert.Empty(persisted.AuditLog);
+        Assert.Empty(persisted.Timeline);
     }
 
     [Fact]

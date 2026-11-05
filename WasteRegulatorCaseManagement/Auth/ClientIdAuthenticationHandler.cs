@@ -372,7 +372,7 @@ public class ClientIdAuthenticationHandler(
     /// BFF (frontend) forwards the acting user's identity in optional
     /// headers. They are not authenticators in their own right — the HMAC
     /// signature is what establishes trust in the primary client id header
-    /// — but they let backend endpoints produce more useful audit log lines
+    /// — but they let backend endpoints produce more useful timeline lines
     /// without a separate user lookup.
     /// </summary>
     private static List<Claim> BuildClaims(

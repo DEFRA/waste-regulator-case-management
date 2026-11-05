@@ -15,7 +15,7 @@ namespace WasteRegulatorCaseManagement.Test.Cases;
 /// temp data directory, torn down with the fixture) so the BSON
 /// serializers registered by <see cref="MongoConventions"/>, the index definitions in
 /// <see cref="CasePersistence.DefineIndexes"/>, the projection that
-/// strips <see cref="Case.Notes"/> / <see cref="Case.AuditLog"/>
+/// strips <see cref="Case.Timeline"/>
 /// from <see cref="CasePersistence.QueryAsync"/>, and the
 /// optimistic-concurrency path in <see cref="CasePersistence.ReplaceAsync"/>
 /// are exercised against the real driver — not faked. None of these
@@ -202,7 +202,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
     }
 
     [Fact]
-    public async Task QueryAsync_excludes_notes_and_audit_log_at_the_wire_level()
+    public async Task QueryAsync_excludes_the_timeline_at_the_wire_level()
     {
         var now = _time.GetUtcNow().UtcDateTime;
         var caseRecord = new Case
@@ -211,19 +211,9 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
             StateId = "submitted",
             SubmittedAt = now,
             LastModifiedAt = now,
-            Notes =
+            Timeline =
             {
-                new CaseNote
-                {
-                    Text = "secret note body",
-                    CreatedAt = now,
-                    CreatedBy = "user-1",
-                    CreatedByName = "Alice",
-                },
-            },
-            AuditLog =
-            {
-                new CaseAuditEntry
+                new CaseTimelineEntry
                 {
                     Action = "submitted",
                     ActionDisplayName = "Submitted",
@@ -240,17 +230,15 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
             caseRecord.Id,
             TestContext.Current.CancellationToken
         );
-        Assert.Single(full!.Notes);
-        Assert.Single(full.AuditLog);
+        Assert.Single(full!.Timeline);
 
-        // QueryAsync is the projected path; both collections must be empty.
+        // QueryAsync is the projected path; the timeline must be empty.
         var page = await _persistence.QueryAsync(
             new CaseQuery(),
             TestContext.Current.CancellationToken
         );
         var item = Assert.Single(page.Items);
-        Assert.Empty(item.Notes);
-        Assert.Empty(item.AuditLog);
+        Assert.Empty(item.Timeline);
     }
 
     // ─────────────────────── RA-324 filter + sort (real Mongo) ───────────────────────
@@ -368,7 +356,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
     }
 
     [Fact]
-    public async Task QueryAsync_sorted_path_still_strips_notes_and_audit_log()
+    public async Task QueryAsync_sorted_path_still_strips_the_timeline()
     {
         var ct = TestContext.Current.CancellationToken;
         var now = _time.GetUtcNow().UtcDateTime;
@@ -379,19 +367,9 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
             SubmittedAt = now,
             LastModifiedAt = now,
             Payload = new BsonDocument { ["organisationName"] = "Acme" },
-            Notes =
+            Timeline =
             {
-                new CaseNote
-                {
-                    Text = "secret",
-                    CreatedAt = now,
-                    CreatedBy = "u",
-                    CreatedByName = "U",
-                },
-            },
-            AuditLog =
-            {
-                new CaseAuditEntry
+                new CaseTimelineEntry
                 {
                     Action = "submitted",
                     ActionDisplayName = "Submitted",
@@ -408,8 +386,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
         var got = Assert.Single(page.Items);
         // Projection preserved on the aggregation path, and the computed sort
         // fields were $unset so the document still deserialises cleanly.
-        Assert.Empty(got.Notes);
-        Assert.Empty(got.AuditLog);
+        Assert.Empty(got.Timeline);
         Assert.Equal("Acme", got.Payload["organisationName"].AsString);
     }
 
@@ -634,8 +611,8 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
             SubmittedBy = "client-1",
         };
         caseRecord.ReplacePayload(new BsonDocument { ["accreditationId"] = accreditationId });
-        caseRecord.AuditLog.Add(
-            new CaseAuditEntry
+        caseRecord.Timeline.Add(
+            new CaseTimelineEntry
             {
                 Action = "accreditation-issued",
                 ActionDisplayName = "Accreditation issued",

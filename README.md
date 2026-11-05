@@ -74,7 +74,7 @@ HTTP traffic to Notify).
 Even with the flag on and a key set, notification calls are logged but **never**
 sent to GOV.UK Notify when running locally: the no-op client is registered on a
 Development host and whenever `ENVIRONMENT` is `local` or `dev`. It returns
-success, so the case's audit log still records a `notification-sent` entry
+success, so the case's timeline still records a `notification-sent` entry
 and the UI behaves as it does in a sending environment. The non-production
 Notify team key can only reach team-registered addresses plus five guests, and
 those slots are used up — see

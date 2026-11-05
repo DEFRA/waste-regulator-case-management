@@ -12,7 +12,7 @@ public interface ICaseType : ICaseTemplate
     /// <summary>Stable, machine-readable identifier (e.g. "CSoC").</summary>
     string TypeId { get; }
 
-    /// <summary>Human-readable name shown in UIs and audit logs.</summary>
+    /// <summary>Human-readable name shown in UIs and timelines.</summary>
     string DisplayName { get; }
 
     /// <summary>The state a newly-ingested case starts in.</summary>

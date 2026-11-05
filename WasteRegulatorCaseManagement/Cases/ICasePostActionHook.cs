@@ -13,7 +13,7 @@ namespace WasteRegulatorCaseManagement.Cases;
 ///   <item>Be idempotent / safe to invoke once per successful state change.</item>
 ///   <item>Never throw — failures must be swallowed and recorded by the
 ///   hook itself (typically via an audit entry written through
-///   <see cref="ICaseAuditAppender"/>) so a side-effect failure does
+///   <see cref="ICaseTimelineAppender"/>) so a side-effect failure does
 ///   not unwind the originating mutation that has already persisted.</item>
 ///   <item>Only react to cases whose <see cref="Case.TypeId"/>
 ///   matches the module they belong to.</item>

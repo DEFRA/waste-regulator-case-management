@@ -59,7 +59,7 @@ public class CaseAuthBoundaryTests
         var persisted = await factory.Persistence.GetByIdAsync(id, cancellationToken);
         Assert.Equal("bob-2", persisted!.AssignedToId);
         Assert.Equal(1, persisted.Version);
-        Assert.Single(persisted.AuditLog);
+        Assert.Single(persisted.Timeline);
     }
 
     [Fact]
@@ -84,7 +84,7 @@ public class CaseAuthBoundaryTests
         var persisted = await factory.Persistence.GetByIdAsync(id, cancellationToken);
         Assert.Equal("alice-1", persisted!.AssignedToId);
         Assert.Equal(1, persisted.Version);
-        Assert.Single(persisted.AuditLog);
+        Assert.Single(persisted.Timeline);
     }
 
     [Fact]
@@ -106,7 +106,7 @@ public class CaseAuthBoundaryTests
         var persisted = await factory.Persistence.GetByIdAsync(id, cancellationToken);
         Assert.Null(persisted!.AssignedToId);
         Assert.Equal(1, persisted.Version);
-        Assert.Single(persisted.AuditLog);
+        Assert.Single(persisted.Timeline);
     }
 
     // Coverage for "RBAC lives in the frontend now" (no ownership gate on

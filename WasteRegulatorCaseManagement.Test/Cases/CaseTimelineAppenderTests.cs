@@ -13,7 +13,7 @@ namespace WasteRegulatorCaseManagement.Test.Cases;
 /// Uses real ephemeral MongoDB so concurrency / retry behaviour is
 /// exercised against the actual optimistic-concurrency implementation.
 /// </summary>
-public class CaseAuditAppenderTests
+public class CaseTimelineAppenderTests
     : IAsyncDisposable
 {
     private readonly TestMongoDbClientFactory _clientFactory;
@@ -26,7 +26,7 @@ public class CaseAuditAppenderTests
         new Claim("user:name", "Alice")
     ], "test"));
 
-    public CaseAuditAppenderTests(MongoIntegrationFixture fixture)
+    public CaseTimelineAppenderTests(MongoIntegrationFixture fixture)
     {
         _databaseName = MongoIntegrationFixture.NewDatabaseName("audit-appender");
         _clientFactory = new TestMongoDbClientFactory(fixture.ConnectionString, _databaseName);
@@ -36,8 +36,8 @@ public class CaseAuditAppenderTests
     public async ValueTask DisposeAsync() =>
         await _clientFactory.GetClient().DropDatabaseAsync(_databaseName);
 
-    private CaseAuditAppender BuildSut() =>
-        new(_persistence, NullLogger<CaseAuditAppender>.Instance);
+    private CaseTimelineAppender BuildSut() =>
+        new(_persistence, NullLogger<CaseTimelineAppender>.Instance);
 
     private async Task<Case> CreateCaseAsync(CancellationToken ct)
     {
@@ -70,7 +70,7 @@ public class CaseAuditAppenderTests
 
         var persisted = await _persistence.GetByIdAsync(caseRecord.Id, ct);
         Assert.NotNull(persisted);
-        var entry = Assert.Single(persisted!.AuditLog);
+        var entry = Assert.Single(persisted!.Timeline);
         Assert.Equal("notification-sent", entry.Action);
         Assert.Equal("Email sent", entry.ActionDisplayName);
         Assert.Equal("DulyMade", entry.Details?["templateKey"]);
@@ -107,9 +107,9 @@ public class CaseAuditAppenderTests
         await sut.AppendAsync(caseRecord.Id, "second", "Second", new(), s_user, ct);
 
         var persisted = await _persistence.GetByIdAsync(caseRecord.Id, ct);
-        Assert.Equal(2, persisted!.AuditLog.Count);
-        Assert.Equal("first", persisted.AuditLog[0].Action);
-        Assert.Equal("second", persisted.AuditLog[1].Action);
+        Assert.Equal(2, persisted!.Timeline.Count);
+        Assert.Equal("first", persisted.Timeline[0].Action);
+        Assert.Equal("second", persisted.Timeline[1].Action);
     }
 
     [Fact]
@@ -144,7 +144,7 @@ public class CaseAuditAppenderTests
                 return Task.CompletedTask;
             });
 
-        var sut = new CaseAuditAppender(mockPersistence, NullLogger<CaseAuditAppender>.Instance);
+        var sut = new CaseTimelineAppender(mockPersistence, NullLogger<CaseTimelineAppender>.Instance);
 
         var ok = await sut.AppendAsync(
             caseId,

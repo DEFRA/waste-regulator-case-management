@@ -26,7 +26,7 @@ public static class CaseModuleExtensions
         services.AddSingleton<ICaseRegistry>(sp =>
             new CaseRegistry(sp.GetServices<ICaseType>()));
         services.AddSingleton<ICaseService, CaseService>();
-        services.AddSingleton<ICaseAuditAppender, CaseAuditAppender>();
+        services.AddSingleton<ICaseTimelineAppender, CaseTimelineAppender>();
         services.AddHostedService<CaseMigrationHostedService>();
         return services;
     }

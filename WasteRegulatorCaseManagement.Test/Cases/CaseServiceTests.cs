@@ -390,10 +390,8 @@ public class CaseServiceTests : IAsyncDisposable
 
         Assert.True(result.IsSuccess, result.Message);
         var fetched = await GetAsync(caseRecord.Id);
-        var note = Assert.Single(fetched.Notes);
-        Assert.Equal("test-user", note.CreatedBy);
-        var auditEntry = Assert.Single(fetched.AuditLog, a => a.Action == "note-added");
-        Assert.Equal("test-user", auditEntry.CreatedBy);
+        var noteEntry = Assert.Single(fetched.Timeline, a => a.Action == "note-added");
+        Assert.Equal("test-user", noteEntry.CreatedBy);
     }
 
     [Fact]
@@ -1013,7 +1011,7 @@ public class CaseServiceTests : IAsyncDisposable
         var fetched = await GetAsync(caseRecord.Id);
         Assert.Null(fetched.AssignedToId);
         Assert.Equal(0, fetched.Version);
-        Assert.Empty(fetched.AuditLog);
+        Assert.Empty(fetched.Timeline);
     }
 
     [Theory]
@@ -1046,7 +1044,7 @@ public class CaseServiceTests : IAsyncDisposable
         var fetched = await GetAsync(caseRecord.Id);
         Assert.Equal("alice-1", fetched.AssignedToId);
         Assert.Equal(0, fetched.Version);
-        Assert.Empty(fetched.AuditLog);
+        Assert.Empty(fetched.Timeline);
     }
 
     [Fact]
@@ -1198,7 +1196,7 @@ public class CaseServiceTests : IAsyncDisposable
         var fetched = await GetAsync(caseRecord.Id);
         Assert.Equal("bob-1", fetched.AssignedToId);
         Assert.Equal(0, fetched.Version);
-        Assert.Empty(fetched.AuditLog);
+        Assert.Empty(fetched.Timeline);
     }
 
     [Fact]
@@ -1406,8 +1404,8 @@ public class CaseServiceTests : IAsyncDisposable
 
         Assert.True(result.IsSuccess);
         var fetched = await GetAsync(caseRecord.Id);
-        var note = Assert.Single(fetched.Notes);
-        Assert.Equal("Spoke to applicant; awaiting evidence.", note.Text);
+        var note = Assert.Single(fetched.Timeline, e => e.Action == "note-added");
+        Assert.Equal("Spoke to applicant; awaiting evidence.", note.Details["text"]);
         Assert.Equal("alice-1", note.CreatedBy);
         Assert.Equal("Alice Example", note.CreatedByName);
         Assert.Equal(TickedNow, note.CreatedAt);
@@ -1427,7 +1425,7 @@ public class CaseServiceTests : IAsyncDisposable
         Assert.False(result.IsSuccess);
         Assert.Equal(CaseActionFailureCode.InvalidNote, result.FailureCode);
         var fetched = await GetAsync(caseRecord.Id);
-        Assert.Empty(fetched.Notes);
+        Assert.Empty(fetched.Timeline);
         Assert.Equal(0, fetched.Version);
     }
 
@@ -1444,7 +1442,7 @@ public class CaseServiceTests : IAsyncDisposable
         Assert.False(result.IsSuccess);
         Assert.Equal(CaseActionFailureCode.InvalidNote, result.FailureCode);
         var fetched = await GetAsync(caseRecord.Id);
-        Assert.Empty(fetched.Notes);
+        Assert.Empty(fetched.Timeline);
     }
 
     [Fact]
@@ -1484,7 +1482,7 @@ public class CaseServiceTests : IAsyncDisposable
 
         Assert.True(result.IsSuccess);
         var fetched = await GetAsync(caseRecord.Id);
-        Assert.Single(fetched.Notes);
+        Assert.Single(fetched.Timeline, e => e.Action == "note-added");
     }
 
     private sealed class FakeTimeProvider(DateTime utcNow) : TimeProvider
@@ -1492,7 +1490,7 @@ public class CaseServiceTests : IAsyncDisposable
         public override DateTimeOffset GetUtcNow() => new(utcNow, TimeSpan.Zero);
     }
 
-    // ---------------------- Audit log (RA-97) ----------------------
+    // ---------------------- Timeline (RA-97) ----------------------
 
     private static ClaimsPrincipal AuditUser(
         string userId = "alice-1",
@@ -1533,8 +1531,8 @@ public class CaseServiceTests : IAsyncDisposable
             );
 
         var fetched = await GetAsync(caseRecord.Id);
-        var entry = Assert.Single(fetched.AuditLog);
-        Assert.Equal("action-applied", entry.Action);
+        var entry = Assert.Single(fetched.Timeline);
+        Assert.Equal("state-changed", entry.Action);
         Assert.Equal("Action applied", entry.ActionDisplayName);
         Assert.Equal("withdraw", entry.Details["actionId"]);
         Assert.Equal("Withdraw", entry.Details["actionDisplayName"]);
@@ -1570,7 +1568,7 @@ public class CaseServiceTests : IAsyncDisposable
         Assert.False(result.IsSuccess);
         Assert.Equal(CaseActionFailureCode.TerminalState, result.FailureCode);
         var fetched = await GetAsync(caseRecord.Id);
-        Assert.Empty(fetched.AuditLog);
+        Assert.Empty(fetched.Timeline);
     }
 
     [Fact]
@@ -1594,7 +1592,7 @@ public class CaseServiceTests : IAsyncDisposable
             );
 
         var fetched = await GetAsync(caseRecord.Id);
-        var entry = Assert.Single(fetched.AuditLog);
+        var entry = Assert.Single(fetched.Timeline);
         Assert.Equal("assigned", entry.Action);
         Assert.Equal("Assigned", entry.ActionDisplayName);
         Assert.Equal("carol-1", entry.Details["assigneeId"]);
@@ -1625,7 +1623,7 @@ public class CaseServiceTests : IAsyncDisposable
             );
 
         var fetched = await GetAsync(caseRecord.Id);
-        Assert.Empty(fetched.AuditLog);
+        Assert.Empty(fetched.Timeline);
     }
 
     [Fact]
@@ -1640,7 +1638,7 @@ public class CaseServiceTests : IAsyncDisposable
 
         Assert.False(result.IsSuccess);
         var fetched = await GetAsync(caseRecord.Id);
-        Assert.Empty(fetched.AuditLog);
+        Assert.Empty(fetched.Timeline);
     }
 
     [Fact]
@@ -1658,7 +1656,7 @@ public class CaseServiceTests : IAsyncDisposable
             .UnassignAsync(caseRecord.Id, actor, TestContext.Current.CancellationToken);
 
         var fetched = await GetAsync(caseRecord.Id);
-        var entry = Assert.Single(fetched.AuditLog);
+        var entry = Assert.Single(fetched.Timeline);
         Assert.Equal("unassigned", entry.Action);
         Assert.Equal("Unassigned", entry.ActionDisplayName);
         Assert.Equal("alice-1", entry.Details["previousAssigneeId"]);
@@ -1677,7 +1675,7 @@ public class CaseServiceTests : IAsyncDisposable
             .UnassignAsync(caseRecord.Id, actor, TestContext.Current.CancellationToken);
 
         var fetched = await GetAsync(caseRecord.Id);
-        Assert.Empty(fetched.AuditLog);
+        Assert.Empty(fetched.Timeline);
     }
 
     [Fact]
@@ -1695,16 +1693,11 @@ public class CaseServiceTests : IAsyncDisposable
             );
 
         var fetched = await GetAsync(caseRecord.Id);
-        var note = Assert.Single(fetched.Notes);
-        var entry = Assert.Single(fetched.AuditLog);
+        var entry = Assert.Single(fetched.Timeline);
         Assert.Equal("note-added", entry.Action);
         Assert.Equal("Note added", entry.ActionDisplayName);
-        Assert.Equal(note.Id.ToString(), entry.Details["noteId"]);
-        // epr-27o: the audit entry snapshots the trimmed note body so a
-        // reader of the audit log can see what was written without
-        // cross-referencing the Notes collection by id.
-        Assert.Equal("A note.", entry.Details["noteText"]);
-        Assert.Equal(note.Text, entry.Details["noteText"]);
+        // epr-27o: the entry holds the trimmed note body.
+        Assert.Equal("A note.", entry.Details["text"]);
         Assert.Equal("alice-1", entry.CreatedBy);
         Assert.Equal("Alice Example", entry.CreatedByName);
         Assert.Equal(TickedNow, entry.CreatedAt);
@@ -1721,7 +1714,7 @@ public class CaseServiceTests : IAsyncDisposable
 
         Assert.False(result.IsSuccess);
         var fetched = await GetAsync(caseRecord.Id);
-        Assert.Empty(fetched.AuditLog);
+        Assert.Empty(fetched.Timeline);
     }
 
     [Fact]
@@ -1767,24 +1760,24 @@ public class CaseServiceTests : IAsyncDisposable
         );
 
         var fetched = await GetAsync(caseRecord.Id);
-        Assert.Equal(3, fetched.AuditLog.Count);
+        Assert.Equal(3, fetched.Timeline.Count);
         Assert.Equal(
-            ["note-added", "assigned", "action-applied"],
-            fetched.AuditLog.Select(e => e.Action).ToArray()
+            ["note-added", "assigned", "state-changed"],
+            fetched.Timeline.Select(e => e.Action).ToArray()
         );
         // Strictly increasing timestamps — entries are appended in
         // chronological (insertion) order on disk.
-        Assert.True(fetched.AuditLog[0].CreatedAt < fetched.AuditLog[1].CreatedAt);
-        Assert.True(fetched.AuditLog[1].CreatedAt < fetched.AuditLog[2].CreatedAt);
+        Assert.True(fetched.Timeline[0].CreatedAt < fetched.Timeline[1].CreatedAt);
+        Assert.True(fetched.Timeline[1].CreatedAt < fetched.Timeline[2].CreatedAt);
         // epr-rr9s: each entry snapshots the state AS OF its own event. The
         // note + assign happened while the item was still 'submitted'; only
-        // the action-applied entry carries the post-transition 'approved'.
+        // the state-changed entry carries the post-transition 'approved'.
         // This is the regression the bug was about: earlier entries must NOT
         // inherit the live current state.
         Assert.Equal("approved", fetched.StateId);
         Assert.Equal(
             ["submitted", "submitted", "approved"],
-            fetched.AuditLog.Select(e => e.StateId).ToArray()
+            fetched.Timeline.Select(e => e.StateId).ToArray()
         );
     }
 
@@ -1848,8 +1841,8 @@ public class CaseServiceTests : IAsyncDisposable
         // The audit entry must have been part of the original CreateAsync
         // write (not a follow-up replace), so Version is still 0.
         Assert.Equal(0, fetched.Version);
-        var entry = Assert.Single(fetched.AuditLog);
-        Assert.Equal("work-item-submitted", entry.Action);
+        var entry = Assert.Single(fetched.Timeline);
+        Assert.Equal("case-created", entry.Action);
         Assert.Equal("Case submitted", entry.ActionDisplayName);
         Assert.Equal("alice-1", entry.CreatedBy);
         Assert.Equal("Alice Example", entry.CreatedByName);
@@ -1912,8 +1905,8 @@ public class CaseServiceTests : IAsyncDisposable
 
         Assert.True(result.IsSuccess);
         var fetched = await GetAsync(result.Case!.Id);
-        var entry = Assert.Single(fetched.AuditLog);
-        Assert.Equal("work-item-submitted", entry.Action);
+        var entry = Assert.Single(fetched.Timeline);
+        Assert.Equal("case-created", entry.Action);
         Assert.Equal(TickedNow, entry.CreatedAt);
         Assert.Equal(TypeId, entry.Details["typeId"]);
         Assert.Equal("submitted", entry.Details["stateId"]);
@@ -1942,7 +1935,7 @@ public class CaseServiceTests : IAsyncDisposable
 
         Assert.True(result.IsSuccess);
         var fetched = await GetAsync(result.Case!.Id);
-        var entry = Assert.Single(fetched.AuditLog);
+        var entry = Assert.Single(fetched.Timeline);
         Assert.True(entry.Details.ContainsKey("source"));
         Assert.Null(entry.Details["source"]);
         Assert.Equal("test-client", entry.Details["clientId"]);

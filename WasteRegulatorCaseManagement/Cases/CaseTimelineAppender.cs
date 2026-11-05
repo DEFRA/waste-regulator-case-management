@@ -4,15 +4,15 @@ using Microsoft.Extensions.Logging;
 namespace WasteRegulatorCaseManagement.Cases;
 
 /// <summary>
-/// Default <see cref="ICaseAuditAppender"/>. Re-loads the case
+/// Default <see cref="ICaseTimelineAppender"/>. Re-loads the case
 /// from <see cref="ICasePersistence"/> before each save so it picks
 /// up any audit entries written by the engine immediately before the
 /// hook fires.
 /// </summary>
-internal sealed class CaseAuditAppender(
+internal sealed class CaseTimelineAppender(
     ICasePersistence persistence,
-    ILogger<CaseAuditAppender> logger,
-    TimeProvider? timeProvider = null) : ICaseAuditAppender
+    ILogger<CaseTimelineAppender> logger,
+    TimeProvider? timeProvider = null) : ICaseTimelineAppender
 {
     private const int MaxAttempts = 3;
     private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
@@ -36,7 +36,7 @@ internal sealed class CaseAuditAppender(
             }
 
             var now = _timeProvider.GetUtcNow().UtcDateTime;
-            caseRecord.AuditLog.Add(new CaseAuditEntry
+            caseRecord.Timeline.Add(new CaseTimelineEntry
             {
                 Action = action,
                 ActionDisplayName = actionDisplayName,
