@@ -12,6 +12,8 @@ public sealed class AuditEventService
 {
     public const string AuditEventCollectionName = "auditEvents";
     public const string AuditEventCounterCollectionName = "auditEventCounters";
+    public const string AuditEventDispatchLeaseCollectionName = "auditEventDispatchLeases";
+    public const string AnalyticsProcessName = "analytics";
 
     private const string AuditEventCounterId = "audit_event";
 
@@ -36,6 +38,19 @@ public sealed class AuditEventService
                         .Ascending(x => x.EntityId)
                         .Ascending(x => x.Version),
                     new CreateIndexOptions { Name = "Entity_EntityId_Version" }
+                ),
+                new CreateIndexModel<AuditEvent>(
+                    Builders<AuditEvent>
+                        .IndexKeys.Ascending(AuditEventDispatchFieldNames.DispatchPath(AnalyticsProcessName))
+                        .Ascending(x => x.Sequence),
+                    new CreateIndexOptions { Name = $"Dispatch_{AnalyticsProcessName}" }
+                ),
+                new CreateIndexModel<AuditEvent>(
+                    Builders<AuditEvent>
+                        .IndexKeys.Ascending(AuditEventDispatchFieldNames.DispatchStatusPath(AnalyticsProcessName))
+                        .Ascending(AuditEventDispatchFieldNames.DispatchNextAttemptAtPath(AnalyticsProcessName))
+                        .Ascending(x => x.Sequence),
+                    new CreateIndexOptions { Name = $"Dispatch_{AnalyticsProcessName}_Status_NextAttemptAt_Sequence" }
                 ),
             ]
         );
@@ -66,7 +81,7 @@ public sealed class AuditEventService
                 Operation = ToValue(auditEvent.Operation),
                 EventType = auditEvent.EventType,
                 OccurredAt = auditEvent.OccurredAt,
-                RecordedAt = WithoutMicroseconds(_timeProvider.GetUtcNow()),
+                RecordedAt = AuditEventTime.Now(_timeProvider),
                 Actor = auditEvent.Actor,
                 Version = auditEvent.Version,
                 Before = auditEvent.Before,
@@ -76,9 +91,6 @@ public sealed class AuditEventService
             cancellationToken: cancellationToken
         );
     }
-
-    private static DateTime WithoutMicroseconds(DateTimeOffset now) =>
-        new DateTimeOffset(now.Ticks - now.Ticks % TimeSpan.TicksPerMillisecond, TimeSpan.Zero).UtcDateTime;
 
     private static string ToValue(AuditEventOperation operation) =>
         operation switch

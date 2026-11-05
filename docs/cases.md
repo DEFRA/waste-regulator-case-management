@@ -261,6 +261,17 @@ MongoDB transaction (see
 [ADR-0010](adr/0010-transactional-audit-events.md)). The audit events are
 the outbox from which changes are published to the analytics topic.
 
+When `AnalyticsAuditEventProcessor:ProcessingEnabled` is true, a background
+processor polls `auditEvents` and publishes each event not yet sent to the
+SNS topic `AnalyticsAuditEventProcessor:TopicArn`, in sequence order. A lease
+in `auditEventDispatchLeases` keeps publishing to one instance at a time. The
+outcome is recorded on the event under `dispatches.analytics`: `Dispatched`,
+or `Failed` with a next attempt time, or `DeadLettered` once
+`MaxDispatchAttempts` publishes have failed. A message larger than SNS allows
+is sent gzip-compressed and base64-encoded with a `Content-Encoding:
+gzip+base64` attribute. Delivery is at least once, so consumers de-duplicate
+on `eventId`.
+
 ### Mechanism
 
 Every state-changing engine call (`SubmitAsync`,

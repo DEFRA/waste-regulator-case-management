@@ -191,6 +191,13 @@ registered) but required in every other environment.
 See [Local development](#local-development) above for the full local
 Notify-testing walkthrough.
 
+### Analytics
+
+| Variable | Secret? | Description |
+| --- | --- | --- |
+| `AnalyticsAuditEventProcessor__ProcessingEnabled` | No | Publish audit events to the analytics SNS topic (default `false`; `true` in Docker Compose) |
+| `AnalyticsAuditEventProcessor__TopicArn` | No | Analytics SNS topic ARN, required when processing is enabled |
+
 ### Database and misc
 
 | Variable | Secret? | Description |

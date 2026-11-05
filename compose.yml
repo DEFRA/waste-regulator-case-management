@@ -64,6 +64,12 @@ services:
       ASPNETCORE_URLS: http://+:8085
       Mongo__DatabaseUri: mongodb://mongodb:27017/?replicaSet=rs0&directConnection=true
       Mongo__DatabaseName: waste-regulator-case-management
+      AWS_ENDPOINT_URL: http://floci:4566
+      AWS__AuthenticationRegion: eu-west-2
+      AWS__ServiceURL: http://floci:4566
+      AnalyticsAuditEventProcessor__ProcessingEnabled: true
+      AnalyticsAuditEventProcessor__TopicArn: arn:aws:sns:eu-west-2:000000000000:waste_regulator_case_management_analytics_events
+      AnalyticsAuditEventProcessor__PollIntervalSeconds: 1
       NOTIFY_API_KEY: ${NOTIFY_API_KEY}
     networks:
       - cdp-tenant

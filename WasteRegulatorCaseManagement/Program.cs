@@ -1,5 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
+using Amazon.SimpleNotificationService;
 using WasteRegulatorCaseManagement.AuditEvents;
+using WasteRegulatorCaseManagement.AuditEvents.Analytics;
 using WasteRegulatorCaseManagement.Auth;
 using WasteRegulatorCaseManagement.Config;
 using WasteRegulatorCaseManagement.Health;
@@ -136,6 +138,7 @@ static void ConfigureServices(WebApplicationBuilder builder)
         .AddCheck<RequiredConfigHealthCheck>("required-config", tags: ["ready"]);
 
     ConfigureCases(builder);
+    ConfigureAnalytics(services, configuration);
 }
 
 [ExcludeFromCodeCoverage]
@@ -146,6 +149,30 @@ static void ConfigureCases(WebApplicationBuilder builder)
     services.AddCaseFramework();
     services.AddSingleton<AuditEventService>();
     services.AddSingleton<ICasePersistence, CasePersistence>();
+}
+
+[ExcludeFromCodeCoverage]
+static void ConfigureAnalytics(IServiceCollection services, IConfiguration configuration)
+{
+    services
+        .AddOptions<AnalyticsAuditEventProcessorOptions>()
+        .Bind(configuration.GetSection(AnalyticsAuditEventProcessorOptions.SectionName))
+        .ValidateDataAnnotations()
+        .ValidateOnStart();
+    services.AddSingleton<AuditEventLeaseService>();
+    services.AddSingleton<AuditEventDispatchService>();
+    services.AddSingleton<IAnalyticsEventSender, SnsAnalyticsEventSender>();
+    services.AddDefaultAWSOptions(configuration.GetAWSOptions());
+    services.AddAWSService<IAmazonSimpleNotificationService>();
+
+    if (
+        configuration.GetValue<bool>(
+            $"{AnalyticsAuditEventProcessorOptions.SectionName}:{nameof(AnalyticsAuditEventProcessorOptions.ProcessingEnabled)}"
+        )
+    )
+    {
+        services.AddHostedService<AnalyticsAuditEventProcessor>();
+    }
 }
 
 [ExcludeFromCodeCoverage]

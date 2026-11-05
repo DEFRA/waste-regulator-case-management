@@ -31,6 +31,8 @@ These are produced by the CDP portal at deploy time unless noted otherwise.
 | `Auth__CaseIntakeClientId` | Service config  | The `clientId` that the Case Intake Processor is expected to assert, and the only client allowed to create cases. Defaults to `case-intake-processor`. Must be distinct from `Auth__ManagementFeClientId`; the service throws at first request if the two collide. |
 | `ENVIRONMENT`              | CDP platform          | Platform environment name (`local`, `dev`, `test`, `perf-test`, `ext-test`, `prod`). Read by `CdpEnvironment.Read` for `NotifySendingPolicy` — see [Notify sending by environment](#notify-sending-by-environment) below. |
 | `NOTIFY_SENDEMAILS`        | Service config        | Optional. Overrides the environment-derived decision about whether email is really dispatched (`true`/`false`). A flat top-level key, matching `NOTIFY_API_KEY`'s convention. Leave unset in normal operation. |
+| `AnalyticsAuditEventProcessor__ProcessingEnabled` | Service config | `true` to publish audit events to the analytics topic. Defaults to `false`, which does not start the processor. |
+| `AnalyticsAuditEventProcessor__TopicArn` | Service config | ARN of the analytics SNS topic. Required when processing is enabled. |
 | `Notify__RegulatorMailboxes__<Nation>` | Service config | Regulator shared-mailbox address that regulator-facing emails are sent to, one per nation (`England`, `Scotland`, `Wales`, `NorthernIreland`). `appsettings.json` ships every nation blank, so each environment sets its own addresses in cdp-app-config. The real regulator inboxes are set in prod's config only; a non-prod environment never falls back to a real regulator. A missing or blank nation skips the send and records a `notification-skipped` audit entry with reason `missing-regulator-mailbox`. |
 
 ## Required secrets (cdp-portal)
@@ -164,6 +166,8 @@ flows so they appear under the service's owning team:
 
 - ECR repository (named after the service).
 - MongoDB database (`waste-regulator-case-management`).
+- SNS topic for analytics events, with publish permission for the service's
+  role.
 - CloudWatch log group + dashboard (created automatically once the service
   publishes ECS metrics).
 
@@ -176,6 +180,7 @@ the cdp-portal "Outbound proxy" form:
 - `sts.eu-west-2.amazonaws.com` — STS for IAM roles for service accounts.
 - `mongodb-*.eu-west-2.docdb.amazonaws.com` (CDP-managed MongoDB endpoint).
 - `api.notifications.service.gov.uk` — GOV.UK Notify (required when `NOTIFY_API_KEY` is set).
+- `sns.eu-west-2.amazonaws.com` — the analytics topic (required when analytics processing is enabled).
 - `sqs.eu-west-2.amazonaws.com` — only when SQS queues are added.
 
 ## Related

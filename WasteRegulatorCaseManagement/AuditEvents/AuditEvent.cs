@@ -31,4 +31,7 @@ public sealed record AuditEvent
     public BsonDocument? Before { get; init; }
     public BsonDocument? After { get; init; }
     public required string SchemaVersion { get; init; }
+
+    /// <summary>Outcome of publishing this event, keyed by the publishing process's name.</summary>
+    public Dictionary<string, AuditEventDispatch> Dispatches { get; init; } = [];
 }
