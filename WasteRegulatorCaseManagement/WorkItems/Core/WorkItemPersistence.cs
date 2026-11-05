@@ -180,25 +180,6 @@ public sealed class WorkItemPersistence
         _statusRank = WorkItemSort.StatusRank(registry);
     }
 
-    /// <summary>
-    /// Test-only convenience overload that derives the registry from the
-    /// shipping module set (currently re-accreditation). Production wiring
-    /// always uses the registry-injecting constructor above; this keeps the
-    /// many persistence-layer integration tests that predate it from having to
-    /// thread a registry through, while still exercising the real Status sort
-    /// ordering.
-    /// </summary>
-    [ExcludeFromCodeCoverage]
-    internal WorkItemPersistence(
-        IMongoDbClientFactory connectionFactory,
-        ILoggerFactory loggerFactory
-    )
-        : this(
-            connectionFactory,
-            loggerFactory,
-            new WorkItemRegistry([new ReAccreditation.ReAccreditationType()])
-        ) { }
-
     [ExcludeFromCodeCoverage]
     public async Task CreateAsync(WorkItem workItem, CancellationToken cancellationToken = default)
     {
@@ -530,13 +511,6 @@ public sealed class WorkItemPersistence
             clauses.Add(builder.Eq(w => w.SubmittedBy, submittedBy));
         }
 
-        if (query.Nations is { Count: > 0 } nations)
-        {
-            // Filter by payload.nation stored as a string in the BSON document
-            // (the Nation enum is serialised as its member name, e.g. "England").
-            clauses.Add(builder.In("payload.nation", nations));
-        }
-
         // RA-313: there is deliberately NO terminal-state exclusion here.
         //
         // RA-224 used to hide every terminal state (approved/rejected/withdrawn)
@@ -730,11 +704,6 @@ public sealed class WorkItemPersistence
                 builder.Descending(w => w.SubmittedAt)
             )
         );
-        // RA-125: nation-based routing filter; most useful when also
-        // filtering by state so both fields appear in the compound key.
-        var nationAndState = new CreateIndexModel<WorkItem>(
-            builder.Combine(builder.Ascending("payload.nation"), builder.Ascending(w => w.StateId))
-        );
         // Search by org name: text index supports word-level case-insensitive $text queries.
         // Only one text index is allowed per collection; scope it to organisationName.
         var orgNameText = new CreateIndexModel<WorkItem>(builder.Text("payload.organisationName"));
@@ -811,7 +780,6 @@ public sealed class WorkItemPersistence
             stateAndSubmitted,
             submittedDescending,
             assigneeAndSubmitted,
-            nationAndState,
             orgNameText,
             applicationReference,
             operatorApplicationId,

@@ -748,7 +748,7 @@ public class SlaEndpointsTests
                 services.AddSingleton<IWorkItemPersistence>(sp =>
                     new WorkItemPersistence(
                         _clientFactory,
-                        sp.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>()));
+                        sp.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>(),    sp.GetRequiredService<IWorkItemRegistry>()));
                 services.AddSingleton<IWorkItemType>(new TestWorkItemType(TypeId, "Test type"));
                 if (_timeProvider is not null)
                 {

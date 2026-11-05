@@ -40,7 +40,6 @@ public class OpenApiEndpointTests
     [InlineData("SubmitWorkItem")]
     [InlineData("AssignWorkItem")]
     [InlineData("AddWorkItemNote")]
-    [InlineData("RecordReAccreditationDecisionRationale")]
     public async Task Request_body_example_is_present_for_known_operation(string operationId)
     {
         // Drift guard for WorkItemOpenApiExampleTransformer: if an

@@ -1,6 +1,5 @@
 using WasteRegulatorCaseManagement.Test.TestSupport;
 using WasteRegulatorCaseManagement.WorkItems.Core;
-using WasteRegulatorCaseManagement.WorkItems.ReAccreditation.Endpoints;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
@@ -33,9 +32,7 @@ public class WorkItemRequestSizeLimitTests
     {
         new("SubmitWorkItem",                          WorkItemEndpoints.MaxSubmitBodyBytes)             { TestDisplayName = "Submit"                },
         new("AssignWorkItem",                          WorkItemEndpoints.MaxAssignBodyBytes)             { TestDisplayName = "Assign"                },
-        new("AddWorkItemNote",                         WorkItemEndpoints.MaxNoteBodyBytes)               { TestDisplayName = "AddNote"               },
-        new("RecordReAccreditationDecisionRationale",  ReAccreditationEndpoints.MaxRationaleBodyBytes)   { TestDisplayName = "RecordDecisionRationale" },
-        new("ResumeReAccreditationFromQuery",          ReAccreditationEndpoints.MaxResumeBodyBytes)      { TestDisplayName = "ResumeFromQuery"       }
+        new("AddWorkItemNote",                         WorkItemEndpoints.MaxNoteBodyBytes)               { TestDisplayName = "AddNote"               }
     };
 
     [Theory]
@@ -62,27 +59,11 @@ public class WorkItemRequestSizeLimitTests
     }
 
     /// <summary>
-    /// RA-696: a resubmit carries the same section data as the original
-    /// submit (plus a second copy of the overseas-site list in the BES
-    /// evidence section), so its limit can never be smaller than the submit
-    /// limit. At 64 KiB (against 1 MiB on submit), operators of larger
-    /// applications got a 413 and could not resubmit.
-    /// </summary>
-    [Fact]
-    public void Resume_from_query_accepts_at_least_as_much_as_submit()
-    {
-        Assert.True(
-            ReAccreditationEndpoints.MaxResumeBodyBytes >= WorkItemEndpoints.MaxSubmitBodyBytes,
-            "resume-from-query must accept any body that fits on submit");
-    }
-
-    /// <summary>
     /// Generic scan (epr-e5h): any endpoint registered anywhere in the
     /// service — framework or module — that calls <c>.DisableValidation()</c>
     /// MUST also carry an explicit <c>RequestSizeLimitAttribute</c>. This
     /// catches new module endpoints that copy the manual-parse pattern
-    /// from <see cref="ReAccreditationEndpoints"/> without copying the
-    /// size cap.
+    /// without copying the size cap.
     /// </summary>
     [Fact]
     public void Every_endpoint_that_disables_validation_has_a_request_size_limit()

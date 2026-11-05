@@ -1,7 +1,6 @@
 using System.Security.Claims;
 using System.Text.Json;
 using WasteRegulatorCaseManagement.WorkItems.Core;
-using WasteRegulatorCaseManagement.WorkItems.ReAccreditation;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 
@@ -125,7 +124,7 @@ public class WorkItemSlaDueDateTests
             .Returns(item);
         var service = new SlaService(
             persistence,
-            new WorkItemRegistry([new ReAccreditationType()]),
+            new WorkItemRegistry([]),
             NullLogger<SlaService>.Instance,
             new FixedTimeProvider(s_startedAt.AddDays(10)));
 
@@ -160,7 +159,7 @@ public class WorkItemSlaDueDateTests
             .Returns(item);
         var service = new SlaService(
             persistence,
-            new WorkItemRegistry([new ReAccreditationType()]),
+            new WorkItemRegistry([]),
             NullLogger<SlaService>.Instance,
             new FixedTimeProvider(s_startedAt.AddDays(60)));
 

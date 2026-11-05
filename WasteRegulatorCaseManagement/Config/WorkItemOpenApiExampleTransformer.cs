@@ -21,33 +21,16 @@ internal sealed class WorkItemOpenApiExampleTransformer : IOpenApiDocumentTransf
         {
             ["SubmitWorkItem"] = JsonNode.Parse("""
                 {
-                    "typeId": "re-accreditation",
-                    "payload": {
-                        "organisationName": "Acme Recycling Ltd",
-                        "registrationNumber": "12345678",
-                        "operatorRegistrationId": "reg-001",
-                        "material": "plastic",
-                        "previousAccreditationYear": 2023,
-                        "complianceIssuesReported": 0,
-                        "operatorEmail": "operator@acmerecycling.example.com"
-                    }
+                    "typeId": "example",
+                    "payload": {}
                 }
                 """),
-
-            ["LogReAccreditationDecision"] = JsonNode.Parse(
-                """{ "outcome": "approved" }"""),
 
             ["AssignWorkItem"] = JsonNode.Parse(
                 """{ "assigneeId": "caseworker-abc123", "assigneeName": "Jane Smith" }"""),
 
             ["AddWorkItemNote"] = JsonNode.Parse(
                 """{ "text": "Organisation details verified against Companies House. All directors confirmed active." }"""),
-
-            ["RecordReAccreditationDecisionRationale"] = JsonNode.Parse("""
-                {
-                    "rationale": "Assessment completed satisfactorily. Organisation demonstrates adequate technical and financial capacity for re-accreditation."
-                }
-                """),
         };
 
     public Task TransformAsync(

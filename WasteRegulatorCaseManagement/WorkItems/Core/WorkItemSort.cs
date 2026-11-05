@@ -121,12 +121,16 @@ internal static class WorkItemSort
                 { "case", new BsonDocument("$eq", new BsonArray { "$stateId", kv.Key }) },
                 { "then", kv.Value }
             }));
-        var addFields = new BsonDocument(RankField,
-            new BsonDocument("$switch", new BsonDocument
+        // $switch rejects an empty branches array, so with no registered
+        // states every item simply takes the unknown-state rank.
+        BsonValue rank = branches.Count == 0
+            ? UnknownStateRank
+            : new BsonDocument("$switch", new BsonDocument
             {
                 { "branches", branches },
                 { "default", UnknownStateRank }
-            }));
+            });
+        var addFields = new BsonDocument(RankField, rank);
         var sort = StableSort(RankField, dir);
         return (addFields, sort);
     }

@@ -36,7 +36,7 @@ public class WorkItemServiceTimestampTests
     {
         _databaseName = MongoIntegrationFixture.NewDatabaseName("svc_timestamps");
         _clientFactory = new TestMongoDbClientFactory(fixture.ConnectionString, _databaseName);
-        _persistence = new WorkItemPersistence(_clientFactory, NullLoggerFactory.Instance);
+        _persistence = new WorkItemPersistence(_clientFactory, NullLoggerFactory.Instance, new WorkItemRegistry([]));
     }
 
     public async ValueTask DisposeAsync() =>

@@ -10,9 +10,6 @@ using WasteRegulatorCaseManagement.Utils.Http;
 using WasteRegulatorCaseManagement.Utils.Logging;
 using WasteRegulatorCaseManagement.Utils.Mongo;
 using WasteRegulatorCaseManagement.WorkItems.Core;
-using WasteRegulatorCaseManagement.WorkItems.ReAccreditation;
-using WasteRegulatorCaseManagement.WorkItems.ReAccreditation.ReEx;
-using WasteRegulatorCaseManagement.WorkItems.ReAccreditation.ReEx.Http;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
@@ -36,15 +33,7 @@ static Task RunStartupMigrations(WebApplication app) =>
     StartupMigrationRunner.RunAsync(
         app.Services,
         app.Logger,
-        migrations:
-        [
-            // epr-2uxy: READ-ONLY diagnostic — writes nothing, and is a no-op
-            // unless Diagnostics:Ra292IsNewSiteAudit is set. Registered on this
-            // harness because CDP offers no way to run ad-hoc mongosh against a
-            // deployed database, and the open question is precisely whether a
-            // deployed environment retained affected data.
-            ("epr-2uxy-isnewsite-audit (read-only)", ReAccreditationIsNewSiteAudit.RunAsync),
-        ]
+        migrations: []
     );
 
 [ExcludeFromCodeCoverage]
@@ -150,7 +139,6 @@ static void ConfigureServices(WebApplicationBuilder builder)
     ConfigureMongo(services, configuration);
     ConfigureCors(services, configuration);
     ConfigureNotifications(services, configuration, builder.Environment);
-    ConfigureReEx(services, configuration);
     ConfigureOperatorBackendPush(services, configuration);
 
     services
@@ -201,34 +189,7 @@ static void ConfigureWorkItems(WebApplicationBuilder builder)
     // post-action hooks) so it lives next to the framework, not in a
     // module. RA-447/CM6: the old max-extension-days cap (SlaConfig) has
     // been removed entirely.
-    // RA-133: accreditation issuance config (current year drives the
-    // generated AccreditationId year segment and AccreditationStartDate).
-    services
-        .AddOptions<AccreditationConfig>()
-        .Bind(builder.Configuration.GetSection("Accreditation"));
-    // RA-291 (AC06): public operator-service base URL, surfaced in the
-    // Queried Notify email. Read from the flat OPERATOR_SERVICE_BASE_URL
-    // environment variable, matching NOTIFY_API_KEY's convention.
-    services
-        .AddOptions<OperatorServiceConfig>()
-        .Configure<IConfiguration>(
-            (options, configuration) =>
-                options.BaseUrl =
-                    configuration.GetValue<string>("OPERATOR_SERVICE_BASE_URL") ?? string.Empty
-        );
-    // RA-581: case management (management-fe) base URL, surfaced as the
-    // work_item_link Notify placeholder in every regulator-facing email.
-    // Read from the flat CASE_MANAGEMENT_BASE_URL environment variable,
-    // matching OPERATOR_SERVICE_BASE_URL's convention.
-    services
-        .AddOptions<CaseManagementConfig>()
-        .Configure<IConfiguration>(
-            (options, configuration) =>
-                options.BaseUrl =
-                    configuration.GetValue<string>("CASE_MANAGEMENT_BASE_URL") ?? string.Empty
-        );
     services.AddSingleton<ISlaService, SlaService>();
-    services.AddWorkItemModule<ReAccreditationModule>(builder.Configuration);
     services.AddHostedService<SlaBreachBackgroundService>();
     services.AddHostedService<ArchiveBackgroundService>();
 
@@ -470,60 +431,6 @@ static void ConfigureMongo(IServiceCollection services, IConfiguration configura
 }
 
 /// <summary>
-/// ReEx accreditation client wiring. When <c>REEX_API_BASIC_AUTH_USERNAME</c>
-/// is absent or empty the stub client is registered so the service still boots
-/// in local and CI environments without ReEx credentials. When set, the real
-/// HTTP client is registered with Basic Auth behind
-/// <see cref="IReExAccreditationClient"/> and routed through the corporate proxy.
-/// The Base URL is read from the <c>ReExApi:BaseUrl</c> config section (same
-/// section name as the operator backend for consistency).
-/// RA-000: with <c>TestOrganisations__Enabled</c> on as well, the real client
-/// is wrapped in <see cref="TestOrganisationReExAccreditationClient"/>, which
-/// answers <c>e2e-</c> organisations from the stub — real ReEx has never heard
-/// of them — and sends everything else to real ReEx.
-/// </summary>
-[ExcludeFromCodeCoverage]
-static void ConfigureReEx(IServiceCollection services, IConfiguration configuration)
-{
-    services.AddOptions<ReExAccreditationConfig>().Bind(configuration.GetSection("ReExApi"));
-
-    var username = configuration.GetValue<string>("REEX_API_BASIC_AUTH_USERNAME");
-
-    if (string.IsNullOrWhiteSpace(username))
-    {
-        services.AddSingleton<IReExAccreditationClient, StubReExAccreditationClient>();
-        return;
-    }
-
-    services.Configure<ReExAccreditationCredentials>(creds =>
-    {
-        creds.Username = username;
-        creds.Password =
-            configuration.GetValue<string>("REEX_API_BASIC_AUTH_PASSWORD") ?? string.Empty;
-    });
-    services.AddTransient<ReExBasicAuthHandler>();
-    services
-        .AddHttpClientWithProxy<HttpReExAccreditationClient, HttpReExAccreditationClient>()
-        .AddHttpMessageHandler<ReExBasicAuthHandler>();
-
-    if (!TestOrganisations.IsEnabled(configuration))
-    {
-        services.AddTransient<IReExAccreditationClient>(sp =>
-            sp.GetRequiredService<HttpReExAccreditationClient>()
-        );
-        return;
-    }
-
-    // Transient, like the typed HttpClient it wraps, so the composite never
-    // pins one HttpClient (and its handler) for the life of the process.
-    services.AddSingleton<StubReExAccreditationClient>();
-    services.AddTransient<IReExAccreditationClient>(sp => new TestOrganisationReExAccreditationClient(
-        sp.GetRequiredService<HttpReExAccreditationClient>(),
-        sp.GetRequiredService<StubReExAccreditationClient>()
-    ));
-}
-
-/// <summary>
 /// RA-311/MBE-1: outbound push-to-operator-backend wiring. Adapter selection
 /// is keyed off the explicit <c>OperatorBackendApi:Enabled</c> switch
 /// (defaulting to <c>false</c>), not off whether <c>Url</c> happens to be
@@ -535,8 +442,7 @@ static void ConfigureReEx(IServiceCollection services, IConfiguration configurat
 /// <see cref="OperatorBackendPushDisabledWarningHostedService"/>. When
 /// enabled, <see cref="OperatorBackendApiConfigValidator"/> fails startup if
 /// <c>Url</c>/<c>ClientId</c>/<c>SharedSecret</c> are incomplete, rather than
-/// letting every push fail silently at runtime. Mirrors
-/// <see cref="ConfigureReEx"/>'s stub/real selection.
+/// letting every push fail silently at runtime.
 /// </summary>
 [ExcludeFromCodeCoverage]
 static void ConfigureOperatorBackendPush(IServiceCollection services, IConfiguration configuration)

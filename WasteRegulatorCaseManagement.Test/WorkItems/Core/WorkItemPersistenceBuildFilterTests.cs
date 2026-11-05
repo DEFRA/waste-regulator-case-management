@@ -16,9 +16,6 @@ public class WorkItemPersistenceBuildFilterTests
     private static readonly string[] s_materialsPlastic = ["plastic"];
     private static readonly string[] s_materialsPlasticAndGlass = ["plastic", "glass"];
     private static readonly string[] s_materialsWithRegexMetacharacter = ["a.b"];
-    private static readonly string[] s_nationsEngland = ["England"];
-    private static readonly string[] s_nationsEnglandAndScotland = ["England", "Scotland"];
-    private static readonly string[] s_nationsWales = ["Wales"];
     private static readonly string[] s_stateIdsSubmitted = ["submitted"];
     private static readonly string[] s_stateIdsSubmittedAndInReview = ["submitted", "in-review"];
     private static readonly string[] s_stateIdsWithdrawnAndSubmitted = ["withdrawn", "submitted"];
@@ -237,53 +234,6 @@ public class WorkItemPersistenceBuildFilterTests
         Assert.Equal("bob", doc["submittedBy"].AsString);
     }
 
-    // ─────────────────────────────── Nations ────────────────────────────────
-
-    [Fact]
-    public void NationsRendersAsInClauseOnPayloadNation()
-    {
-        var doc = Render(new WorkItemQuery(Nations: s_nationsEnglandAndScotland));
-
-        var inArr = doc["payload.nation"]["$in"].AsBsonArray;
-        Assert.Equal(2, inArr.Count);
-        Assert.Contains("England", inArr.Select(v => v.AsString));
-        Assert.Contains("Scotland", inArr.Select(v => v.AsString));
-    }
-
-    [Fact]
-    public void SingleNationRendersAsInClause()
-    {
-        var doc = Render(new WorkItemQuery(Nations: s_nationsWales));
-
-        Assert.Equal("Wales", doc["payload.nation"]["$in"].AsBsonArray[0].AsString);
-    }
-
-    [Fact]
-    public void EmptyNationsIsIgnored()
-    {
-        var doc = Render(new WorkItemQuery(Nations: Array.Empty<string>()));
-
-        Assert.Equal(new BsonDocument(), doc);
-    }
-
-    [Fact]
-    public void NullNationsIsIgnored()
-    {
-        var doc = Render(new WorkItemQuery(Nations: null));
-
-        Assert.Equal(new BsonDocument(), doc);
-    }
-
-    [Fact]
-    public void NationsAndTypeIdsCombineCorrectly()
-    {
-        var doc = Render(new WorkItemQuery(
-            TypeIds: s_typeIdsReAccreditation,
-            Nations: s_nationsEngland));
-
-        Assert.Equal("re-accreditation", doc["typeId"]["$in"].AsBsonArray[0].AsString);
-        Assert.Equal("England", doc["payload.nation"]["$in"].AsBsonArray[0].AsString);
-    }
 
     // ──────────────────────────── OrgId / RegistrationId / OrgName ──────────────────────────────
 

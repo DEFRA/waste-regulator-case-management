@@ -1,7 +1,5 @@
 using WasteRegulatorCaseManagement.Notifications;
 using WasteRegulatorCaseManagement.Test.TestSupport;
-using WasteRegulatorCaseManagement.WorkItems.Core;
-using WasteRegulatorCaseManagement.WorkItems.ReAccreditation;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace WasteRegulatorCaseManagement.Test.Notifications;
@@ -17,14 +15,10 @@ internal static class NotifyTestConstants
 }
 
 /// <summary>
-/// RA-422: the central <c>Notify:Enabled</c> flag (default false) gates BOTH
-/// the outbound <see cref="INotifyClient"/> AND the re-accreditation
-/// notification post-action hook — the single hook that both sends Case Management service email
-/// and writes every <c>notification-*</c> audit entry. These tests pin the
-/// full wiring matrix (flag × API-key) for the registered client and for the
-/// presence of <see cref="ReAccreditationNotificationHook"/> in the
-/// <see cref="IWorkItemPostActionHook"/> fan-out, so disabling the flag can
-/// never leak an email or an audit entry.
+/// RA-422: the central <c>Notify:Enabled</c> flag (default false) gates the
+/// outbound <see cref="INotifyClient"/>. These tests pin the wiring matrix
+/// (flag × API-key) for the registered client, so disabling the flag can
+/// never leak an email.
 ///
 /// Config-key tests use UseSetting and are safe for parallel execution.
 /// Env-var tests mutate the process environment and are placed in the
@@ -38,11 +32,11 @@ public class NotifyApiKeyRegistrationTests
     public NotifyApiKeyRegistrationTests(MongoIntegrationFixture fixture) => _fixture = fixture;
 
     [Fact]
-    public void Default_flag_absent_registers_noop_client_and_omits_notification_hook()
+    public void Default_flag_absent_registers_noop_client()
     {
         // No Notify:Enabled override at all: the shipped appsettings default
         // (false) applies, so even a configured API key yields the no-op
-        // client and the notification hook is never registered.
+        // client.
         using var factory = new EphemeralMongoTestFactory(
             _fixture,
             "notify-default",
@@ -52,54 +46,31 @@ public class NotifyApiKeyRegistrationTests
             });
 
         Assert.IsType<NoOpNotifyClient>(factory.Services.GetRequiredService<INotifyClient>());
-        Assert.DoesNotContain(Hooks(factory), h => h is ReAccreditationNotificationHook);
     }
 
     [Fact]
-    public void Explicitly_disabled_registers_noop_client_and_omits_notification_hook()
+    public void Explicitly_disabled_registers_noop_client()
     {
         using var factory = NewFactory(NotifyTestConstants.FakeApiKey, enabled: false);
 
         Assert.IsType<NoOpNotifyClient>(factory.Services.GetRequiredService<INotifyClient>());
-        Assert.DoesNotContain(Hooks(factory), h => h is ReAccreditationNotificationHook);
     }
 
     [Fact]
-    public void Enabled_with_api_key_registers_govuk_client_and_notification_hook()
+    public void Enabled_with_api_key_registers_govuk_client()
     {
         using var factory = NewFactory(NotifyTestConstants.FakeApiKey, enabled: true);
 
         Assert.IsType<GovukNotifyClient>(factory.Services.GetRequiredService<INotifyClient>());
-        Assert.Contains(Hooks(factory), h => h is ReAccreditationNotificationHook);
     }
 
     [Fact]
-    public void Enabled_without_api_key_registers_noop_client_but_keeps_notification_hook()
+    public void Enabled_without_api_key_registers_noop_client()
     {
-        // Dev/e2e can still watch the audit trail with a NoOp send: whenever
-        // the flag is on the hook runs (and writes notification-* entries),
-        // regardless of whether a real API key is configured.
         using var factory = NewFactory(apiKey: null, enabled: true);
 
         Assert.IsType<NoOpNotifyClient>(factory.Services.GetRequiredService<INotifyClient>());
-        Assert.Contains(Hooks(factory), h => h is ReAccreditationNotificationHook);
     }
-
-    [Fact]
-    public void Non_notification_hooks_stay_registered_when_disabled()
-    {
-        // The gate is scoped to the notification hook alone: nation-routing,
-        // query-push and status-push are not email and stay registered.
-        using var factory = NewFactory(NotifyTestConstants.FakeApiKey, enabled: false);
-        var hooks = Hooks(factory);
-
-        Assert.Contains(hooks, h => h is ReAccreditationNationRoutingHook);
-        Assert.Contains(hooks, h => h is ReAccreditationQueryPushHook);
-        Assert.Contains(hooks, h => h is ReAccreditationStatusPushHook);
-    }
-
-    private static IReadOnlyList<IWorkItemPostActionHook> Hooks(EphemeralMongoTestFactory factory) =>
-        factory.Services.GetServices<IWorkItemPostActionHook>().ToList();
 
     // Always set NOTIFY_API_KEY and Notify:Enabled explicitly so an ambient
     // value in the test runner's environment cannot influence the outcome.

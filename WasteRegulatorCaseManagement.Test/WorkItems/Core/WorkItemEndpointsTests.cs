@@ -1922,8 +1922,8 @@ public class WorkItemEndpointsTests
                 services.AddSingleton<IWorkItemPersistence>(sp => new RecordingPersistence(
                     new WorkItemPersistence(
                         clientFactory,
-                        sp.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>()
-                    )
+                        sp.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>(),
+                        sp.GetRequiredService<IWorkItemRegistry>())
                 ));
                 services.AddSingleton<IWorkItemType>(
                     new TestWorkItemType(

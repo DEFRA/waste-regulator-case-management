@@ -1,12 +1,10 @@
 using WasteRegulatorCaseManagement.Test.TestSupport;
 using WasteRegulatorCaseManagement.Utils.Mongo;
 using WasteRegulatorCaseManagement.WorkItems.Core;
-using WasteRegulatorCaseManagement.WorkItems.ReAccreditation;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
-using MongoDB.Bson;
 
 namespace WasteRegulatorCaseManagement.Test.WorkItems.Core;
 
@@ -31,15 +29,14 @@ public sealed class WorkItemSeederHostedServiceIdempotencyTests
         _fixture = fixture;
         _databaseName = MongoIntegrationFixture.NewDatabaseName("work_items_seeder");
         _clientFactory = new TestMongoDbClientFactory(fixture.ConnectionString, _databaseName);
-        _persistence = new WorkItemPersistence(_clientFactory, NullLoggerFactory.Instance);
+        _persistence = new WorkItemPersistence(_clientFactory, NullLoggerFactory.Instance, new WorkItemRegistry([]));
 
-        var registry = new WorkItemRegistry(new IWorkItemType[] { new ReAccreditationType() });
+        var registry = new WorkItemRegistry([new TestWorkItemType(TestSeeder.SeedTypeId, "Seeded test type")]);
 
         _services = new ServiceCollection()
             .AddSingleton<IWorkItemPersistence>(_persistence)
             .AddSingleton<IWorkItemRegistry>(registry)
-            .AddSingleton<INationResolver, NationResolver>()
-            .AddSingleton<IWorkItemSeeder, ReAccreditationSeeder>()
+            .AddSingleton<IWorkItemSeeder, TestSeeder>()
             .BuildServiceProvider();
     }
 
@@ -75,7 +72,7 @@ public sealed class WorkItemSeederHostedServiceIdempotencyTests
                 ["WorkItems:SeedOnStartup"] = "true"
             })
             .Build();
-        var registry = new WorkItemRegistry(new IWorkItemType[] { new ReAccreditationType() });
+        var registry = new WorkItemRegistry([new TestWorkItemType(TestSeeder.SeedTypeId, "Seeded test type")]);
         var services = new ServiceCollection()
             .AddSingleton<IWorkItemPersistence>(_persistence)
             .AddSingleton<IWorkItemRegistry>(registry)
@@ -105,8 +102,7 @@ public sealed class WorkItemSeederHostedServiceIdempotencyTests
             })
             .Build();
         var services = new ServiceCollection()
-            .AddSingleton<INationResolver, NationResolver>()
-            .AddSingleton<IWorkItemSeeder, ReAccreditationSeeder>()
+            .AddSingleton<IWorkItemSeeder, TestSeeder>()
             // Deliberately no IWorkItemPersistence or IWorkItemRegistry registered.
             .BuildServiceProvider();
         var service = new WorkItemSeederHostedService(
@@ -141,41 +137,6 @@ public sealed class WorkItemSeederHostedServiceIdempotencyTests
             new WorkItemQuery { Page = 1, PageSize = 100 },
             TestContext.Current.CancellationToken);
         Assert.Equal(initialCount, afterSecond.TotalCount);
-    }
-
-    [Fact]
-    public async Task Reseeding_preserves_a_stored_sha1_reference_and_its_audit_history()
-    {
-        var time = new FakeTimeProvider(new DateTimeOffset(2026, 5, 1, 12, 0, 0, TimeSpan.Zero));
-        var seeds = new ReAccreditationSeeder(new NationResolver())
-            .Build(new ReAccreditationType(), time).ToList();
-        // Pin the original persisted UUID as well as the old reference so
-        // changing either hashing algorithm cannot silently re-key this item.
-        var id = new Guid("cc1a0c7f-0b02-5241-93d4-777d37ce10e9");
-        var legacy = seeds.Single(i => i.Id == id);
-        const string legacyReference = "RA-706111075";
-        Assert.NotEqual(legacyReference, legacy.Payload["applicationReference"].AsString);
-        legacy.Payload["applicationReference"] = legacyReference;
-        var submission = Assert.Single(legacy.AuditLog, e => e.Action == "work-item-submitted");
-        submission.Details["applicationReference"] = legacyReference;
-        await _persistence.CreateAsync(legacy, TestContext.Current.CancellationToken);
-        var before = await _persistence.GetByIdAsync(id, TestContext.Current.CancellationToken);
-        Assert.NotNull(before);
-
-        await BuildHostedService().StartAsync(TestContext.Current.CancellationToken);
-        await BuildHostedService().StartAsync(TestContext.Current.CancellationToken);
-
-        var after = await _persistence.GetByIdAsync(id, TestContext.Current.CancellationToken);
-        Assert.NotNull(after);
-        Assert.Equal(before.ToBsonDocument(), after.ToBsonDocument());
-        var page = await _persistence.QueryAsync(
-            new WorkItemQuery { Page = 1, PageSize = 100 },
-            TestContext.Current.CancellationToken);
-        Assert.Equal(seeds.Count, page.TotalCount);
-        var newSeed = seeds.First(i => i.Id != id);
-        var inserted = await _persistence.GetByIdAsync(newSeed.Id, TestContext.Current.CancellationToken);
-        Assert.NotNull(inserted);
-        Assert.Equal(newSeed.Payload["applicationReference"], inserted.Payload["applicationReference"]);
     }
 
     [Fact]
@@ -229,13 +190,12 @@ public sealed class WorkItemSeederHostedServiceIdempotencyTests
         var clientFactory = new TestMongoDbClientFactory(_fixture.ConnectionString, dbName);
         try
         {
-            var persistence = new WorkItemPersistence(clientFactory, NullLoggerFactory.Instance);
-            var registry = new WorkItemRegistry(new IWorkItemType[] { new ReAccreditationType() });
+            var persistence = new WorkItemPersistence(clientFactory, NullLoggerFactory.Instance, new WorkItemRegistry([]));
+            var registry = new WorkItemRegistry([new TestWorkItemType(TestSeeder.SeedTypeId, "Seeded test type")]);
             var services = new ServiceCollection()
                 .AddSingleton<IWorkItemPersistence>(persistence)
                 .AddSingleton<IWorkItemRegistry>(registry)
-                .AddSingleton<INationResolver, NationResolver>()
-                .AddSingleton<IWorkItemSeeder, ReAccreditationSeeder>()
+                .AddSingleton<IWorkItemSeeder, TestSeeder>()
                 .BuildServiceProvider();
             var config = new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string?>
@@ -256,5 +216,22 @@ public sealed class WorkItemSeederHostedServiceIdempotencyTests
         {
             await clientFactory.GetClient().DropDatabaseAsync(dbName);
         }
+    }
+
+    private sealed class TestSeeder : IWorkItemSeeder
+    {
+        public const string SeedTypeId = "seeded-test";
+
+        public string TypeId => SeedTypeId;
+
+        public IEnumerable<WorkItem> Build(IWorkItemType type, TimeProvider time) =>
+            new[] { "first", "second", "third" }.Select(seedKey => new WorkItem
+            {
+                Id = WorkItemSeed.DeterministicId(type.TypeId, seedKey),
+                TypeId = type.TypeId,
+                StateId = type.InitialState.Id,
+                SubmittedAt = time.GetUtcNow().UtcDateTime,
+                LastModifiedAt = time.GetUtcNow().UtcDateTime,
+            });
     }
 }

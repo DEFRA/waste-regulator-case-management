@@ -146,7 +146,7 @@ public class WorkItemAvailableActionsWireContractTests
                     _fixture.ConnectionString, _databaseName);
                 services.AddSingleton<IMongoDbClientFactory>(clientFactory);
                 services.AddSingleton<IWorkItemPersistence>(sp =>
-                    new WorkItemPersistence(clientFactory, sp.GetRequiredService<ILoggerFactory>()));
+                    new WorkItemPersistence(clientFactory, sp.GetRequiredService<ILoggerFactory>(), sp.GetRequiredService<IWorkItemRegistry>()));
 
                 // Mirrors the re-accreditation shape that produced the bug:
                 // several non-invocable transitions sharing a FromStateId and

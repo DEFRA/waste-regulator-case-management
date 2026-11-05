@@ -1,18 +1,16 @@
 using WasteRegulatorCaseManagement.Utils.Mongo;
 using WasteRegulatorCaseManagement.WorkItems.Core;
-using WasteRegulatorCaseManagement.WorkItems.ReAccreditation.Models;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 
 namespace WasteRegulatorCaseManagement.Test.Utils.Mongo;
 
 /// <summary>
-/// RA-176 regression: <see cref="System.DateOnly"/> values (notably the
-/// issued <c>AccreditationStartDate</c>) must serialise as a plain ISO date
-/// string so the payload JSON returned to the BFF contains
-/// <c>"accreditationStartDate": "2027-01-01"</c> rather than the driver's
-/// default extended-JSON object <c>{"$date": ...}</c>, which the frontend
-/// rendered as the literal "[object Object]".
+/// RA-176 regression: <see cref="System.DateOnly"/> values must serialise as a
+/// plain ISO date string so payload JSON returned to the frontend contains
+/// <c>"startDate": "2027-01-01"</c> rather than the driver's default
+/// extended-JSON object <c>{"$date": ...}</c>, which a frontend renders as the
+/// literal "[object Object]".
 /// </summary>
 public class MongoConventionsDateOnlyTests
 {
@@ -21,29 +19,21 @@ public class MongoConventionsDateOnlyTests
     [Fact]
     public void DateOnly_payload_field_serialises_as_iso_string_in_relaxed_json()
     {
-        var payload = new ReAccreditationPayload
-        {
-            AccreditationId = "ACC-2027-P-AB12CD34",
-            AccreditationStartDate = new DateOnly(2027, 1, 1),
-            AccreditationYear = 2027
-        };
+        var payload = new DatedPayload { StartDate = new DateOnly(2027, 1, 1) };
 
         var json = WorkItemPayloadConverter.ToJson(payload.ToBsonDocument());
 
         Assert.Equal(
             "2027-01-01",
-            json.GetProperty("accreditationStartDate").GetString());
+            json.GetProperty("startDate").GetString());
     }
 
     [Fact]
     public void DateOnly_serialises_to_a_bson_string_not_a_datetime()
     {
-        var payload = new ReAccreditationPayload
-        {
-            AccreditationStartDate = new DateOnly(2027, 1, 1)
-        };
+        var payload = new DatedPayload { StartDate = new DateOnly(2027, 1, 1) };
 
-        var element = payload.ToBsonDocument()["accreditationStartDate"];
+        var element = payload.ToBsonDocument()["startDate"];
 
         Assert.Equal(BsonType.String, element.BsonType);
         Assert.Equal("2027-01-01", element.AsString);
@@ -52,32 +42,34 @@ public class MongoConventionsDateOnlyTests
     [Fact]
     public void DateOnly_round_trips_from_iso_string()
     {
-        var payload = new ReAccreditationPayload
-        {
-            AccreditationStartDate = new DateOnly(2027, 1, 1)
-        };
+        var payload = new DatedPayload { StartDate = new DateOnly(2027, 1, 1) };
 
-        var roundTripped = BsonSerializer.Deserialize<ReAccreditationPayload>(
+        var roundTripped = BsonSerializer.Deserialize<DatedPayload>(
             payload.ToBsonDocument());
 
-        Assert.Equal(new DateOnly(2027, 1, 1), roundTripped.AccreditationStartDate);
+        Assert.Equal(new DateOnly(2027, 1, 1), roundTripped.StartDate);
     }
 
     [Fact]
     public void DateOnly_still_reads_legacy_bson_datetime_documents()
     {
-        // Documents written before RA-176 stored the start date as a BSON
-        // DateTime. The string-representation serializer must remain
-        // backward-compatible and read those values back as DateOnly.
+        // Documents written before RA-176 stored dates as a BSON DateTime.
+        // The string-representation serializer must remain backward-compatible
+        // and read those values back as DateOnly.
         var legacy = new BsonDocument
         {
-            ["accreditationStartDate"] =
+            ["startDate"] =
                 new DateTime(2025, 2, 3, 0, 0, 0, DateTimeKind.Utc)
         };
 
         var roundTripped =
-            BsonSerializer.Deserialize<ReAccreditationPayload>(legacy);
+            BsonSerializer.Deserialize<DatedPayload>(legacy);
 
-        Assert.Equal(new DateOnly(2025, 2, 3), roundTripped.AccreditationStartDate);
+        Assert.Equal(new DateOnly(2025, 2, 3), roundTripped.StartDate);
+    }
+
+    private sealed class DatedPayload
+    {
+        public DateOnly StartDate { get; set; }
     }
 }

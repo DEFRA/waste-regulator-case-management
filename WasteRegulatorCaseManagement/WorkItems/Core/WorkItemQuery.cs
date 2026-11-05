@@ -36,12 +36,6 @@ namespace WasteRegulatorCaseManagement.WorkItems.Core;
 /// is enforced by the frontend, not this filter — the backend applies
 /// whatever scope the request asks for. Empty/null means "any submitter".
 /// </param>
-/// <param name="Nations">
-/// Restrict to items whose <c>payload.nation</c> is in this set.
-/// Empty/null means "any nation". Values are the string names of the
-/// <see cref="WasteRegulatorCaseManagement.WorkItems.ReAccreditation.Models.Nation"/>
-/// enum members (e.g. <c>England</c>, <c>NorthernIreland</c>).
-/// </param>
 /// <param name="WasteProcessingTypes">
 /// Restrict to items by applicant type. Empty/null means "any type".
 /// A collection containing <c>exporter</c> (case-insensitive) restricts to
@@ -71,7 +65,6 @@ public sealed record WorkItemQuery(
     int Page = 1,
     int PageSize = 20,
     string? SubmittedBy = null,
-    IReadOnlyCollection<string>? Nations = null,
     IReadOnlyCollection<string>? WasteProcessingTypes = null,
     bool IncludeArchived = false,
     string? OrgId = null,

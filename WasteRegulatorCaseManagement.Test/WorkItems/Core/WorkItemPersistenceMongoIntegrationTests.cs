@@ -85,7 +85,19 @@ public sealed class WorkItemPersistenceMongoIntegrationTests : IAsyncDisposable,
         // not leak into another.
         _databaseName = MongoIntegrationFixture.NewDatabaseName("work_items");
         _clientFactory = new TestMongoDbClientFactory(fixture.ConnectionString, _databaseName);
-        _persistence = new WorkItemPersistence(_clientFactory, NullLoggerFactory.Instance);
+        _persistence = new WorkItemPersistence(
+            _clientFactory,
+            NullLoggerFactory.Instance,
+            new WorkItemRegistry([
+                new TestWorkItemType(
+                    "test",
+                    "Test type",
+                    states: s_expectedStatusRankAscending
+                        .Select(id => new WorkItemState(id, id))
+                        .ToArray()
+                ),
+            ])
+        );
     }
 
     /// <summary>
@@ -143,7 +155,7 @@ public sealed class WorkItemPersistenceMongoIntegrationTests : IAsyncDisposable,
     }
 
     [Fact]
-    public async Task DefineIndexes_creates_the_nine_documented_indexes_on_startup()
+    public async Task DefineIndexes_creates_the_eight_documented_indexes_on_startup()
     {
         // Constructor of WorkItemPersistence calls EnsureIndexes; we
         // assert what the driver actually wrote (not what we asked for)
@@ -160,7 +172,7 @@ public sealed class WorkItemPersistenceMongoIntegrationTests : IAsyncDisposable,
             .OrderBy(s => s, StringComparer.Ordinal)
             .ToList();
 
-        Assert.Equal(9, keyDocs.Count);
+        Assert.Equal(8, keyDocs.Count);
         Assert.Contains(
             keyDocs,
             k => k.Contains("\"typeId\" : 1") && k.Contains("\"submittedAt\" : -1")
@@ -180,11 +192,6 @@ public sealed class WorkItemPersistenceMongoIntegrationTests : IAsyncDisposable,
                 && !k.Contains("typeId")
                 && !k.Contains("stateId")
                 && !k.Contains("assignedToId")
-        );
-        // RA-125: nation + stateId compound index for fast nation-filtered worklist queries.
-        Assert.Contains(
-            keyDocs,
-            k => k.Contains("\"payload.nation\" : 1") && k.Contains("\"stateId\" : 1")
         );
         // Text index for org name search — the key doc always contains "_fts":"text".
         Assert.Contains(keyDocs, k => k.Contains("\"_fts\" : \"text\""));
@@ -258,7 +265,7 @@ public sealed class WorkItemPersistenceMongoIntegrationTests : IAsyncDisposable,
             // Before the fix this threw MongoCommandException (code 85); now it
             // must complete cleanly.
             var ex = Record.Exception(() =>
-                new WorkItemPersistence(factory, NullLoggerFactory.Instance)
+                new WorkItemPersistence(factory, NullLoggerFactory.Instance, new WorkItemRegistry([]))
             );
             Assert.Null(ex);
 
@@ -288,9 +295,9 @@ public sealed class WorkItemPersistenceMongoIntegrationTests : IAsyncDisposable,
         var factory = new TestMongoDbClientFactory(_fixture.ConnectionString, freshDb);
         try
         {
-            _ = new WorkItemPersistence(factory, NullLoggerFactory.Instance);
+            _ = new WorkItemPersistence(factory, NullLoggerFactory.Instance, new WorkItemRegistry([]));
             var ex = Record.Exception(() =>
-                new WorkItemPersistence(factory, NullLoggerFactory.Instance)
+                new WorkItemPersistence(factory, NullLoggerFactory.Instance, new WorkItemRegistry([]))
             );
             Assert.Null(ex);
 
@@ -532,6 +539,22 @@ public sealed class WorkItemPersistenceMongoIntegrationTests : IAsyncDisposable,
         // Descending workflow rank: queried(4), assessment-in-progress(2), then
         // the two submitted(0) items broken newest-first by the tiebreak.
         Assert.Equal(s_expectedStatusRankDescending, OrgOrder(page));
+    }
+
+    [Fact]
+    public async Task QueryAsync_sort_status_succeeds_when_no_work_item_types_are_registered()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var persistence = new WorkItemPersistence(
+            _clientFactory,
+            NullLoggerFactory.Instance,
+            new WorkItemRegistry([])
+        );
+        await SeedAsync("only", stateId: "submitted");
+
+        var page = await persistence.QueryAsync(new WorkItemQuery(Sort: "status"), ct);
+
+        Assert.Equal("only", Assert.Single(page.Items).Payload["organisationName"].AsString);
     }
 
     [Fact]
@@ -1137,67 +1160,6 @@ public sealed class WorkItemPersistenceMongoIntegrationTests : IAsyncDisposable,
     }
 
     // ------------------------- RA-551 payload.nation representation -------------------------
-
-    /// <summary>
-    /// RA-551: real-Mongo round trip proving payload.nation, stored as a string,
-    /// survives a create/get cycle as a string for every Nation value — the
-    /// representation the string-based nation filter below depends on.
-    /// </summary>
-    [Theory]
-    [InlineData("England")]
-    [InlineData("Scotland")]
-    [InlineData("Wales")]
-    [InlineData("NorthernIreland")]
-    public async Task Nation_round_trips_as_a_bson_string_through_real_mongo(string nation)
-    {
-        var ct = TestContext.Current.CancellationToken;
-        var now = _time.GetUtcNow().UtcDateTime;
-        var workItem = new WorkItem
-        {
-            TypeId = "re-accreditation",
-            StateId = "submitted",
-            SubmittedAt = now,
-            LastModifiedAt = now,
-            Payload = new BsonDocument
-            {
-                ["organisationName"] = "Acme Ltd",
-                ["nation"] = nation,
-            },
-        };
-
-        await _persistence.CreateAsync(workItem, ct);
-
-        var fetched = await _persistence.GetByIdAsync(workItem.Id, ct);
-        Assert.NotNull(fetched);
-        Assert.Equal(BsonType.String, fetched!.Payload["nation"].BsonType);
-        Assert.Equal(nation, fetched.Payload["nation"].AsString);
-    }
-
-    /// <summary>
-    /// RA-551: proves the string-based {"payload.nation": {"$in": [...]}} filter
-    /// (WorkItemPersistence.BuildFilter) actually matches items whose nation is
-    /// stored as a string — the exact query shape that silently returned zero
-    /// results once payload.nation was corrupted to an int by the missing
-    /// BsonRepresentation(String) on ReAccreditationPayload.Nation.
-    /// </summary>
-    [Fact]
-    public async Task QueryAsync_nation_filter_matches_items_with_string_nation()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        await SeedWithNationAsync("England Co", "England");
-        await SeedWithNationAsync("Scotland Co", "Scotland");
-        await SeedWithNationAsync("Wales Co", "Wales");
-
-        var page = await _persistence.QueryAsync(
-            new WorkItemQuery(Nations: ["Scotland", "Wales"], Sort: "organisation"),
-            ct
-        );
-
-        Assert.Equal(
-            new[] { "Scotland Co", "Wales Co" },
-            page.Items.Select(i => i.Payload["organisationName"].AsString).ToArray()
-        );
-    }
 
     private async Task SeedWithNationAsync(string organisationName, string nation)
     {

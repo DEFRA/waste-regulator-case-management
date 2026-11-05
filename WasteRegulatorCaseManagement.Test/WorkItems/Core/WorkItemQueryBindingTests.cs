@@ -12,15 +12,12 @@ public class WorkItemQueryBindingTests
 {
     private static readonly string[] s_expectedSingleMaterial = ["plastic"];
     private static readonly string[] s_expectedSingleWasteProcessingType = ["exporter"];
-    private static readonly string[] s_expectedValidNations = ["England", "Wales"];
     private static readonly string[] s_materialsPlasticGlassAndPaper =
     [
         "plastic",
         "glass",
         "paper",
     ];
-    private static readonly string[] s_nationsEnglandAndScotland = ["England", "Scotland"];
-    private static readonly string[] s_nationsWithAnInvalidValue = ["England", "Atlantis", "wales"];
     private static readonly string[] s_wasteProcessingTypesExporterAndReprocessor =
     [
         "exporter",
@@ -103,73 +100,6 @@ public class WorkItemQueryBindingTests
         Assert.Null(query.SubmittedBy);
     }
 
-    // ─────────────────────────────── Nations ────────────────────────────────
-
-    [Fact]
-    public void SingleNationIsBound()
-    {
-        var query = WorkItemQueryBinding.FromQueryString(Q(("nation", "England")));
-
-        Assert.NotNull(query.Nations);
-        Assert.Contains("England", query.Nations!);
-    }
-
-    [Fact]
-    public void MultipleNationValuesAreBound()
-    {
-        var dict = new Dictionary<string, Microsoft.Extensions.Primitives.StringValues>(
-            StringComparer.OrdinalIgnoreCase)
-        {
-            ["nation"] = new Microsoft.Extensions.Primitives.StringValues(s_nationsEnglandAndScotland)
-        };
-        var query = WorkItemQueryBinding.FromQueryString(new QueryCollection(dict));
-
-        Assert.NotNull(query.Nations);
-        Assert.Contains("England", query.Nations!);
-        Assert.Contains("Scotland", query.Nations!);
-    }
-
-    [Fact]
-    public void EmptyQueryProducesNullNations()
-    {
-        var query = WorkItemQueryBinding.FromQueryString(new QueryCollection());
-
-        Assert.Null(query.Nations);
-    }
-
-    [Theory]
-    [InlineData("england", "England")]
-    [InlineData("ENGLAND", "England")]
-    [InlineData("northernireland", "NorthernIreland")]
-    public void NationValuesAreNormalisedToCanonicalEnumName(string input, string expected)
-    {
-        var query = WorkItemQueryBinding.FromQueryString(Q(("nation", input)));
-
-        Assert.NotNull(query.Nations);
-        Assert.Contains(expected, query.Nations!);
-    }
-
-    [Fact]
-    public void UnknownNationValueIsDropped()
-    {
-        var query = WorkItemQueryBinding.FromQueryString(Q(("nation", "Atlantis")));
-
-        Assert.Null(query.Nations);
-    }
-
-    [Fact]
-    public void MixedValidAndInvalidNationsKeepsOnlyValid()
-    {
-        var dict = new Dictionary<string, Microsoft.Extensions.Primitives.StringValues>(
-            StringComparer.OrdinalIgnoreCase)
-        {
-            ["nation"] = new Microsoft.Extensions.Primitives.StringValues(s_nationsWithAnInvalidValue)
-        };
-        var query = WorkItemQueryBinding.FromQueryString(new QueryCollection(dict));
-
-        Assert.NotNull(query.Nations);
-        Assert.Equal(s_expectedValidNations.OrderBy(n => n), query.Nations!.OrderBy(n => n));
-    }
 
     // ──────────────────────────── IncludeArchived ────────────────────────────
 

@@ -2,7 +2,6 @@ using System.Security.Claims;
 using System.Xml;
 using MongoDB.Bson;
 using WasteRegulatorCaseManagement.WorkItems.Core;
-using WasteRegulatorCaseManagement.WorkItems.ReAccreditation;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
@@ -23,10 +22,10 @@ public class SlaServiceTests
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    // The real registry the host builds: SlaService resolves an item's template
-    // through it (WorkItemEngineRules.ResolveTemplate). The items here are of
-    // type "test", which it does not know, so no extend moves them.
-    private static WorkItemRegistry Registry() => new([new ReAccreditationType()]);
+    // SlaService resolves an item's template through the registry
+    // (WorkItemEngineRules.ResolveTemplate). The items here are of type
+    // "test", which it does not know, so no extend moves them.
+    private static WorkItemRegistry Registry() => new([]);
 
     private SlaService BuildService(TimeProvider? timeProvider = null) =>
         new(

@@ -29,7 +29,7 @@ public class WorkItemAuditAppenderTests
     {
         _databaseName = MongoIntegrationFixture.NewDatabaseName("audit-appender");
         _clientFactory = new TestMongoDbClientFactory(fixture.ConnectionString, _databaseName);
-        _persistence = new WorkItemPersistence(_clientFactory, NullLoggerFactory.Instance);
+        _persistence = new WorkItemPersistence(_clientFactory, NullLoggerFactory.Instance, new WorkItemRegistry([]));
     }
 
     public async ValueTask DisposeAsync() =>

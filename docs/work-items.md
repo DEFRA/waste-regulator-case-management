@@ -1,7 +1,7 @@
 # Work item framework (backend)
 
-The case management system manages **work items**. Re-accreditation is one
-type, but the design must accommodate other types in future without rewrites.
+The case management system manages **work items**. The design must
+accommodate multiple types without rewrites.
 This document describes the framework that makes adding a new work item type
 a localised change to a new module.
 
@@ -123,27 +123,7 @@ That is the complete list of changes required outside the new module folder.
   intermediate transitions `CallerInvocable: false` so that is the only
   route, and accept every intermediate state as a valid entry state so a
   failure part-way through is finished by replaying the same request rather
-  than needing a rescue path. RA-410's
-  `POST /work-items/re-accreditation/{id}/decision` is the reference case: it
-  carries an application from `assessment-in-progress` (or, since the RA-527
-  follow-up, a started case still in `assessment-started`) through
-  `awaiting-decision` to its determination in one call (RA-527: it now lands
-  in the non-terminal `approved-pending-contact` or `rejected-pending-contact`
-  and pushes nothing), because two calls left a window in which an
-  application stranded in `awaiting-decision` had no call to action to
-  discharge it. Step 1 of an approval stamps only the accreditation number;
-  the same outcome replays (200, no change) on its pending state and on its
-  own final state, as on `main`, and the other outcome is a 409. RA-527's
-  `POST /work-items/re-accreditation/{id}/confirm-contact` (step 2) then
-  applies the outcome, doing what the old single-step approve or refuse did.
-  Every check that could refuse the write (including payload readability)
-  runs first; then it pushes `approved` or `rejected` to the operator journey
-  (on failure nothing is applied; only `status-push-failed` is recorded),
-  then one write moves the item to its terminal state with "Applicant
-  contacted" audited. An approval also stops the SLA clock, stamps the
-  accreditation start date and year, queues publishing and sends the Decision
-  email. A refusal leaves the SLA clock running, as `main` did, and sends no
-  email (RA-211).
+  than needing a rescue path.
 
 ## Template versioning (RA-94)
 
@@ -448,13 +428,7 @@ So, when changing seed data:
   first. Without the `-v` the volume survives and you test the old fixture.
 
 This is deliberate, not a defect: seeds that silently mutated under a running
-environment would be far worse than seeds that only ever appear. The
-`ReAccreditationSeeder` RA-292 fixture is the worked example — it got its own
-`seedKey` rather than enriching `full-payload-verification` precisely so it
-would reach already-seeded environments. RA-434's `additional-information-exporter`
-fixture is the same pattern applied a second time: it needed its own new
-`seedKey` because it exercises a shape (`wasteProcessingType: "exporter"`
-with no `siteAddress`) that no existing fixture covers.
+environment would be far worse than seeds that only ever appear.
 
 ### End-to-end test fixtures (RA-000): reset, not insert
 
@@ -473,34 +447,4 @@ a legacy template snapshot.
 seeder (Development + `WorkItems:SeedOnStartup`, the compose stack) and, on
 its own, wherever `TestOrganisations__Enabled` is on (CDP test). The demo set
 never runs outside Development, and prod can reach neither: startup refuses
-`TestOrganisations__Enabled` there. The re-accreditation fixtures are in
-`ReAccreditationTestOrganisationFixtures`.
-
-## Example: re-accreditation module (RA-98)
-
-Reference implementation that demonstrates the framework's "one folder + one
-registration line" promise. All files live under
-`WasteRegulatorCaseManagement/WorkItems/ReAccreditation/`:
-
-| File | Role |
-| --- | --- |
-| `ReAccreditationType.cs` | Declares the states (`submitted`, `duly-made`, `assessment-started` (RA-527 follow-up: started, still displayed "Duly made"), `assessment-in-progress`, `awaiting-decision`, `queried`, `updated`, `approved-pending-contact` / `rejected-pending-contact` (RA-527: determined, applicant not yet contacted), terminal `approved` / `rejected` / `withdrawn`) and the transitions between them. `duly-make`, `submit-for-decision`, `make-determination-approved` / `-rejected`, `confirm-contact-approved` / `-rejected`, `resume-during-*`, `continue-review-during-*` and the moving `sla-extend` (below) are declared `CallerInvocable: false` — each is reachable only through the module service that resolves it server-side. Template version v18 (RA-527 follow-up): `start-assessment` targets `duly-made` → `assessment-started`, the only transition into that state, so starting a case keeps it "Duly made" on both sides. Its four exits reuse existing action ids with a second from-state: `submit-for-decision` → `awaiting-decision` (a second declaration, reached only through `/decision`), `query-during-assessment` → `queried`, `withdraw-during-assessment` → `withdrawn`, and `sla-extend` → `assessment-in-progress` — a real move, unlike the `assessment-in-progress` and `queried` self-loops, which `SlaService` applies in the same write as the deadline change (resolving the template via `WorkItemEngineRules.ResolveTemplate`), so the case becomes "Updated". Only the deadline change (`POST /work-items/{id}/sla/extend`) applies that move: `POST /work-items/{id}/sla/override` (no Case Management UI or caller since RA-572) only rewrites the clock, never changes state and never pushes, so an override on a started case leaves it "Duly made". Deliberately left so while override is retired; if it is ever reinstated, it should apply the same move. |
-| `ReAccreditationStatusPushHook.cs` | Pushes each applied transition's target state to the operator journey, except a *move* (self-loops are never excluded) onto `queried`, `withdrawn`, either pending-contact state or (RA-527 follow-up) `assessment-started`, plus the decision actions whose push is owned by the confirm-contact service. A start therefore pushes nothing and writes no `status-push-*` entry, so the operator stays DulyMade; a deadline change from `assessment-started` pushes `assessment-in-progress` (Updated). |
-| `ReAccreditationAssessmentStartedSnapshotMigration.cs` | v18 snapshot migration, registered last of the snapshot migrations so it sets the final version. Adds `assessment-started` (after `duly-made`) to every re-accreditation case's frozen snapshot, retargets `start-assessment` and adds the four exits. Writes only `TemplateSnapshot` and `TemplateVersion` — it never moves a case, so a case already in `assessment-in-progress` stays "Updated" — and skips an item whose snapshot already matches. |
-| `Models/ReAccreditationPayload.cs` | Module's interpretation of the free-form `WorkItem.Payload` (organisation name, registration number, materials handled, previous accreditation year, compliance issues reported). |
-| `IReAccreditationDecisionService.cs` / `ReAccreditationDecisionService.cs` | Module-scoped service object showing where type-specific business logic lives. Pure recommendation function (`approve` / `reject` / `more-info-needed`) over the payload. |
-| `Endpoints/ReAccreditationEndpoints.cs` | Module-namespaced endpoint at `GET /work-items/re-accreditation/{id}/recommendation` — fetches the work item, deserialises the payload via `WorkItemPayloadConverter`, calls the decision service and returns `{ recommendation, rationale }`. |
-| `IReAccreditationChangePaymentDateService.cs` / `ReAccreditationChangePaymentDateService.cs` / `ReAccreditationChangePaymentDateValidator.cs` | RA-576: `POST /work-items/re-accreditation/{id}/change-payment-date` with body `{ paymentDate, reason }` corrects the payment date entered at duly making. One `ReplaceAsync` edits `payload.paymentDate` and appends an `action-applied` audit entry (`actionId=change-payment-date`, `previousPaymentDate`, `paymentDate`, `reason`). `StateId` and `SlaClock` are not changed and no hooks run, so status and "Due on" stay as they were. Allowed in any non-terminal state (repeat edits included); terminal items and items with no payment date get 409. 400 codes: the duly-making `payment-date-*` codes (`field: paymentDate`) plus `payment-date-reason-required` / `payment-date-reason-too-long` (`field: reason`, max 200 words). |
-| `ReAccreditationModule.cs` | Glue: exposes the type, registers the decision service in DI, mounts the endpoints. |
-
-Wired into the application by a single line in `Program.cs.ConfigureWorkItems`:
-
-```csharp
-services.AddWorkItemModule<ReAccreditationModule>();
-```
-
-The workflow diagram these states and transitions follow is referenced in
-RA-85. The module inherits the
-framework's audit log automatically — see `ReAccreditationLifecycleTests` for
-a happy-path walk from `submitted` → `approved` that asserts every step is
-captured.
+`TestOrganisations__Enabled` there.

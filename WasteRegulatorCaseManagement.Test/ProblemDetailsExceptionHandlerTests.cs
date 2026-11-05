@@ -67,7 +67,7 @@ public class ProblemDetailsExceptionHandlerTests
                 services.RemoveAll<IWorkItemPersistence>();
                 var clientFactory = new TestMongoDbClientFactory(
                     fixture.ConnectionString, _databaseName);
-                var real = new WorkItemPersistence(clientFactory, NullLoggerFactory.Instance);
+                var real = new WorkItemPersistence(clientFactory, NullLoggerFactory.Instance, new WorkItemRegistry([]));
                 services.AddSingleton<IWorkItemPersistence>(new ThrowingOnQueryPersistence(real));
             });
         }

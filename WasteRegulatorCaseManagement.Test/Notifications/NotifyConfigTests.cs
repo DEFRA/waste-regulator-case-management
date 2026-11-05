@@ -1,8 +1,5 @@
 using WasteRegulatorCaseManagement.Notifications;
-using WasteRegulatorCaseManagement.WorkItems.ReAccreditation;
-using WasteRegulatorCaseManagement.WorkItems.ReAccreditation.Models;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Options;
 
 namespace WasteRegulatorCaseManagement.Test.Notifications;
 
@@ -129,17 +126,16 @@ public class NotifyConfigTests
 
         var notifyConfig = new NotifyConfig();
         config.GetSection("Notify").Bind(notifyConfig);
-        var resolver = new RegulatorMailboxResolver(Options.Create(notifyConfig));
 
-        foreach (var nation in Enum.GetValues<Nation>())
-        {
-            // Key stays declared so the shape is discoverable in the file.
-            Assert.True(
-                notifyConfig.RegulatorMailboxes.ContainsKey(nation.ToString()),
-                $"Notify:RegulatorMailboxes:{nation} is not declared in appsettings.json"
-            );
-            Assert.Null(resolver.Resolve(nation));
-        }
+        // Keys stay declared so the shape is discoverable in the file.
+        Assert.NotEmpty(notifyConfig.RegulatorMailboxes);
+        Assert.All(
+            notifyConfig.RegulatorMailboxes,
+            mailbox => Assert.True(
+                string.IsNullOrWhiteSpace(mailbox.Value),
+                $"Notify:RegulatorMailboxes:{mailbox.Key} must be blank in appsettings.json"
+            )
+        );
     }
 
     private static string LocateAppSettings()
