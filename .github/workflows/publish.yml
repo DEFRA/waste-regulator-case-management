@@ -5,6 +5,15 @@ on:
     branches:
       - main
 
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+  queue: max
+
+permissions:
+  contents: read
+  packages: read
+
 env:
   AWS_REGION: eu-west-2
   AWS_ACCOUNT_ID: "094954420758"
@@ -27,6 +36,11 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
   sonarcloud-scan:
     name: CDP SonarCloud Scan
+    permissions:
+      id-token: write
+      pull-requests: write
+      contents: read
+      packages: read
     uses: ./.github/workflows/sonarcloud.yml
     needs: build
     secrets: inherit
