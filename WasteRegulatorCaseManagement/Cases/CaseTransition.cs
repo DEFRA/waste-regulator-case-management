@@ -18,9 +18,15 @@ namespace WasteRegulatorCaseManagement.Cases;
 /// <param name="DisplayName">Human-readable label shown in UIs and timelines.</param>
 /// <param name="FromStateId">State the case must be in for the action to be allowed.</param>
 /// <param name="ToStateId">State the case moves to when the action succeeds.</param>
+/// <param name="RequiredDecisionFields">
+/// Fields the caller's <c>decision</c> must supply, non-blank, for the
+/// action to be applied (e.g. CSoC <c>cancel</c> requires <c>reason</c>).
+/// Absent for most transitions.
+/// </param>
 [BsonIgnoreExtraElements]
 public sealed record CaseTransition(
     string ActionId,
     string DisplayName,
     string FromStateId,
-    string ToStateId);
+    string ToStateId,
+    IReadOnlyCollection<string>? RequiredDecisionFields = null);

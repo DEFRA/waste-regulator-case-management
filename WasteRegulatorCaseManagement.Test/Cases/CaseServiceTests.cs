@@ -163,6 +163,7 @@ public class CaseServiceTests : IAsyncDisposable
             .ApplyActionAsync(
                 caseRecord.Id,
                 "approve",
+                decision: null,
                 User(),
                 TestContext.Current.CancellationToken
             );
@@ -186,6 +187,7 @@ public class CaseServiceTests : IAsyncDisposable
             .ApplyActionAsync(
                 caseRecord.Id,
                 "approve",
+                decision: null,
                 User(),
                 TestContext.Current.CancellationToken
             );
@@ -237,6 +239,7 @@ public class CaseServiceTests : IAsyncDisposable
         var result = await service.ApplyActionAsync(
             caseRecord.Id,
             "approve",
+            decision: null,
             User(),
             requestAborted.Token
         );
@@ -265,6 +268,7 @@ public class CaseServiceTests : IAsyncDisposable
             .ApplyActionAsync(
                 caseRecord.Id,
                 "withdraw",
+                decision: null,
                 User(),
                 TestContext.Current.CancellationToken
             );
@@ -286,6 +290,7 @@ public class CaseServiceTests : IAsyncDisposable
             .ApplyActionAsync(
                 caseRecord.Id,
                 "approve",
+                decision: null,
                 User(),
                 TestContext.Current.CancellationToken
             );
@@ -303,7 +308,7 @@ public class CaseServiceTests : IAsyncDisposable
         var caseRecord = await SeedAsync();
 
         var result = await BuildService(type)
-            .ApplyActionAsync(caseRecord.Id, "delete", User(), TestContext.Current.CancellationToken);
+            .ApplyActionAsync(caseRecord.Id, "delete", decision: null, User(), TestContext.Current.CancellationToken);
 
         Assert.False(result.IsSuccess);
         Assert.Equal(CaseActionFailureCode.UnknownAction, result.FailureCode);
@@ -337,7 +342,7 @@ public class CaseServiceTests : IAsyncDisposable
         var caseRecord = await SeedAsync(stateId: "state-b");
 
         var result = await BuildService(type)
-            .ApplyActionAsync(caseRecord.Id, "ping", User(), TestContext.Current.CancellationToken);
+            .ApplyActionAsync(caseRecord.Id, "ping", decision: null, User(), TestContext.Current.CancellationToken);
 
         Assert.True(result.IsSuccess);
         var fetched = await GetAsync(caseRecord.Id);
@@ -368,7 +373,7 @@ public class CaseServiceTests : IAsyncDisposable
         var caseRecord = await SeedAsync(stateId: "state-c");
 
         var result = await BuildService(type)
-            .ApplyActionAsync(caseRecord.Id, "ping", User(), TestContext.Current.CancellationToken);
+            .ApplyActionAsync(caseRecord.Id, "ping", decision: null, User(), TestContext.Current.CancellationToken);
 
         Assert.False(result.IsSuccess);
         Assert.Equal(CaseActionFailureCode.InvalidTransition, result.FailureCode);
@@ -386,6 +391,7 @@ public class CaseServiceTests : IAsyncDisposable
         var result = await racingService.ApplyActionAsync(
             caseRecord.Id,
             "approve",
+            decision: null,
             User(),
             TestContext.Current.CancellationToken
         );
@@ -574,6 +580,7 @@ public class CaseServiceTests : IAsyncDisposable
             .ApplyActionAsync(
                 caseRecord.Id,
                 "approve",
+                decision: null,
                 User(),
                 TestContext.Current.CancellationToken
             );
@@ -1487,6 +1494,7 @@ public class CaseServiceTests : IAsyncDisposable
             .ApplyActionAsync(
                 caseRecord.Id,
                 "withdraw",
+                decision: null,
                 AuditUser(),
                 TestContext.Current.CancellationToken
             );
@@ -1522,6 +1530,7 @@ public class CaseServiceTests : IAsyncDisposable
             .ApplyActionAsync(
                 caseRecord.Id,
                 "approve",
+                decision: null,
                 AuditUser(),
                 TestContext.Current.CancellationToken
             );
@@ -1716,6 +1725,7 @@ public class CaseServiceTests : IAsyncDisposable
         await service.ApplyActionAsync(
             caseRecord.Id,
             "approve",
+            decision: null,
             AuditUser(),
             TestContext.Current.CancellationToken
         );

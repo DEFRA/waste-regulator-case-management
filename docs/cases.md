@@ -41,7 +41,7 @@ are mounted by `MapCaseFrameworkEndpoints()`:
 | `POST` | `/cases` | Submit a new case. Body: `{ "caseType", "sourceSystemId", "callbackUrl", "nation", "orgId", "producerType"?, "displayData"? }` — see below. The `caseType` must be a case type in `caseModuleConfig`; the server stamps the case with the type's `InitialState`, the caller's CDP client id and a server-side timestamp. Returns `201 Created` with `Location: /cases/{id}`; a `sourceSystemId` that already has a case returns that case with `200 OK` and `X-Idempotent-Replay: true`. |
 | `GET` | `/cases/{id}` | Fetch a single case by id, projected with the actions the engine will currently allow. |
 | `GET` | `/cases` | List persisted cases (with the same projection), newest first, with filter / search / pagination per RA-93. Query string parameters: `caseType` (repeatable), `stateId` (repeatable), `search` (free-text — matched on id and submitter), `page` (1-based, default 1), `pageSize` (default 20, capped at 100). Returns a paged envelope: `{ items, totalCount, page, pageSize }`. |
-| `POST` | `/cases/{id}/actions/{actionId}` | Invoke a named action declared by the type's transitions. `409` if the case is in a terminal state; `400` for unknown actions and transitions whose from-state does not match. |
+| `POST` | `/cases/{id}/actions/{actionId}` | Invoke a named action declared by the type's transitions, with an optional body `{ "decision": { field: string } }` (see below). `409` if the case is in a terminal state; `400` for unknown actions, transitions whose from-state does not match, and a decision missing a field the transition requires. |
 
 All three endpoints require authentication via the CDP client id
 header (`x-cdp-client-id`) per RA-89/RA-85b.
@@ -66,6 +66,20 @@ Only the Case Intake Processor may create cases: `POST /cases` requires the
 
 The case management service holds a reference to the submission, not its
 content: anything else a caseworker needs is fetched from the source system.
+
+### Decisions
+
+A transition can list `requiredDecisionFields` in its case type
+configuration; the action is refused with `400` unless the request's
+`decision` supplies each of them as a non-blank string. CSoC `cancel`
+requires `reason`:
+
+```json
+{ "decision": { "reason": "Submitted against the wrong obligation year." } }
+```
+
+The decision is stored on the case as `decision` and on the action's
+`state-changed` timeline entry as `decision.<field>` details.
 
 ### Nation scoping
 
@@ -93,7 +107,7 @@ for example `CSoC.json`:
   ],
   "transitions": [
     { "actionId": "accept", "displayName": "Accept", "fromStateId": "SUBMITTED", "toStateId": "ACCEPTED" },
-    { "actionId": "cancel", "displayName": "Cancel", "fromStateId": "SUBMITTED", "toStateId": "CANCELLED" }
+    { "actionId": "cancel", "displayName": "Cancel", "fromStateId": "SUBMITTED", "toStateId": "CANCELLED", "requiredDecisionFields": ["reason"] }
   ]
 }
 ```

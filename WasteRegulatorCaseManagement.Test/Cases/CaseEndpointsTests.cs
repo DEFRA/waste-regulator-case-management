@@ -659,6 +659,117 @@ public class CaseEndpointsTests
     }
 
     [Fact]
+    public async Task Cancel_without_a_reason_is_rejected_and_leaves_the_case_submitted()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var factory = NewFactory();
+        using var client = factory.CreateClient();
+        var caseId = await SubmitCSoCCaseAsync(client, "csoc-2024-eng-00125", cancellationToken);
+
+        // Act
+        var response = await client.PostAsJsonAsync(
+            $"/cases/{caseId}/actions/cancel",
+            new { decision = new { } },
+            cancellationToken
+        );
+
+        // Assert
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("requires decision field 'reason'", await response.Content.ReadAsStringAsync(cancellationToken));
+        var persisted = await factory.Persistence.GetByIdAsync(caseId, cancellationToken);
+        Assert.Equal("SUBMITTED", persisted!.StateId);
+    }
+
+    [Fact]
+    public async Task Cancel_with_a_reason_records_the_decision_on_the_case_and_its_timeline()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var factory = NewFactory();
+        using var client = factory.CreateClient();
+        var caseId = await SubmitCSoCCaseAsync(client, "csoc-2024-eng-00126", cancellationToken);
+
+        // Act
+        var response = await client.PostAsJsonAsync(
+            $"/cases/{caseId}/actions/cancel",
+            new { decision = new { reason = "Submitted against the wrong obligation year." } },
+            cancellationToken
+        );
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
+        Assert.Equal("CANCELLED", body!.StateId);
+        Assert.True(body.IsTerminal);
+        Assert.Equal("Submitted against the wrong obligation year.", body.Decision!["reason"]);
+        var stateChange = Assert.Single(body.Timeline!, e => e.Action == "state-changed");
+        Assert.Equal("Submitted against the wrong obligation year.", stateChange.Details["decision.reason"]);
+    }
+
+    [Fact]
+    public async Task Accept_is_applied_without_a_decision()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var factory = NewFactory();
+        using var client = factory.CreateClient();
+        var caseId = await SubmitCSoCCaseAsync(client, "csoc-2024-eng-00127", cancellationToken);
+
+        // Act
+        var response = await client.PostAsync($"/cases/{caseId}/actions/accept", content: null, cancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
+        Assert.Equal("ACCEPTED", body!.StateId);
+        Assert.Null(body.Decision);
+    }
+
+    [Fact]
+    public async Task Action_rejects_a_decision_field_that_is_not_a_string()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var factory = NewFactory();
+        using var client = factory.CreateClient();
+        var caseId = await SubmitCSoCCaseAsync(client, "csoc-2024-eng-00128", cancellationToken);
+
+        // Act
+        var response = await client.PostAsJsonAsync(
+            $"/cases/{caseId}/actions/cancel",
+            new { decision = new { reason = 42 } },
+            cancellationToken
+        );
+
+        // Assert
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("Decision field 'reason' must be a string", await response.Content.ReadAsStringAsync(cancellationToken));
+    }
+
+    private static async Task<string> SubmitCSoCCaseAsync(
+        HttpClient client,
+        string sourceSystemId,
+        CancellationToken cancellationToken)
+    {
+        var response = await client.PostAsJsonAsync(
+            "/cases",
+            new
+            {
+                caseType = "CSoC",
+                sourceSystemId,
+                callbackUrl = $"https://source-system.test/declarations/{sourceSystemId}",
+                nation = "ENGLAND",
+                orgId = "org-00456",
+            },
+            cancellationToken
+        );
+        var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken)
+            ?? throw new InvalidOperationException($"Intake returned {response.StatusCode}.");
+        return body.Id;
+    }
+
+    [Fact]
     public async Task Get_by_id_returns_case_when_present()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

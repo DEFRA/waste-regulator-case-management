@@ -129,6 +129,12 @@ public sealed class Case
     public Dictionary<string, CaseDisplayField> DisplayData { get; init; } = new();
 
     /// <summary>
+    /// The decision fields supplied with the most recent action that carried
+    /// any (for CSoC, the cancellation <c>reason</c>); <c>null</c> until then.
+    /// </summary>
+    public Dictionary<string, string>? Decision { get; set; }
+
+    /// <summary>
     /// Append-only system timeline (RA-97). The framework writes one entry
     /// here for every successful state-changing engine call (case created,
     /// state changed, assigned / unassigned, note added — a note's text lives

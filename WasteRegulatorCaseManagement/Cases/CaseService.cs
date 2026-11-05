@@ -37,6 +37,7 @@ public interface ICaseService
     Task<CaseActionResult> ApplyActionAsync(
         string caseId,
         string actionId,
+        IReadOnlyDictionary<string, string>? decision,
         ClaimsPrincipal user,
         CancellationToken cancellationToken = default
     );
@@ -259,6 +260,7 @@ public sealed class CaseService : ICaseService
     public async Task<CaseActionResult> ApplyActionAsync(
         string caseId,
         string actionId,
+        IReadOnlyDictionary<string, string>? decision,
         ClaimsPrincipal user,
         CancellationToken cancellationToken = default
     )
@@ -333,25 +335,40 @@ public sealed class CaseService : ICaseService
             );
         }
 
+        var missingField = transition.RequiredDecisionFields?.FirstOrDefault(field =>
+            decision is null
+            || !decision.TryGetValue(field, out var value)
+            || string.IsNullOrWhiteSpace(value)
+        );
+        if (missingField is not null)
+        {
+            return CaseActionResult.Failure(
+                CaseActionFailureCode.MissingDecisionField,
+                $"Action '{transition.ActionId}' requires decision field '{missingField}'."
+            );
+        }
+
         var previousState = caseRecord.StateId;
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         caseRecord.StateId = transition.ToStateId;
         caseRecord.IsTerminal = TerminalStates.Find(template, transition.ToStateId) is not null;
         caseRecord.LastModifiedAt = now;
-        AppendTimelineEntry(
-            caseRecord,
-            "state-changed",
-            "Action applied",
-            user,
-            now,
-            new()
+        var details = new Dictionary<string, string?>
+        {
+            ["actionId"] = transition.ActionId,
+            ["actionDisplayName"] = transition.DisplayName,
+            ["fromStateId"] = previousState,
+            ["toStateId"] = caseRecord.StateId,
+        };
+        if (decision is { Count: > 0 })
+        {
+            caseRecord.Decision = new Dictionary<string, string>(decision);
+            foreach (var (field, value) in decision)
             {
-                ["actionId"] = transition.ActionId,
-                ["actionDisplayName"] = transition.DisplayName,
-                ["fromStateId"] = previousState,
-                ["toStateId"] = caseRecord.StateId,
+                details[$"decision.{field}"] = value;
             }
-        );
+        }
+        AppendTimelineEntry(caseRecord, "state-changed", "Action applied", user, now, details);
         try
         {
             await _persistence.ReplaceAsync(caseRecord, cancellationToken);

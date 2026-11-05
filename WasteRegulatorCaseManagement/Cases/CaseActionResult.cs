@@ -30,6 +30,11 @@ public enum CaseActionFailureCode
     InvalidNote,
 
     /// <summary>
+    /// The action's decision omitted a field its transition requires.
+    /// </summary>
+    MissingDecisionField,
+
+    /// <summary>
     /// The case was modified by another caller between load and save
     /// (optimistic concurrency conflict). Retry the request after re-reading
     /// the latest state.

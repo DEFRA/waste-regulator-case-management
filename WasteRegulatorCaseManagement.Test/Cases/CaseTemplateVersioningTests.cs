@@ -114,7 +114,7 @@ public class CaseTemplateVersioningTests
         _persistence.GetByIdAsync(caseRecord.Id, Arg.Any<CancellationToken>()).Returns(caseRecord);
 
         var result = await BuildService(liveType).ApplyActionAsync(
-            caseRecord.Id, "approve", User(), TestContext.Current.CancellationToken);
+            caseRecord.Id, "approve", decision: null, User(), TestContext.Current.CancellationToken);
 
         Assert.True(result.IsSuccess);
         Assert.Equal("approved", caseRecord.StateId);

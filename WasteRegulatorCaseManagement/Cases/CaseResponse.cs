@@ -2,7 +2,6 @@ namespace WasteRegulatorCaseManagement.Cases;
 
 /// <summary>
 /// API representation of a persisted case. Mirrors <see cref="Case"/>
-/// but carries the payload as a JSON element so callers do not see BSON types,
 /// and projects engine state (the actions the engine will currently allow) so
 /// a UI can render without re-deriving it.
 ///
@@ -25,6 +24,7 @@ public sealed record CaseResponse(
     string? ProducerType,
     IReadOnlyDictionary<string, CaseDisplayField> DisplayData,
     IReadOnlyCollection<CaseTransition> AvailableActions,
+    IReadOnlyDictionary<string, string>? Decision,
     string? AssignedToId = null,
     string? AssignedToName = null,
     DateTime? AssignedAt = null,

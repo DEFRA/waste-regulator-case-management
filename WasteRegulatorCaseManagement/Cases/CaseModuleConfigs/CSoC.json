@@ -10,6 +10,6 @@
   ],
   "transitions": [
     { "actionId": "accept", "displayName": "Accept", "fromStateId": "SUBMITTED", "toStateId": "ACCEPTED" },
-    { "actionId": "cancel", "displayName": "Cancel", "fromStateId": "SUBMITTED", "toStateId": "CANCELLED" }
+    { "actionId": "cancel", "displayName": "Cancel", "fromStateId": "SUBMITTED", "toStateId": "CANCELLED", "requiredDecisionFields": ["reason"] }
   ]
 }

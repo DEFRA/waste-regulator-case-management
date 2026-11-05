@@ -397,18 +397,62 @@ public static class CaseEndpoints
     > ApplyAction(
         [FromRoute] string id,
         [FromRoute] string actionId,
+        JsonElement? body,
         HttpContext httpContext,
         [FromServices] ICaseService engine,
         CancellationToken cancellationToken
     )
     {
+        if (ReadDecision(body, out var decision) is { } decisionError)
+        {
+            return BadRequest(InvalidRequestTitle, decisionError);
+        }
+
         var result = await engine.ApplyActionAsync(
             id,
             actionId,
+            decision,
             httpContext.User,
             cancellationToken
         );
         return ToHttpResult(result, engine);
+    }
+
+    /// <summary>
+    /// Reads the optional <c>{ "decision": { field: string } }</c> body of an
+    /// action, returning an error message when it is malformed.
+    /// </summary>
+    private static string? ReadDecision(JsonElement? body, out Dictionary<string, string>? decision)
+    {
+        decision = null;
+        if (body is not { ValueKind: not JsonValueKind.Undefined } element)
+        {
+            return null;
+        }
+        if (element.ValueKind != JsonValueKind.Object)
+        {
+            return "Request body must be a JSON object.";
+        }
+        if (!element.TryGetProperty("decision", out var decisionElement))
+        {
+            return null;
+        }
+
+        if (decisionElement.ValueKind != JsonValueKind.Object)
+        {
+            return "'decision' must be a JSON object of string fields.";
+        }
+
+        decision = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var field in decisionElement.EnumerateObject())
+        {
+            if (field.Value.ValueKind != JsonValueKind.String)
+            {
+                return $"Decision field '{field.Name}' must be a string.";
+            }
+            decision[field.Name] = field.Value.GetString()!;
+        }
+        return null;
     }
 
     internal static async Task<Results<Ok<CaseResponse>, NotFound, ProblemHttpResult>> Assign(
@@ -530,7 +574,8 @@ public static class CaseEndpoints
             CaseActionFailureCode.UnknownAction
             or CaseActionFailureCode.InvalidTransition
             or CaseActionFailureCode.InvalidAssignment
-            or CaseActionFailureCode.InvalidNote => TypedResults.Problem(
+            or CaseActionFailureCode.InvalidNote
+            or CaseActionFailureCode.MissingDecisionField => TypedResults.Problem(
                 title: "Invalid action",
                 detail: result.Message,
                 statusCode: StatusCodes.Status400BadRequest
@@ -576,6 +621,7 @@ public static class CaseEndpoints
             w.ProducerType,
             w.DisplayData,
             projection.AvailableActions,
+            w.Decision,
             w.AssignedToId,
             w.AssignedToName,
             w.AssignedAt,
