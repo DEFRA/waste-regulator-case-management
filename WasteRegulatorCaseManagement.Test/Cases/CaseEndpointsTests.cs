@@ -31,7 +31,6 @@ public class CaseEndpointsTests
 {
     private static readonly string[] s_expectedCapturedStateIds = ["submitted"];
     private static readonly string[] s_expectedCapturedTypeIds = ["re-accreditation", "other-type"];
-    private static readonly int[] s_nonObjectPayload = [1, 2, 3];
 
     private const string TypeId = "test-type";
     private readonly MongoIntegrationFixture _fixture;
@@ -54,7 +53,14 @@ public class CaseEndpointsTests
 
         var response = await client.PostAsJsonAsync(
             "/cases",
-            new { typeId = TypeId },
+            new
+            {
+                typeId = TypeId,
+                sourceSystemId = Ulid.NewUlid().ToString(),
+                callbackUrl = "https://source-system.test/callback",
+                nation = "ENGLAND",
+                orgId = "test-org",
+            },
             cancellationToken
         );
 
@@ -124,7 +130,20 @@ public class CaseEndpointsTests
 
         var response = await client.PostAsJsonAsync(
             "/cases",
-            new { typeId = TypeId, payload = new { applicantName = "Acme", tonnage = 42 } },
+            new
+            {
+                typeId = TypeId,
+                sourceSystemId = "csoc-2024-eng-00123",
+                callbackUrl = "https://source-system.test/declarations/00123",
+                nation = "ENGLAND",
+                orgId = "org-00456",
+                producerType = "DIRECT_PRODUCER",
+                displayData = new
+                {
+                    organisationName = new { value = "Acme Packaging Ltd", type = "string" },
+                    percentageMet = new { value = "87.3", type = "number" },
+                },
+            },
             cancellationToken
         );
 
@@ -137,8 +156,12 @@ public class CaseEndpointsTests
         Assert.Equal(TypeId, persisted!.TypeId);
         Assert.Equal("submitted", persisted.StateId);
         Assert.Equal("test-client", persisted.SubmittedBy);
-        Assert.Equal("Acme", persisted.Payload["applicantName"].AsString);
-        Assert.Equal(42, persisted.Payload["tonnage"].AsInt32);
+        Assert.Equal("csoc-2024-eng-00123", persisted.SourceSystemId);
+        Assert.Equal("https://source-system.test/declarations/00123", persisted.CallbackUrl);
+        Assert.Equal("ENGLAND", persisted.Nation);
+        Assert.Equal("org-00456", persisted.OrgId);
+        Assert.Equal("DIRECT_PRODUCER", persisted.ProducerType);
+        Assert.Equal(new CaseDisplayField("Acme Packaging Ltd", "string"), persisted.DisplayData["organisationName"]);
 
         // Snapshot of the type's template (states, tasks, transitions, version)
         // is frozen onto the case at submission for faithful historical
@@ -156,8 +179,11 @@ public class CaseEndpointsTests
         Assert.False(body.IsTerminal);
         Assert.Equal("test-client", body.SubmittedBy);
         Assert.Equal("v1", body.TemplateVersion);
-        Assert.Equal(JsonValueKind.Object, body.Payload.ValueKind);
-        Assert.Equal("Acme", body.Payload.GetProperty("applicantName").GetString());
+        Assert.Equal("csoc-2024-eng-00123", body.SourceSystemId);
+        Assert.Equal("ENGLAND", body.Nation);
+        Assert.Equal("org-00456", body.OrgId);
+        Assert.Equal("DIRECT_PRODUCER", body.ProducerType);
+        Assert.Equal(new CaseDisplayField("87.3", "number"), body.DisplayData["percentageMet"]);
     }
 
     [Fact]
@@ -173,7 +199,14 @@ public class CaseEndpointsTests
 
         var response = await client.PostAsJsonAsync(
             "/cases",
-            new { typeId = TypeId },
+            new
+            {
+                typeId = TypeId,
+                sourceSystemId = Ulid.NewUlid().ToString(),
+                callbackUrl = "https://source-system.test/callback",
+                nation = "ENGLAND",
+                orgId = "test-org",
+            },
             cancellationToken
         );
 
@@ -214,7 +247,14 @@ public class CaseEndpointsTests
 
         var response = await client.PostAsJsonAsync(
             "/cases",
-            new { typeId = TypeId },
+            new
+            {
+                typeId = TypeId,
+                sourceSystemId = Ulid.NewUlid().ToString(),
+                callbackUrl = "https://source-system.test/callback",
+                nation = "ENGLAND",
+                orgId = "test-org",
+            },
             cancellationToken
         );
 
@@ -237,8 +277,11 @@ public class CaseEndpointsTests
             new
             {
                 typeId = TypeId,
+                sourceSystemId = Ulid.NewUlid().ToString(),
+                callbackUrl = "https://source-system.test/callback",
+                nation = "ENGLAND",
+                orgId = "test-org",
                 source = "operator-fe",
-                payload = new { applicantName = "Acme" },
             },
             cancellationToken
         );
@@ -268,7 +311,14 @@ public class CaseEndpointsTests
 
         var response = await client.PostAsJsonAsync(
             "/cases",
-            new { typeId = TypeId },
+            new
+            {
+                typeId = TypeId,
+                sourceSystemId = Ulid.NewUlid().ToString(),
+                callbackUrl = "https://source-system.test/callback",
+                nation = "ENGLAND",
+                orgId = "test-org",
+            },
             cancellationToken
         );
 
@@ -299,7 +349,14 @@ public class CaseEndpointsTests
         // Hand-craft body to inject a non-string value (e.g. a number)
         // for the field under test.
         var json = $$"""
-            { "typeId": "{{TypeId}}", "{{field}}": 42 }
+            {
+                "typeId": "{{TypeId}}",
+                "sourceSystemId": "{{Ulid.NewUlid()}}",
+                "callbackUrl": "https://source-system.test/callback",
+                "nation": "ENGLAND",
+                "orgId": "test-org",
+                "{{field}}": 42
+            }
             """;
         var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
         var response = await client.PostAsync("/cases", content, cancellationToken);
@@ -312,7 +369,7 @@ public class CaseEndpointsTests
     }
 
     [Fact]
-    public async Task Post_accepts_request_without_payload()
+    public async Task Post_accepts_request_without_display_data()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var factory = NewFactory();
@@ -320,7 +377,14 @@ public class CaseEndpointsTests
 
         var response = await client.PostAsJsonAsync(
             "/cases",
-            new { typeId = TypeId },
+            new
+            {
+                typeId = TypeId,
+                sourceSystemId = Ulid.NewUlid().ToString(),
+                callbackUrl = "https://source-system.test/callback",
+                nation = "ENGLAND",
+                orgId = "test-org",
+            },
             cancellationToken
         );
 
@@ -328,11 +392,11 @@ public class CaseEndpointsTests
         var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
         var persisted = await factory.Persistence.GetByIdAsync(body!.Id, cancellationToken);
         Assert.NotNull(persisted);
-        Assert.Empty(persisted!.Payload.Names);
+        Assert.Empty(persisted!.DisplayData);
     }
 
     [Fact]
-    public async Task Post_returns_problem_when_payload_is_not_an_object()
+    public async Task Post_returns_problem_when_a_required_intake_field_is_missing()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var factory = NewFactory();
@@ -340,13 +404,121 @@ public class CaseEndpointsTests
 
         var response = await client.PostAsJsonAsync(
             "/cases",
-            new { typeId = TypeId, payload = s_nonObjectPayload },
+            new
+            {
+                typeId = TypeId,
+                callbackUrl = "https://source-system.test/callback",
+                nation = "ENGLAND",
+                orgId = "test-org",
+            },
             cancellationToken
         );
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken);
-        Assert.Equal("Invalid case payload", problem?.Title);
+        Assert.Contains("sourceSystemId", problem?.Detail);
+    }
+
+    [Fact]
+    public async Task Post_returns_problem_when_nation_is_not_recognised()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var factory = NewFactory();
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync(
+            "/cases",
+            new
+            {
+                typeId = TypeId,
+                sourceSystemId = Ulid.NewUlid().ToString(),
+                callbackUrl = "https://source-system.test/callback",
+                nation = "England",
+                orgId = "test-org",
+            },
+            cancellationToken
+        );
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken);
+        Assert.Contains("nation", problem?.Detail);
+    }
+
+    [Fact]
+    public async Task Post_returns_problem_when_callback_url_is_not_absolute()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var factory = NewFactory();
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync(
+            "/cases",
+            new
+            {
+                typeId = TypeId,
+                sourceSystemId = Ulid.NewUlid().ToString(),
+                callbackUrl = "/declarations/00123",
+                nation = "ENGLAND",
+                orgId = "test-org",
+            },
+            cancellationToken
+        );
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken);
+        Assert.Contains("callbackUrl", problem?.Detail);
+    }
+
+    [Fact]
+    public async Task Post_returns_problem_when_a_display_data_type_is_not_recognised()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var factory = NewFactory();
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync(
+            "/cases",
+            new
+            {
+                typeId = TypeId,
+                sourceSystemId = Ulid.NewUlid().ToString(),
+                callbackUrl = "https://source-system.test/callback",
+                nation = "ENGLAND",
+                orgId = "test-org",
+                displayData = new { organisationName = new { value = "Acme", type = "text" } },
+            },
+            cancellationToken
+        );
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken);
+        Assert.Contains("displayData.organisationName", problem?.Detail);
+    }
+
+    [Fact]
+    public async Task Post_returns_the_existing_case_when_the_source_system_id_was_already_submitted()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var factory = NewFactory();
+        using var client = factory.CreateClient();
+        var submission = new
+        {
+            typeId = TypeId,
+            sourceSystemId = "csoc-2024-eng-00999",
+            callbackUrl = "https://source-system.test/callback",
+            nation = "ENGLAND",
+            orgId = "test-org",
+        };
+
+        var first = await client.PostAsJsonAsync("/cases", submission, cancellationToken);
+        var second = await client.PostAsJsonAsync("/cases", submission, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+        Assert.Equal("true", second.Headers.GetValues(CaseEndpoints.IdempotentReplayHeader).Single());
+        var firstBody = await first.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
+        var secondBody = await second.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
+        Assert.Equal(firstBody!.Id, secondBody!.Id);
     }
 
     [Fact]
@@ -360,6 +532,10 @@ public class CaseEndpointsTests
         await factory.SeedAsync(
             new Case
             {
+                SourceSystemId = Ulid.NewUlid().ToString(),
+                CallbackUrl = "https://source-system.test/callback",
+                Nation = "ENGLAND",
+                OrgId = "test-org",
                 Id = id,
                 TypeId = TypeId,
                 StateId = "submitted",
@@ -401,6 +577,10 @@ public class CaseEndpointsTests
         await factory.SeedAsync(
             new Case
             {
+                SourceSystemId = Ulid.NewUlid().ToString(),
+                CallbackUrl = "https://source-system.test/callback",
+                Nation = "ENGLAND",
+                OrgId = "test-org",
                 Id = id,
                 TypeId = TypeId,
                 StateId = "submitted",
@@ -423,6 +603,10 @@ public class CaseEndpointsTests
         await factory.SeedAsync(
             new Case
             {
+                SourceSystemId = Ulid.NewUlid().ToString(),
+                CallbackUrl = "https://source-system.test/callback",
+                Nation = "ENGLAND",
+                OrgId = "test-org",
                 Id = Ulid.NewUlid().ToString(),
                 TypeId = TypeId,
                 StateId = "submitted",
@@ -433,6 +617,10 @@ public class CaseEndpointsTests
         await factory.SeedAsync(
             new Case
             {
+                SourceSystemId = Ulid.NewUlid().ToString(),
+                CallbackUrl = "https://source-system.test/callback",
+                Nation = "ENGLAND",
+                OrgId = "test-org",
                 Id = Ulid.NewUlid().ToString(),
                 TypeId = TypeId,
                 StateId = "submitted",
@@ -467,6 +655,10 @@ public class CaseEndpointsTests
         await factory.SeedAsync(
             new Case
             {
+                SourceSystemId = Ulid.NewUlid().ToString(),
+                CallbackUrl = "https://source-system.test/callback",
+                Nation = "ENGLAND",
+                OrgId = "test-org",
                 Id = Ulid.NewUlid().ToString(),
                 TypeId = TypeId,
                 StateId = "submitted",
@@ -477,6 +669,10 @@ public class CaseEndpointsTests
         await factory.SeedAsync(
             new Case
             {
+                SourceSystemId = Ulid.NewUlid().ToString(),
+                CallbackUrl = "https://source-system.test/callback",
+                Nation = "ENGLAND",
+                OrgId = "test-org",
                 Id = Ulid.NewUlid().ToString(),
                 TypeId = TypeId,
                 StateId = "submitted",
@@ -549,6 +745,10 @@ public class CaseEndpointsTests
         var engine = Substitute.For<ICaseService>();
         var submittedCase = new Case
         {
+            SourceSystemId = Ulid.NewUlid().ToString(),
+            CallbackUrl = "https://source-system.test/callback",
+            Nation = "ENGLAND",
+            OrgId = "test-org",
             Id = Ulid.NewUlid().ToString(),
             TypeId = TypeId,
             StateId = "submitted",
@@ -559,7 +759,7 @@ public class CaseEndpointsTests
         engine
             .SubmitAsync(
                 Arg.Any<ICaseType>(),
-                Arg.Any<MongoDB.Bson.BsonDocument>(),
+                Arg.Any<CaseIntake>(),
                 Arg.Any<string?>(),
                 Arg.Any<System.Security.Claims.ClaimsPrincipal>(),
                 Arg.Any<IReadOnlyDictionary<string, string?>?>(),
@@ -623,7 +823,7 @@ public class CaseEndpointsTests
         engine
             .SubmitAsync(
                 Arg.Any<ICaseType>(),
-                Arg.Any<MongoDB.Bson.BsonDocument>(),
+                Arg.Any<CaseIntake>(),
                 Arg.Any<string?>(),
                 Arg.Any<System.Security.Claims.ClaimsPrincipal>(),
                 Arg.Any<IReadOnlyDictionary<string, string?>?>(),
@@ -631,7 +831,17 @@ public class CaseEndpointsTests
             )
             .Returns(Task.FromException<CaseActionResult>(new InvalidOperationException("boom")));
 
-        var body = JsonDocument.Parse($"{{\"typeId\":\"{TypeId}\"}}").RootElement;
+        var body = JsonDocument.Parse(
+            $$"""
+            {
+                "typeId": "{{TypeId}}",
+                "sourceSystemId": "{{Ulid.NewUlid()}}",
+                "callbackUrl": "https://source-system.test/callback",
+                "nation": "ENGLAND",
+                "orgId": "test-org"
+            }
+            """
+        ).RootElement;
         var httpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext
         {
             User = new System.Security.Claims.ClaimsPrincipal(
@@ -709,7 +919,7 @@ public class CaseEndpointsTests
         engine
             .SubmitAsync(
                 Arg.Any<ICaseType>(),
-                Arg.Any<MongoDB.Bson.BsonDocument>(),
+                Arg.Any<CaseIntake>(),
                 Arg.Any<string?>(),
                 Arg.Any<System.Security.Claims.ClaimsPrincipal>(),
                 Arg.Any<IReadOnlyDictionary<string, string?>?>(),
@@ -722,7 +932,17 @@ public class CaseEndpointsTests
                 )
             );
 
-        var body = JsonDocument.Parse($"{{\"typeId\":\"{TypeId}\"}}").RootElement;
+        var body = JsonDocument.Parse(
+            $$"""
+            {
+                "typeId": "{{TypeId}}",
+                "sourceSystemId": "{{Ulid.NewUlid()}}",
+                "callbackUrl": "https://source-system.test/callback",
+                "nation": "ENGLAND",
+                "orgId": "test-org"
+            }
+            """
+        ).RootElement;
         var httpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext
         {
             User = new System.Security.Claims.ClaimsPrincipal(
@@ -775,6 +995,10 @@ public class CaseEndpointsTests
         await factory.SeedAsync(
             new Case
             {
+                SourceSystemId = Ulid.NewUlid().ToString(),
+                CallbackUrl = "https://source-system.test/callback",
+                Nation = "ENGLAND",
+                OrgId = "test-org",
                 Id = Ulid.NewUlid().ToString(),
                 TypeId = TypeId,
                 StateId = "submitted",
@@ -785,6 +1009,10 @@ public class CaseEndpointsTests
         await factory.SeedAsync(
             new Case
             {
+                SourceSystemId = Ulid.NewUlid().ToString(),
+                CallbackUrl = "https://source-system.test/callback",
+                Nation = "ENGLAND",
+                OrgId = "test-org",
                 Id = Ulid.NewUlid().ToString(),
                 TypeId = TypeId,
                 StateId = "submitted",
@@ -817,6 +1045,10 @@ public class CaseEndpointsTests
         var assignedAt = new DateTime(2026, 4, 27, 9, 0, 0, DateTimeKind.Utc);
         var caseRecord = new Case
         {
+            SourceSystemId = Ulid.NewUlid().ToString(),
+            CallbackUrl = "https://source-system.test/callback",
+            Nation = "ENGLAND",
+            OrgId = "test-org",
             Id = Ulid.NewUlid().ToString(),
             TypeId = TypeId,
             StateId = "submitted",
@@ -901,6 +1133,10 @@ public class CaseEndpointsTests
         await factory.SeedAsync(
             new Case
             {
+                SourceSystemId = Ulid.NewUlid().ToString(),
+                CallbackUrl = "https://source-system.test/callback",
+                Nation = "ENGLAND",
+                OrgId = "test-org",
                 Id = id,
                 TypeId = TypeId,
                 StateId = "submitted",
@@ -938,6 +1174,10 @@ public class CaseEndpointsTests
         await factory.SeedAsync(
             new Case
             {
+                SourceSystemId = Ulid.NewUlid().ToString(),
+                CallbackUrl = "https://source-system.test/callback",
+                Nation = "ENGLAND",
+                OrgId = "test-org",
                 Id = id,
                 TypeId = TypeId,
                 StateId = "submitted",
@@ -966,6 +1206,10 @@ public class CaseEndpointsTests
         await factory.SeedAsync(
             new Case
             {
+                SourceSystemId = Ulid.NewUlid().ToString(),
+                CallbackUrl = "https://source-system.test/callback",
+                Nation = "ENGLAND",
+                OrgId = "test-org",
                 Id = id,
                 TypeId = TypeId,
                 StateId = "submitted",
@@ -997,6 +1241,10 @@ public class CaseEndpointsTests
         await factory.SeedAsync(
             new Case
             {
+                SourceSystemId = Ulid.NewUlid().ToString(),
+                CallbackUrl = "https://source-system.test/callback",
+                Nation = "ENGLAND",
+                OrgId = "test-org",
                 Id = id,
                 TypeId = TypeId,
                 StateId = "submitted",
@@ -1029,6 +1277,10 @@ public class CaseEndpointsTests
         await factory.SeedAsync(
             new Case
             {
+                SourceSystemId = Ulid.NewUlid().ToString(),
+                CallbackUrl = "https://source-system.test/callback",
+                Nation = "ENGLAND",
+                OrgId = "test-org",
                 Id = id,
                 TypeId = TypeId,
                 StateId = "submitted",
@@ -1073,6 +1325,10 @@ public class CaseEndpointsTests
         await factory.SeedAsync(
             new Case
             {
+                SourceSystemId = Ulid.NewUlid().ToString(),
+                CallbackUrl = "https://source-system.test/callback",
+                Nation = "ENGLAND",
+                OrgId = "test-org",
                 Id = id,
                 TypeId = TypeId,
                 StateId = "submitted",
@@ -1111,6 +1367,10 @@ public class CaseEndpointsTests
         await factory.SeedAsync(
             new Case
             {
+                SourceSystemId = Ulid.NewUlid().ToString(),
+                CallbackUrl = "https://source-system.test/callback",
+                Nation = "ENGLAND",
+                OrgId = "test-org",
                 Id = id,
                 TypeId = TypeId,
                 StateId = "submitted",
@@ -1140,6 +1400,10 @@ public class CaseEndpointsTests
         await factory.SeedAsync(
             new Case
             {
+                SourceSystemId = Ulid.NewUlid().ToString(),
+                CallbackUrl = "https://source-system.test/callback",
+                Nation = "ENGLAND",
+                OrgId = "test-org",
                 Id = id,
                 TypeId = TypeId,
                 StateId = "submitted",
@@ -1176,6 +1440,10 @@ public class CaseEndpointsTests
         await factory.SeedAsync(
             new Case
             {
+                SourceSystemId = Ulid.NewUlid().ToString(),
+                CallbackUrl = "https://source-system.test/callback",
+                Nation = "ENGLAND",
+                OrgId = "test-org",
                 Id = id,
                 TypeId = TypeId,
                 StateId = "submitted",
@@ -1226,6 +1494,10 @@ public class CaseEndpointsTests
         await factory.SeedAsync(
             new Case
             {
+                SourceSystemId = Ulid.NewUlid().ToString(),
+                CallbackUrl = "https://source-system.test/callback",
+                Nation = "ENGLAND",
+                OrgId = "test-org",
                 Id = id,
                 TypeId = TypeId,
                 StateId = stateId,
@@ -1268,6 +1540,10 @@ public class CaseEndpointsTests
         await factory.SeedAsync(
             new Case
             {
+                SourceSystemId = Ulid.NewUlid().ToString(),
+                CallbackUrl = "https://source-system.test/callback",
+                Nation = "ENGLAND",
+                OrgId = "test-org",
                 Id = id,
                 TypeId = TypeId,
                 StateId = stateId,
@@ -1312,6 +1588,10 @@ public class CaseEndpointsTests
         await factory.SeedAsync(
             new Case
             {
+                SourceSystemId = Ulid.NewUlid().ToString(),
+                CallbackUrl = "https://source-system.test/callback",
+                Nation = "ENGLAND",
+                OrgId = "test-org",
                 Id = id,
                 TypeId = TypeId,
                 StateId = "submitted",
@@ -1349,6 +1629,10 @@ public class CaseEndpointsTests
         await factory.SeedAsync(
             new Case
             {
+                SourceSystemId = Ulid.NewUlid().ToString(),
+                CallbackUrl = "https://source-system.test/callback",
+                Nation = "ENGLAND",
+                OrgId = "test-org",
                 Id = id,
                 TypeId = TypeId,
                 StateId = "submitted",
@@ -1376,6 +1660,10 @@ public class CaseEndpointsTests
         await factory.SeedAsync(
             new Case
             {
+                SourceSystemId = Ulid.NewUlid().ToString(),
+                CallbackUrl = "https://source-system.test/callback",
+                Nation = "ENGLAND",
+                OrgId = "test-org",
                 Id = id,
                 TypeId = TypeId,
                 StateId = "submitted",
@@ -1414,6 +1702,10 @@ public class CaseEndpointsTests
         await factory.SeedAsync(
             new Case
             {
+                SourceSystemId = Ulid.NewUlid().ToString(),
+                CallbackUrl = "https://source-system.test/callback",
+                Nation = "ENGLAND",
+                OrgId = "test-org",
                 Id = id,
                 TypeId = TypeId,
                 StateId = "submitted",
@@ -1476,6 +1768,10 @@ public class CaseEndpointsTests
         await factory.SeedAsync(
             new Case
             {
+                SourceSystemId = Ulid.NewUlid().ToString(),
+                CallbackUrl = "https://source-system.test/callback",
+                Nation = "ENGLAND",
+                OrgId = "test-org",
                 Id = id,
                 TypeId = TypeId,
                 StateId = "submitted",
@@ -1547,6 +1843,10 @@ public class CaseEndpointsTests
         await factory.SeedAsync(
             new Case
             {
+                SourceSystemId = Ulid.NewUlid().ToString(),
+                CallbackUrl = "https://source-system.test/callback",
+                Nation = "ENGLAND",
+                OrgId = "test-org",
                 Id = id,
                 TypeId = TypeId,
                 StateId = "submitted",
@@ -1639,6 +1939,10 @@ public class CaseEndpointsTests
         await factory.SeedAsync(
             new Case
             {
+                SourceSystemId = Ulid.NewUlid().ToString(),
+                CallbackUrl = "https://source-system.test/callback",
+                Nation = "ENGLAND",
+                OrgId = "test-org",
                 Id = id,
                 TypeId = TypeId,
                 StateId = "submitted",
@@ -1816,6 +2120,11 @@ public class CaseEndpointsTests
             string id,
             CancellationToken cancellationToken = default
         ) => Inner.GetByIdAsync(id, cancellationToken);
+
+        public Task<Case?> FindBySourceSystemIdAsync(
+            string sourceSystemId,
+            CancellationToken cancellationToken = default
+        ) => Inner.FindBySourceSystemIdAsync(sourceSystemId, cancellationToken);
 
         public Task<CasePage> QueryAsync(
             CaseQuery query,

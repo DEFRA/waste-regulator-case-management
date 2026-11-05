@@ -62,6 +62,10 @@ public class CaseTemplateVersioningTests
 
         var caseRecord = new Case
         {
+            SourceSystemId = Ulid.NewUlid().ToString(),
+            CallbackUrl = "https://source-system.test/callback",
+            Nation = "ENGLAND",
+            OrgId = "test-org",
             TypeId = TypeId,
             StateId = "submitted",
             SubmittedAt = Now,
@@ -95,6 +99,10 @@ public class CaseTemplateVersioningTests
 
         var caseRecord = new Case
         {
+            SourceSystemId = Ulid.NewUlid().ToString(),
+            CallbackUrl = "https://source-system.test/callback",
+            Nation = "ENGLAND",
+            OrgId = "test-org",
             Id = Ulid.NewUlid().ToString(),
             TypeId = TypeId,
             StateId = "submitted",
@@ -122,6 +130,10 @@ public class CaseTemplateVersioningTests
 
         var legacy = new Case
         {
+            SourceSystemId = Ulid.NewUlid().ToString(),
+            CallbackUrl = "https://source-system.test/callback",
+            Nation = "ENGLAND",
+            OrgId = "test-org",
             TypeId = TypeId,
             StateId = "submitted",
             SubmittedAt = Now,
@@ -147,6 +159,10 @@ public class CaseTemplateVersioningTests
 
         var orphan = new Case
         {
+            SourceSystemId = Ulid.NewUlid().ToString(),
+            CallbackUrl = "https://source-system.test/callback",
+            Nation = "ENGLAND",
+            OrgId = "test-org",
             TypeId = "different-type",
             StateId = "anything"
         };

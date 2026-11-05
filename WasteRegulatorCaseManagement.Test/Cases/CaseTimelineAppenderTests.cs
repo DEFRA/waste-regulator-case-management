@@ -43,9 +43,12 @@ public class CaseTimelineAppenderTests
     {
         var caseRecord = new Case
         {
+            SourceSystemId = Ulid.NewUlid().ToString(),
+            CallbackUrl = "https://source-system.test/callback",
+            Nation = "ENGLAND",
+            OrgId = "test-org",
             TypeId = "test-type",
             StateId = "submitted",
-            Payload = new BsonDocument()
         };
         await _persistence.CreateAsync(caseRecord, ct);
         return caseRecord;
@@ -122,10 +125,13 @@ public class CaseTimelineAppenderTests
         var caseId = Ulid.NewUlid().ToString();
         var storedCase = new Case
         {
+            SourceSystemId = Ulid.NewUlid().ToString(),
+            CallbackUrl = "https://source-system.test/callback",
+            Nation = "ENGLAND",
+            OrgId = "test-org",
             Id = caseId,
             TypeId = "test-type",
             StateId = "submitted",
-            Payload = new BsonDocument()
         };
 
         var mockPersistence = Substitute.For<ICasePersistence>();

@@ -4,6 +4,7 @@ using WasteRegulatorCaseManagement.Cases;
 using Microsoft.Extensions.Logging.Abstractions;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using NUlid;
 
 namespace WasteRegulatorCaseManagement.Test.Utils.Mongo;
 
@@ -115,15 +116,21 @@ public sealed class MongoIndexReconcilerTests
         {
             new Case
             {
+                SourceSystemId = Ulid.NewUlid().ToString(),
+                CallbackUrl = "https://source-system.test/callback",
+                Nation = "ENGLAND",
+                OrgId = "test-org",
                 TypeId = "test-type",
                 StateId = "state-1",
-                Payload = new BsonDocument { ["operatorApplicationId"] = "dup-1" },
             },
             new Case
             {
+                SourceSystemId = Ulid.NewUlid().ToString(),
+                CallbackUrl = "https://source-system.test/callback",
+                Nation = "ENGLAND",
+                OrgId = "test-org",
                 TypeId = "test-type",
                 StateId = "state-1",
-                Payload = new BsonDocument { ["operatorApplicationId"] = "dup-1" },
             },
         };
         await _collection.InsertManyAsync(duplicateDocs, cancellationToken: TestContext.Current.CancellationToken);
@@ -132,8 +139,8 @@ public sealed class MongoIndexReconcilerTests
         {
             new(Builders<Case>.IndexKeys.Ascending(w => w.SubmittedBy)),
             new(
-                Builders<Case>.IndexKeys.Ascending("payload.operatorApplicationId"),
-                new CreateIndexOptions { Unique = true, Sparse = true }),
+                Builders<Case>.IndexKeys.Ascending(w => w.OrgId),
+                new CreateIndexOptions { Unique = true }),
         };
 
         var dropped = MongoIndexReconciler.EnsureIndexes(
@@ -145,6 +152,6 @@ public sealed class MongoIndexReconcilerTests
             .ToListAsync(TestContext.Current.CancellationToken);
 
         Assert.Contains(indexes, i => i["key"].AsBsonDocument.Contains("submittedBy"));
-        Assert.DoesNotContain(indexes, i => i["key"].AsBsonDocument.Contains("payload.operatorApplicationId"));
+        Assert.DoesNotContain(indexes, i => i["key"].AsBsonDocument.Contains("orgId"));
     }
 }

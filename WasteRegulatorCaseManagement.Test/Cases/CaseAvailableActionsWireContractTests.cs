@@ -114,6 +114,10 @@ public class CaseAvailableActionsWireContractTests
         await factory.SeedAsync(
             new Case
             {
+                SourceSystemId = Ulid.NewUlid().ToString(),
+                CallbackUrl = "https://source-system.test/callback",
+                Nation = "ENGLAND",
+                OrgId = "test-org",
                 Id = caseId,
                 TypeId = TypeId,
                 StateId = "queried",

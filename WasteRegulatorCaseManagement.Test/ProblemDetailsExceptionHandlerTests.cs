@@ -87,6 +87,11 @@ public class ProblemDetailsExceptionHandlerTests
         public Task<Case?> GetByIdAsync(string id, CancellationToken cancellationToken = default) =>
             inner.GetByIdAsync(id, cancellationToken);
 
+        public Task<Case?> FindBySourceSystemIdAsync(
+            string sourceSystemId,
+            CancellationToken cancellationToken = default
+        ) => inner.FindBySourceSystemIdAsync(sourceSystemId, cancellationToken);
+
         public Task<CasePage> QueryAsync(CaseQuery query, CancellationToken cancellationToken = default) =>
             throw new InvalidOperationException("boom");
 

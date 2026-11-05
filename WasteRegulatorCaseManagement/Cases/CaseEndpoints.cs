@@ -82,7 +82,7 @@ public static class CaseEndpoints
         return app;
     }
 
-    internal static async Task<Results<CreatedAtRoute<CaseResponse>, ProblemHttpResult>> Submit(
+    internal static async Task<Results<CreatedAtRoute<CaseResponse>, Ok<CaseResponse>, ProblemHttpResult>> Submit(
         JsonElement body,
         HttpContext httpContext,
         [FromServices] ICaseRegistry registry,
@@ -171,28 +171,18 @@ public static class CaseEndpoints
             );
         }
 
-        JsonElement? payload = body.TryGetProperty("payload", out var payloadElement)
-            ? payloadElement
-            : null;
-
-        MongoDB.Bson.BsonDocument payloadDocument;
-        try
-        {
-            payloadDocument = CasePayloadConverter.ToBson(payload);
-        }
-        catch (InvalidCasePayloadException ex)
+        if (CaseIntakeBinding.TryRead(body, out var intake) is { } intakeError)
         {
             log.Log(
                 LogLevel.Warning,
-                "Case submission rejected: invalid payload",
+                "Case submission rejected: invalid intake fields",
                 new Dictionary<string, object?>
                 {
                     [CaseTypeIdField] = typeId,
-                    [ErrorMessageField] = ex.Message,
-                },
-                ex
+                    [ErrorMessageField] = intakeError,
+                }
             );
-            return BadRequest("Invalid case payload", ex.Message);
+            return BadRequest(InvalidRequestTitle, intakeError);
         }
 
         var submittedBy =
@@ -233,7 +223,7 @@ public static class CaseEndpoints
         {
             result = await engine.SubmitAsync(
                 type,
-                payloadDocument,
+                intake!,
                 submittedBy,
                 httpContext.User,
                 submissionMetadata,
@@ -288,15 +278,25 @@ public static class CaseEndpoints
         var caseRecord = result.Case!;
         log.Log(
             LogLevel.Information,
-            "Case submission succeeded",
+            result.IsIdempotentReplay
+                ? "Case submission matched an existing case"
+                : "Case submission succeeded",
             new Dictionary<string, object?>
             {
-                ["case.id"] = caseRecord.Id.ToString(),
+                ["case.id"] = caseRecord.Id,
                 [CaseTypeIdField] = typeId,
                 [CallerClientIdField] = submittedBy ?? "(unknown)",
             }
         );
         var response = ToResponse(engine.Project(caseRecord));
+        // A resent submission gets the case it already created, flagged with
+        // the same header the other idempotent mutations use, so the Case
+        // Intake Processor can discard the event.
+        if (result.IsIdempotentReplay)
+        {
+            httpContext.Response.Headers[IdempotentReplayHeader] = "true";
+            return TypedResults.Ok(response);
+        }
         return TypedResults.CreatedAtRoute(response, "GetCaseById", new { id = caseRecord.Id });
     }
 
@@ -577,7 +577,11 @@ public static class CaseEndpoints
             w.LastModifiedAt,
             w.SubmittedBy,
             projection.TemplateVersion,
-            CasePayloadConverter.ToJson(w.Payload),
+            w.SourceSystemId,
+            w.Nation,
+            w.OrgId,
+            w.ProducerType,
+            w.DisplayData,
             projection.AvailableActions,
             w.AssignedToId,
             w.AssignedToName,
@@ -628,7 +632,11 @@ public static class CaseEndpoints
             w.LastModifiedAt,
             w.SubmittedBy,
             projection.TemplateVersion,
-            CasePayloadConverter.ToJson(w.Payload),
+            w.SourceSystemId,
+            w.Nation,
+            w.OrgId,
+            w.ProducerType,
+            w.DisplayData,
             projection.AvailableActions,
             w.AssignedToId,
             w.AssignedToName,

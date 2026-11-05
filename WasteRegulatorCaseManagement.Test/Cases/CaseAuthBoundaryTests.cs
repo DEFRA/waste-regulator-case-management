@@ -118,6 +118,10 @@ public class CaseAuthBoundaryTests
     private static Case NewSubmittedItem(string id) => new()
     {
         Id = id,
+        SourceSystemId = Ulid.NewUlid().ToString(),
+        CallbackUrl = "https://source-system.test/callback",
+        Nation = "ENGLAND",
+        OrgId = "test-org",
         TypeId = TypeId,
         StateId = "submitted",
         SubmittedBy = TenantClientId

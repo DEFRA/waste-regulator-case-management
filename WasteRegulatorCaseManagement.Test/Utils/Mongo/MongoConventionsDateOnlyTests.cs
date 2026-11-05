@@ -1,5 +1,4 @@
 using WasteRegulatorCaseManagement.Utils.Mongo;
-using WasteRegulatorCaseManagement.Cases;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 
@@ -7,26 +6,11 @@ namespace WasteRegulatorCaseManagement.Test.Utils.Mongo;
 
 /// <summary>
 /// RA-176 regression: <see cref="System.DateOnly"/> values must serialise as a
-/// plain ISO date string so payload JSON returned to the frontend contains
-/// <c>"startDate": "2027-01-01"</c> rather than the driver's default
-/// extended-JSON object <c>{"$date": ...}</c>, which a frontend renders as the
-/// literal "[object Object]".
+/// plain ISO date string rather than the driver's default BSON DateTime.
 /// </summary>
 public class MongoConventionsDateOnlyTests
 {
     static MongoConventionsDateOnlyTests() => MongoConventions.Register();
-
-    [Fact]
-    public void DateOnly_payload_field_serialises_as_iso_string_in_relaxed_json()
-    {
-        var payload = new DatedPayload { StartDate = new DateOnly(2027, 1, 1) };
-
-        var json = CasePayloadConverter.ToJson(payload.ToBsonDocument());
-
-        Assert.Equal(
-            "2027-01-01",
-            json.GetProperty("startDate").GetString());
-    }
 
     [Fact]
     public void DateOnly_serialises_to_a_bson_string_not_a_datetime()

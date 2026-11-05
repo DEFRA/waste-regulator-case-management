@@ -81,7 +81,15 @@ public class CaseServiceTimestampTests
     public async Task Submit_stamps_SubmittedAt_LastModifiedAt_and_birth_audit_from_TimeProvider()
     {
         var result = await BuildService(BuildType()).SubmitAsync(
-            BuildType(), new BsonDocument(), submittedBy: "test-client",
+            BuildType(),
+            new CaseIntake(
+                SourceSystemId: Ulid.NewUlid().ToString(),
+                CallbackUrl: "https://source-system.test/callback",
+                Nation: "ENGLAND",
+                OrgId: "test-org",
+                ProducerType: null,
+                DisplayData: new Dictionary<string, CaseDisplayField>()),
+            submittedBy: "test-client",
             User(), cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.True(result.IsSuccess, result.Message);
@@ -100,6 +108,10 @@ public class CaseServiceTimestampTests
     {
         var caseRecord = await SeedAsync(new Case
         {
+            SourceSystemId = Ulid.NewUlid().ToString(),
+            CallbackUrl = "https://source-system.test/callback",
+            Nation = "ENGLAND",
+            OrgId = "test-org",
             Id = Ulid.NewUlid().ToString(),
             TypeId = TypeId,
             StateId = "submitted",
@@ -126,7 +138,15 @@ public class CaseServiceTimestampTests
     [Fact]
     public void Default_construction_leaves_timestamps_at_MinValue_so_engine_bugs_are_loud()
     {
-        var caseRecord = new Case { TypeId = TypeId, StateId = "submitted" };
+        var caseRecord = new Case
+        {
+            SourceSystemId = Ulid.NewUlid().ToString(),
+            CallbackUrl = "https://source-system.test/callback",
+            Nation = "ENGLAND",
+            OrgId = "test-org",
+            TypeId = TypeId,
+            StateId = "submitted",
+        };
         Assert.Equal(default, caseRecord.SubmittedAt);
         Assert.Equal(default, caseRecord.LastModifiedAt);
 

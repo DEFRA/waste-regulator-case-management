@@ -56,6 +56,16 @@ public class CaseServiceTests : IAsyncDisposable
             postActionHooks: [hook]
         );
 
+    private static CaseIntake NewIntake() =>
+        new(
+            SourceSystemId: Ulid.NewUlid().ToString(),
+            CallbackUrl: "https://source-system.test/callback",
+            Nation: "ENGLAND",
+            OrgId: "test-org",
+            ProducerType: null,
+            DisplayData: new Dictionary<string, CaseDisplayField>()
+        );
+
     private static TestCaseType BuildType(CaseTransition[]? transitions = null)
     {
         var states = new[]
@@ -80,6 +90,10 @@ public class CaseServiceTests : IAsyncDisposable
     {
         var caseRecord = new Case
         {
+            SourceSystemId = Ulid.NewUlid().ToString(),
+            CallbackUrl = "https://source-system.test/callback",
+            Nation = "ENGLAND",
+            OrgId = "test-org",
             Id = Ulid.NewUlid().ToString(),
             TypeId = TypeId,
             StateId = stateId,
@@ -416,6 +430,10 @@ public class CaseServiceTests : IAsyncDisposable
         // same code path.
         var caseRecord = new Case
         {
+            SourceSystemId = Ulid.NewUlid().ToString(),
+            CallbackUrl = "https://source-system.test/callback",
+            Nation = "ENGLAND",
+            OrgId = "test-org",
             Id = Ulid.NewUlid().ToString(),
             TypeId = TypeId,
             StateId = "submitted",
@@ -461,6 +479,10 @@ public class CaseServiceTests : IAsyncDisposable
         );
         var caseRecord = new Case
         {
+            SourceSystemId = Ulid.NewUlid().ToString(),
+            CallbackUrl = "https://source-system.test/callback",
+            Nation = "ENGLAND",
+            OrgId = "test-org",
             Id = Ulid.NewUlid().ToString(),
             TypeId = TypeId,
             StateId = "submitted",
@@ -491,6 +513,10 @@ public class CaseServiceTests : IAsyncDisposable
         );
         var caseRecord = new Case
         {
+            SourceSystemId = Ulid.NewUlid().ToString(),
+            CallbackUrl = "https://source-system.test/callback",
+            Nation = "ENGLAND",
+            OrgId = "test-org",
             Id = Ulid.NewUlid().ToString(),
             TypeId = TypeId,
             StateId = "submitted",
@@ -528,6 +554,10 @@ public class CaseServiceTests : IAsyncDisposable
         );
         var caseRecord = new Case
         {
+            SourceSystemId = Ulid.NewUlid().ToString(),
+            CallbackUrl = "https://source-system.test/callback",
+            Nation = "ENGLAND",
+            OrgId = "test-org",
             Id = Ulid.NewUlid().ToString(),
             TypeId = TypeId,
             StateId = "submitted",
@@ -550,6 +580,10 @@ public class CaseServiceTests : IAsyncDisposable
         );
         var caseRecord = new Case
         {
+            SourceSystemId = Ulid.NewUlid().ToString(),
+            CallbackUrl = "https://source-system.test/callback",
+            Nation = "ENGLAND",
+            OrgId = "test-org",
             Id = Ulid.NewUlid().ToString(),
             TypeId = TypeId,
             StateId = "approved",
@@ -604,6 +638,10 @@ public class CaseServiceTests : IAsyncDisposable
         var orphanTypeId = "no-longer-registered-type";
         var caseRecord = new Case
         {
+            SourceSystemId = Ulid.NewUlid().ToString(),
+            CallbackUrl = "https://source-system.test/callback",
+            Nation = "ENGLAND",
+            OrgId = "test-org",
             Id = Ulid.NewUlid().ToString(),
             TypeId = orphanTypeId,
             StateId = "submitted",
@@ -1161,6 +1199,10 @@ public class CaseServiceTests : IAsyncDisposable
     {
         var caseRecord = new Case
         {
+            SourceSystemId = Ulid.NewUlid().ToString(),
+            CallbackUrl = "https://source-system.test/callback",
+            Nation = "ENGLAND",
+            OrgId = "test-org",
             Id = Ulid.NewUlid().ToString(),
             TypeId = "not-registered",
             StateId = "submitted",
@@ -1797,12 +1839,20 @@ public class CaseServiceTests : IAsyncDisposable
     public async Task Submit_persists_case_with_initial_state_and_template_snapshot()
     {
         var type = BuildType();
-        var payload = new BsonDocument { ["foo"] = "bar" };
+        var intake = NewIntake() with
+        {
+            SourceSystemId = "csoc-2024-eng-00123",
+            ProducerType = "COMPLIANCE_SCHEME",
+            DisplayData = new Dictionary<string, CaseDisplayField>
+            {
+                ["organisationName"] = new("Acme Packaging Ltd", "string"),
+            },
+        };
 
         var result = await BuildService(type)
             .SubmitAsync(
                 type,
-                payload,
+                intake,
                 "test-client",
                 AuditUser(),
                 cancellationToken: TestContext.Current.CancellationToken
@@ -1820,7 +1870,9 @@ public class CaseServiceTests : IAsyncDisposable
         Assert.NotNull(fetched.TemplateSnapshot);
         Assert.Equal("v1", fetched.TemplateVersion);
         Assert.Equal("v1", fetched.TemplateSnapshot!.TemplateVersion);
-        Assert.Equal("bar", fetched.Payload["foo"].AsString);
+        Assert.Equal("csoc-2024-eng-00123", fetched.SourceSystemId);
+        Assert.Equal("COMPLIANCE_SCHEME", fetched.ProducerType);
+        Assert.Equal(new CaseDisplayField("Acme Packaging Ltd", "string"), fetched.DisplayData["organisationName"]);
     }
 
     [Fact]
@@ -1831,7 +1883,7 @@ public class CaseServiceTests : IAsyncDisposable
         var result = await BuildService(type)
             .SubmitAsync(
                 type,
-                new BsonDocument(),
+                NewIntake(),
                 "test-client",
                 AuditUser(),
                 cancellationToken: TestContext.Current.CancellationToken
@@ -1865,7 +1917,7 @@ public class CaseServiceTests : IAsyncDisposable
         var result = await BuildService(type)
             .SubmitAsync(
                 type,
-                new BsonDocument(),
+                NewIntake(),
                 "test-client",
                 UserWithoutActorId(),
                 cancellationToken: TestContext.Current.CancellationToken
@@ -1898,7 +1950,7 @@ public class CaseServiceTests : IAsyncDisposable
         var result = await BuildService(type)
             .SubmitAsync(
                 type,
-                new BsonDocument(),
+                NewIntake(),
                 "test-client",
                 AuditUser(),
                 submissionMetadata: metadata,
@@ -1928,7 +1980,7 @@ public class CaseServiceTests : IAsyncDisposable
         var result = await BuildService(type)
             .SubmitAsync(
                 type,
-                new BsonDocument(),
+                NewIntake(),
                 "test-client",
                 AuditUser(),
                 submissionMetadata: null,
@@ -1979,6 +2031,11 @@ public class CaseServiceTests : IAsyncDisposable
             string id,
             CancellationToken cancellationToken = default
         ) => inner.GetByIdAsync(id, cancellationToken);
+
+        public Task<Case?> FindBySourceSystemIdAsync(
+            string sourceSystemId,
+            CancellationToken cancellationToken = default
+        ) => inner.FindBySourceSystemIdAsync(sourceSystemId, cancellationToken);
 
         public Task<CasePage> QueryAsync(
             CaseQuery query,

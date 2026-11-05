@@ -21,8 +21,17 @@ internal sealed class CaseOpenApiExampleTransformer : IOpenApiDocumentTransforme
         {
             ["SubmitCase"] = JsonNode.Parse("""
                 {
-                    "typeId": "example",
-                    "payload": {}
+                    "typeId": "CSoC",
+                    "sourceSystemId": "csoc-2024-eng-00123",
+                    "callbackUrl": "https://waste-obligations.example/organisations/org-00456/compliance-declarations/00123",
+                    "nation": "ENGLAND",
+                    "orgId": "org-00456",
+                    "producerType": "DIRECT_PRODUCER",
+                    "displayData": {
+                        "organisationName": { "value": "Acme Packaging Ltd", "type": "string" },
+                        "percentageMet": { "value": "87.3", "type": "number" },
+                        "dateSubmitted": { "value": "2024-11-01T10:32:00Z", "type": "date" }
+                    }
                 }
                 """),
 

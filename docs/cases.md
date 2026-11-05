@@ -27,7 +27,7 @@ Defined in `WasteRegulatorCaseManagement/Cases/`:
 | `ICaseModule` | A module's entry point. Exposes the `Type` and contributes `RegisterServices(services)` and `MapEndpoints(endpoints)`. |
 | `ICaseRegistry` | DI-resolvable lookup of every registered type. |
 | `ICaseService` | Framework service object that drives state transitions. Resolves the case, validates the request against the type, persists the change and writes an timeline. |
-| `Case` | The persisted case envelope: id, type id, state id, submitted-at, last-modified-at, submitted-by (CDP client id), free-form payload. |
+| `Case` | The persisted case: id, type id, state id, terminal flag, submitted-at, last-modified-at, submitted-by (CDP client id), the intake fields (source system id, callback URL, nation, org id, producer type, display data) and the timeline. |
 | `ICasePersistence` | Framework-owned MongoDB persistence for `Case`s. |
 | `CaseModuleExtensions` | `AddCaseFramework()`, `AddCaseModule<T>()`, `MapCaseModules()`, `MapCaseFrameworkEndpoints()`. |
 
@@ -44,7 +44,7 @@ are mounted by `MapCaseFrameworkEndpoints()`:
 
 | Method | Route | Description |
 | --- | --- | --- |
-| `POST` | `/cases` | Submit a new case. Body: `{ "typeId": "<type>", "payload": { ... } }`. The `typeId` must be registered with the framework; the server stamps the item with the type's `InitialState`, the caller's CDP client id and a server-side timestamp. Returns `201 Created` with `Location: /cases/{id}`. |
+| `POST` | `/cases` | Submit a new case. Body: `{ "typeId", "sourceSystemId", "callbackUrl", "nation", "orgId", "producerType"?, "displayData"? }` — see below. The `typeId` must be registered with the framework; the server stamps the case with the type's `InitialState`, the caller's CDP client id and a server-side timestamp. Returns `201 Created` with `Location: /cases/{id}`; a `sourceSystemId` that already has a case returns that case with `200 OK` and `X-Idempotent-Replay: true`. |
 | `GET` | `/cases/{id}` | Fetch a single case by id, projected with the actions the engine will currently allow. |
 | `GET` | `/cases` | List persisted cases (with the same projection), newest first, with filter / search / pagination per RA-93. Query string parameters: `typeId` (repeatable), `stateId` (repeatable), `search` (free-text — matched on id and submitter), `page` (1-based, default 1), `pageSize` (default 20, capped at 100). Returns a paged envelope: `{ items, totalCount, page, pageSize }`. |
 | `POST` | `/cases/{id}/actions/{actionId}` | Invoke a named action declared by the type's transitions. `409` if the case is in a terminal state; `400` for unknown actions, transitions whose from-state does not match, and transitions declared `CallerInvocable: false`. |
@@ -52,9 +52,19 @@ are mounted by `MapCaseFrameworkEndpoints()`:
 All three endpoints require authentication via the CDP client id
 header (`x-cdp-client-id`) per RA-89/RA-85b.
 
-The persisted envelope is owned by the framework; modules describe the shape
-of their payload via their `ICaseType` and operate on it via their own
-service objects.
+### Intake fields
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| `sourceSystemId` | Yes | Immutable reference to the submission in the source system. Unique: one case per submission. |
+| `callbackUrl` | Yes | Absolute http(s) URL the outcome is reported to when the case reaches a terminal state. |
+| `nation` | Yes | `ENGLAND`, `WALES`, `SCOTLAND` or `N_IRELAND`. |
+| `orgId` | Yes | The submitting organisation's id in the source system. |
+| `producerType` | No | Stored and returned uninterpreted (for CSoC, `DIRECT_PRODUCER` or `COMPLIANCE_SCHEME`). |
+| `displayData` | No | Map of field name to `{ "value": string, "type": "string" \| "number" \| "date" \| "boolean" }`, rendered by the caseworker dashboard. Stored and returned without interpretation. |
+
+The case management service holds a reference to the submission, not its
+content: anything else a caseworker needs is fetched from the source system.
 
 ## Adding a new case type
 
@@ -104,7 +114,7 @@ That is the complete list of changes required outside the new module folder.
   `/cases/<type-id>` so they do not clash with another module's routes.
 - Treat `ICaseType` as data: no I/O, no DI dependencies. Behaviour
   belongs in service objects registered via `RegisterServices`.
-- Form submissions (state transitions, type-specific payload edits)
+- Form submissions (state transitions)
   **must** flow through service objects. The framework's `ICaseService`
   covers transitions, assignment and notes; module-scoped services should
   follow the same pattern (intent-named methods, return result objects

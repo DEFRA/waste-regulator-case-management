@@ -1,8 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
-using System.Text.Json;
 using WasteRegulatorCaseManagement.Utils.Mongo;
 using MongoDB.Bson;
-using MongoDB.Bson.IO;
 using MongoDB.Driver;
 
 namespace WasteRegulatorCaseManagement.Cases;
@@ -17,6 +15,11 @@ public interface ICasePersistence
     Task CreateAsync(Case caseRecord, CancellationToken cancellationToken = default);
 
     Task<Case?> GetByIdAsync(string id, CancellationToken cancellationToken = default);
+
+    Task<Case?> FindBySourceSystemIdAsync(
+        string sourceSystemId,
+        CancellationToken cancellationToken = default
+    );
 
     /// <summary>
     /// Return a single page of cases matching <paramref name="query"/>,
@@ -79,6 +82,16 @@ public sealed class CasePersistence
     )
     {
         return await Collection.Find(w => w.Id == id).FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<Case?> FindBySourceSystemIdAsync(
+        string sourceSystemId,
+        CancellationToken cancellationToken = default
+    )
+    {
+        return await Collection
+            .Find(w => w.SourceSystemId == sourceSystemId)
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
     [ExcludeFromCodeCoverage]
@@ -286,66 +299,19 @@ public sealed class CasePersistence
                 builder.Descending(w => w.SubmittedAt)
             )
         );
+        // One case per source system submission: backs the idempotent intake
+        // lookup and arbitrates concurrent submits of the same reference.
+        var sourceSystemId = new CreateIndexModel<Case>(
+            builder.Ascending(w => w.SourceSystemId),
+            new CreateIndexOptions { Unique = true }
+        );
         return
         [
             typeAndSubmitted,
             stateAndSubmitted,
             submittedDescending,
             assigneeAndSubmitted,
+            sourceSystemId,
         ];
     }
 }
-
-/// <summary>
-/// Conversions between API-facing <see cref="JsonElement"/> payloads and the
-/// <see cref="BsonDocument"/> form persisted in MongoDB. Lifted to a static
-/// helper so endpoints, tests and future modules share one implementation.
-/// </summary>
-public static class CasePayloadConverter
-{
-    private static readonly BsonDocument s_emptyDocument = new();
-
-    /// <summary>
-    /// Pinned BSON-to-JSON output mode for every payload we hand to API
-    /// consumers. Relaxed extended JSON keeps int/long/double/decimal as
-    /// plain JSON numbers and emits dates as <c>{ "$date": "ISO-8601" }</c>,
-    /// so frontends see a stable shape regardless of driver version
-    /// defaults (epr-b0x).
-    /// </summary>
-    private static readonly JsonWriterSettings s_jsonWriterSettings = new()
-    {
-        OutputMode = JsonOutputMode.RelaxedExtendedJson,
-    };
-
-    public static BsonDocument ToBson(JsonElement? payload)
-    {
-        if (
-            !payload.HasValue
-            || payload.Value.ValueKind == JsonValueKind.Undefined
-            || payload.Value.ValueKind == JsonValueKind.Null
-        )
-        {
-            return new BsonDocument();
-        }
-
-        if (payload.Value.ValueKind != JsonValueKind.Object)
-        {
-            throw new InvalidCasePayloadException(
-                $"Case payload must be a JSON object, got {payload.Value.ValueKind}."
-            );
-        }
-
-        var json = payload.Value.GetRawText();
-        return BsonDocument.Parse(json);
-    }
-
-    public static JsonElement ToJson(BsonDocument? document)
-    {
-        var bson = document ?? s_emptyDocument;
-        var json = bson.ToJson(s_jsonWriterSettings);
-        using var doc = JsonDocument.Parse(json);
-        return doc.RootElement.Clone();
-    }
-}
-
-public sealed class InvalidCasePayloadException(string message) : Exception(message);

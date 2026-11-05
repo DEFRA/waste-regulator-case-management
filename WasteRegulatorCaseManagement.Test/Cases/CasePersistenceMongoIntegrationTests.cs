@@ -102,12 +102,15 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
         var now = _time.GetUtcNow().UtcDateTime;
         var caseRecord = new Case
         {
+            SourceSystemId = Ulid.NewUlid().ToString(),
+            CallbackUrl = "https://source-system.test/callback",
+            Nation = "ENGLAND",
+            OrgId = "test-org",
             TypeId = "re-accreditation",
             StateId = "submitted",
             SubmittedAt = now,
             LastModifiedAt = now,
             SubmittedBy = "client-1",
-            Payload = new BsonDocument { ["key"] = "value" },
         };
 
         await _persistence.CreateAsync(caseRecord, TestContext.Current.CancellationToken);
@@ -120,7 +123,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
         Assert.Equal("re-accreditation", fetched!.TypeId);
         Assert.Equal("submitted", fetched.StateId);
         Assert.Equal("client-1", fetched.SubmittedBy);
-        Assert.Equal("value", fetched.Payload["key"].AsString);
+        Assert.Equal("test-org", fetched.OrgId);
 
         var page = await _persistence.QueryAsync(
             new CaseQuery(),
@@ -132,7 +135,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
     }
 
     [Fact]
-    public async Task DefineIndexes_creates_the_four_documented_indexes_on_startup()
+    public async Task DefineIndexes_creates_the_five_documented_indexes_on_startup()
     {
         // Constructor of CasePersistence calls EnsureIndexes; we
         // assert what the driver actually wrote (not what we asked for)
@@ -149,7 +152,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
             .OrderBy(s => s, StringComparer.Ordinal)
             .ToList();
 
-        Assert.Equal(4, keyDocs.Count);
+        Assert.Equal(5, keyDocs.Count);
         Assert.Contains(
             keyDocs,
             k => k.Contains("\"typeId\" : 1") && k.Contains("\"submittedAt\" : -1")
@@ -192,8 +195,8 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
             var indexes = await (
                 await collection.Indexes.ListAsync(TestContext.Current.CancellationToken)
             ).ToListAsync(TestContext.Current.CancellationToken);
-            // Mongo's default _id_ index plus our four.
-            Assert.Equal(5, indexes.Count);
+            // Mongo's default _id_ index plus our five.
+            Assert.Equal(6, indexes.Count);
         }
         finally
         {
@@ -207,6 +210,10 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
         var now = _time.GetUtcNow().UtcDateTime;
         var caseRecord = new Case
         {
+            SourceSystemId = Ulid.NewUlid().ToString(),
+            CallbackUrl = "https://source-system.test/callback",
+            Nation = "ENGLAND",
+            OrgId = "test-org",
             TypeId = "re-accreditation",
             StateId = "submitted",
             SubmittedAt = now,
@@ -244,26 +251,28 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
     // ─────────────────────── RA-324 filter + sort (real Mongo) ───────────────────────
 
     private async Task SeedAsync(
-        string organisationName,
+        string orgId,
         string stateId = "submitted",
         int submittedMinutesAgo = 0
     )
     {
         var now = _time.GetUtcNow().UtcDateTime;
-        var payload = new BsonDocument { ["organisationName"] = organisationName };
         var item = new Case
         {
+            SourceSystemId = Ulid.NewUlid().ToString(),
+            CallbackUrl = "https://source-system.test/callback",
+            Nation = "ENGLAND",
+            OrgId = orgId,
             TypeId = "test",
             StateId = stateId,
             SubmittedAt = now.AddMinutes(-submittedMinutesAgo),
             LastModifiedAt = now,
-            Payload = payload,
         };
         await _persistence.CreateAsync(item, TestContext.Current.CancellationToken);
     }
 
     private static string[] OrgOrder(CasePage page) =>
-        page.Items.Select(i => i.Payload["organisationName"].AsString).ToArray();
+        page.Items.Select(i => i.OrgId).ToArray();
 
     [Fact]
     public async Task QueryAsync_default_sort_is_newest_submitted_first()
@@ -362,11 +371,14 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
         var now = _time.GetUtcNow().UtcDateTime;
         var item = new Case
         {
+            SourceSystemId = Ulid.NewUlid().ToString(),
+            CallbackUrl = "https://source-system.test/callback",
+            Nation = "ENGLAND",
+            OrgId = "Acme",
             TypeId = "test",
             StateId = "submitted",
             SubmittedAt = now,
             LastModifiedAt = now,
-            Payload = new BsonDocument { ["organisationName"] = "Acme" },
             Timeline =
             {
                 new CaseTimelineEntry
@@ -387,7 +399,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
         // Projection preserved on the aggregation path, and the computed sort
         // fields were $unset so the document still deserialises cleanly.
         Assert.Empty(got.Timeline);
-        Assert.Equal("Acme", got.Payload["organisationName"].AsString);
+        Assert.Equal("Acme", got.OrgId);
     }
 
     [Fact]
@@ -403,7 +415,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
 
         var page = await persistence.QueryAsync(new CaseQuery(Sort: "status"), ct);
 
-        Assert.Equal("only", Assert.Single(page.Items).Payload["organisationName"].AsString);
+        Assert.Equal("only", Assert.Single(page.Items).OrgId);
     }
 
     // RA-412 (self-review): a real-Mongo round trip for the applicant-type
@@ -418,6 +430,10 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
         var now = _time.GetUtcNow().UtcDateTime;
         var caseRecord = new Case
         {
+            SourceSystemId = Ulid.NewUlid().ToString(),
+            CallbackUrl = "https://source-system.test/callback",
+            Nation = "ENGLAND",
+            OrgId = "test-org",
             TypeId = "re-accreditation",
             StateId = "submitted",
             SubmittedAt = now,
@@ -459,8 +475,6 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
         );
         Assert.Equal("in-progress", final!.StateId);
     }
-
-    // ---------------------- RA-291 SetPayloadFieldAsync ----------------------
 
     // ------------------- RA-342 legacy snapshot tolerance -------------------
 
@@ -590,37 +604,4 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
             Assert.Single(fetched.TemplateSnapshot!.States, s => s.Id == "submitted").DisplayName
         );
     }
-
-    // ------------------------- RA-551 payload.nation representation -------------------------
-
-    // ----------------- RA-691 FindByPayloadFieldPrefixAsync / CorrectPayloadFieldAsync -----------------
-
-    private async Task<Case> CreateWithAccreditationIdAsync(
-        string accreditationId,
-        string typeId = "re-accreditation",
-        CancellationToken ct = default
-    )
-    {
-        var now = s_seedNow.UtcDateTime;
-        var caseRecord = new Case
-        {
-            TypeId = typeId,
-            StateId = "approved",
-            SubmittedAt = now,
-            LastModifiedAt = now,
-            SubmittedBy = "client-1",
-        };
-        caseRecord.ReplacePayload(new BsonDocument { ["accreditationId"] = accreditationId });
-        caseRecord.Timeline.Add(
-            new CaseTimelineEntry
-            {
-                Action = "accreditation-issued",
-                ActionDisplayName = "Accreditation issued",
-                CreatedAt = now,
-            }
-        );
-        await _persistence.CreateAsync(caseRecord, ct);
-        return caseRecord;
-    }
-
 }

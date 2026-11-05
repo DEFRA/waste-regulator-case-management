@@ -1,4 +1,3 @@
-using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 using NUlid;
 
@@ -98,25 +97,40 @@ public sealed class Case
     public string? TemplateVersion { get; set; }
 
     /// <summary>
-    /// Free-form, type-specific payload supplied by the upstream caller. Stored
-    /// verbatim so modules can interpret it however they choose. Persisted as a
-    /// BSON sub-document; the API converts to/from JSON at the boundary.
-    ///
-    /// The property has a public setter to satisfy the BSON auto-mapper on
-    /// deserialisation. Call-site mutations should go through
-    /// <see cref="ReplacePayload"/> so the intent is explicit and
-    /// discoverable.
+    /// Immutable reference to the submission in the source system. A source
+    /// system creates at most one case per reference, so it is unique.
     /// </summary>
-    public BsonDocument Payload { get; set; } = new();
+    public required string SourceSystemId { get; init; }
 
     /// <summary>
-    /// RA-132: swap the payload for a freshly-built <paramref name="payload"/>
-    /// document. Used by module service objects that need to rebuild the
-    /// payload as part of the same
-    /// atomic <see cref="ICasePersistence.ReplaceAsync"/> that records
-    /// the state transition and audit entries.
+    /// Where this service reports the case's outcome to the source system
+    /// when it reaches a terminal state. Supplied at intake and stored
+    /// unchanged.
     /// </summary>
-    internal void ReplacePayload(BsonDocument payload) => Payload = payload;
+    public required string CallbackUrl { get; init; }
+
+    /// <summary>
+    /// The UK nation the case belongs to, one of <see cref="CaseNations.All"/>.
+    /// Scopes which regulators can see and act on it.
+    /// </summary>
+    public required string Nation { get; init; }
+
+    /// <summary>The submitting organisation's id in the source system.</summary>
+    public required string OrgId { get; init; }
+
+    /// <summary>
+    /// The source system's classification of the submitter (for CSoC,
+    /// <c>DIRECT_PRODUCER</c> or <c>COMPLIANCE_SCHEME</c>). Stored and
+    /// returned uninterpreted.
+    /// </summary>
+    public string? ProducerType { get; init; }
+
+    /// <summary>
+    /// Fields the caseworker dashboard renders in the case list, supplied by
+    /// the source system at intake so listing never joins back to it. Stored
+    /// and returned without interpretation.
+    /// </summary>
+    public Dictionary<string, CaseDisplayField> DisplayData { get; init; } = new();
 
     /// <summary>
     /// Append-only system timeline (RA-97). The framework writes one entry

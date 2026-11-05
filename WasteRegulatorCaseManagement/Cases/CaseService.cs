@@ -1,5 +1,5 @@
 using System.Security.Claims;
-using MongoDB.Bson;
+using MongoDB.Driver;
 
 namespace WasteRegulatorCaseManagement.Cases;
 
@@ -24,11 +24,13 @@ public interface ICaseService
     /// <see cref="ICasePersistence.CreateAsync"/> call. Mutations
     /// require a <c>user:id</c> claim — calls without one return
     /// <see cref="CaseActionFailureCode.MissingActorIdentity"/> and
-    /// nothing is persisted.
+    /// nothing is persisted. A <see cref="CaseIntake.SourceSystemId"/> that
+    /// already has a case returns that case as an idempotent replay rather
+    /// than creating a second one, so a source system can safely resend.
     /// </summary>
     Task<CaseActionResult> SubmitAsync(
         ICaseType type,
-        BsonDocument payload,
+        CaseIntake intake,
         string? submittedBy,
         ClaimsPrincipal user,
         IReadOnlyDictionary<string, string?>? submissionMetadata = null,
@@ -131,7 +133,7 @@ public sealed class CaseService : ICaseService
 
     public async Task<CaseActionResult> SubmitAsync(
         ICaseType type,
-        BsonDocument payload,
+        CaseIntake intake,
         string? submittedBy,
         ClaimsPrincipal user,
         IReadOnlyDictionary<string, string?>? submissionMetadata = null,
@@ -139,28 +141,23 @@ public sealed class CaseService : ICaseService
     )
     {
         ArgumentNullException.ThrowIfNull(type);
-        ArgumentNullException.ThrowIfNull(payload);
+        ArgumentNullException.ThrowIfNull(intake);
 
         if (RequireActorIdentity(user) is { } identityFailure)
         {
             return identityFailure;
         }
 
-        var now = _timeProvider.GetUtcNow().UtcDateTime;
-
-        // RA-196: ensure 'source' is in the payload. If the caller provided
-        // it in the submission metadata (the standard BFF pattern) it is
-        // mirrored here so consumers can find it without parsing the audit
-        // log.
-        if (
-            submissionMetadata != null
-            && submissionMetadata.TryGetValue(SourceKey, out var sourceVal)
-            && sourceVal != null
-            && !payload.Contains(SourceKey)
-        )
+        var existing = await _persistence.FindBySourceSystemIdAsync(
+            intake.SourceSystemId,
+            cancellationToken
+        );
+        if (existing is not null)
         {
-            payload[SourceKey] = sourceVal;
+            return CaseActionResult.IdempotentReplay(existing);
         }
+
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
 
         var snapshot = CaseTemplateSnapshot.Capture(type);
 
@@ -174,7 +171,12 @@ public sealed class CaseService : ICaseService
             SubmittedBy = submittedBy,
             TemplateSnapshot = snapshot,
             TemplateVersion = snapshot.TemplateVersion,
-            Payload = payload,
+            SourceSystemId = intake.SourceSystemId,
+            CallbackUrl = intake.CallbackUrl,
+            Nation = intake.Nation,
+            OrgId = intake.OrgId,
+            ProducerType = intake.ProducerType,
+            DisplayData = new Dictionary<string, CaseDisplayField>(intake.DisplayData),
         };
 
         // Birth event: the timeline must start at submission rather
@@ -213,6 +215,26 @@ public sealed class CaseService : ICaseService
         try
         {
             await _persistence.CreateAsync(caseRecord, cancellationToken);
+        }
+        // A concurrent submit of the same source system id won the insert
+        // between the lookup above and this write: hand back its case.
+        catch (MongoWriteException ex)
+            when (ex.WriteError?.Category == ServerErrorCategory.DuplicateKey)
+        {
+            var winner =
+                await _persistence.FindBySourceSystemIdAsync(
+                    intake.SourceSystemId,
+                    cancellationToken
+                ) ?? throw new InvalidOperationException(
+                    $"Duplicate key creating case {caseRecord.Id}, but no case has source system id '{intake.SourceSystemId}'.",
+                    ex
+                );
+            _logger.LogInformation(
+                "Case for source system id {SourceSystemId} was created concurrently; returning {CaseId}",
+                intake.SourceSystemId,
+                winner.Id
+            );
+            return CaseActionResult.IdempotentReplay(winner);
         }
         catch (Exception ex)
         {

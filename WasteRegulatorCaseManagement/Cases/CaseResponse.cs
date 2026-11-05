@@ -1,5 +1,3 @@
-using System.Text.Json;
-
 namespace WasteRegulatorCaseManagement.Cases;
 
 /// <summary>
@@ -21,7 +19,11 @@ public sealed record CaseResponse(
     DateTime LastModifiedAt,
     string? SubmittedBy,
     string TemplateVersion,
-    JsonElement Payload,
+    string SourceSystemId,
+    string Nation,
+    string OrgId,
+    string? ProducerType,
+    IReadOnlyDictionary<string, CaseDisplayField> DisplayData,
     IReadOnlyCollection<CaseTransition> AvailableActions,
     string? AssignedToId = null,
     string? AssignedToName = null,
