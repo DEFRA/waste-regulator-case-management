@@ -114,7 +114,6 @@ public sealed class CaseService : ICaseService
 	private readonly ICasePersistence _persistence;
 	private readonly ICaseCallbackClient _callbackClient;
 	private readonly ILogger<CaseService> _logger;
-	private readonly IReadOnlyCollection<ICasePostActionHook> _postActionHooks;
 	private readonly TimeProvider _timeProvider;
 
 	public CaseService(
@@ -122,15 +121,13 @@ public sealed class CaseService : ICaseService
 		ICasePersistence persistence,
 		ICaseCallbackClient callbackClient,
 		ILogger<CaseService> logger,
-		TimeProvider? timeProvider = null,
-		IEnumerable<ICasePostActionHook>? postActionHooks = null
+		TimeProvider? timeProvider = null
 	)
 	{
 		this._registry = registry;
 		this._persistence = persistence;
 		_callbackClient = callbackClient;
 		this._logger = logger;
-		_postActionHooks = postActionHooks?.ToArray() ?? Array.Empty<ICasePostActionHook>();
 		_timeProvider = timeProvider ?? TimeProvider.System;
 	}
 
@@ -256,8 +253,6 @@ public sealed class CaseService : ICaseService
 			caseRecord.StateId,
 			DescribeUser(user)
 		);
-
-		await InvokeSubmittedHooksAsync(caseRecord, user, cancellationToken);
 
 		return CaseActionResult.Success(caseRecord);
 	}
@@ -426,13 +421,6 @@ public sealed class CaseService : ICaseService
 			caseRecord.StateId,
 			transition.ActionId,
 			DescribeUser(user)
-		);
-
-		await InvokeActionAppliedHooksAsync(
-			caseRecord,
-			transition.ActionId,
-			previousState,
-			user
 		);
 
 		return CaseActionResult.Success(caseRecord);
@@ -650,17 +638,6 @@ public sealed class CaseService : ICaseService
 			DescribeUser(user)
 		);
 
-		// RA-237: assignment is a first-class envelope operation, so it must
-		// fan out to the post-action hooks explicitly (ApplyActionAsync's hook
-		// fan-out does not cover it). A brand-new assignment on a previously
-		// unassigned item is Assigned; changing the assignee of an
-		// already-assigned item is Reassigned. Fires only on this real-change
-		// path — the earlier IdempotentReplay return skips it.
-		var change = previousAssigneeId is null
-			? CaseAssignmentChange.Assigned
-			: CaseAssignmentChange.Reassigned;
-		await InvokeAssignmentChangedHooksAsync(caseRecord, change, user, cancellationToken);
-
 		return CaseActionResult.Success(caseRecord);
 	}
 
@@ -735,15 +712,6 @@ public sealed class CaseService : ICaseService
 			caseRecord.CaseType,
 			previousAssigneeId,
 			DescribeUser(user)
-		);
-
-		// RA-237: notify the post-action hooks of the real unassignment.
-		// The earlier IdempotentReplay return (already unassigned) skips this.
-		await InvokeAssignmentChangedHooksAsync(
-			caseRecord,
-			CaseAssignmentChange.Unassigned,
-			user,
-			cancellationToken
 		);
 
 		return CaseActionResult.Success(caseRecord);
@@ -1151,105 +1119,5 @@ public sealed class CaseService : ICaseService
 	{
 		var id = user?.FindFirstValue("user:id");
 		return string.IsNullOrWhiteSpace(id) ? null : id;
-	}
-
-	/// <summary>
-	/// Fan out to every registered <see cref="ICasePostActionHook"/>
-	/// after a successful submission. Hooks are required to swallow
-	/// their own failures (see interface contract); this method only
-	/// guards against a misbehaving hook by catching and logging so a
-	/// single hook cannot unwind the originating mutation.
-	/// </summary>
-	private async Task InvokeSubmittedHooksAsync(
-		Case caseRecord,
-		ClaimsPrincipal user,
-		CancellationToken cancellationToken
-	)
-	{
-		foreach (var hook in _postActionHooks)
-		{
-			try
-			{
-				await hook.OnSubmittedAsync(caseRecord, user, cancellationToken);
-			}
-			catch (Exception ex)
-			{
-				_logger.LogError(
-					ex,
-					"Post-action submit hook {HookType} failed for case {CaseId}",
-					hook.GetType().FullName,
-					caseRecord.Id
-				);
-			}
-		}
-	}
-
-	private async Task InvokeActionAppliedHooksAsync(
-		Case caseRecord,
-		string actionId,
-		string fromStateId,
-		ClaimsPrincipal user
-	)
-	{
-		// The transition is already committed by the time hooks run, so a client
-		// that gives up waiting (management-fe times out) must not cancel them:
-		// a hook's outbound side effect and its audit entries would be lost,
-		// leaving this service and the other system disagreeing about the state.
-		foreach (var hook in _postActionHooks)
-		{
-			try
-			{
-				await hook.OnActionAppliedAsync(
-					caseRecord,
-					actionId,
-					fromStateId,
-					user,
-					CancellationToken.None
-				);
-			}
-			catch (Exception ex)
-			{
-				_logger.LogError(
-					ex,
-					"Post-action transition hook {HookType} failed for case {CaseId} action {ActionId}",
-					hook.GetType().FullName,
-					caseRecord.Id,
-					actionId
-				);
-			}
-		}
-	}
-
-	/// <summary>
-	/// RA-237: fan out to every registered <see cref="ICasePostActionHook"/>
-	/// after a successful, non-idempotent assignment change. Mirrors the
-	/// swallow-and-log contract of the submit / action fan-outs so a
-	/// misbehaving hook (e.g. a Notify outage in the assignment-email hook)
-	/// cannot unwind the assignment that has already persisted.
-	/// </summary>
-	private async Task InvokeAssignmentChangedHooksAsync(
-		Case caseRecord,
-		CaseAssignmentChange change,
-		ClaimsPrincipal user,
-		CancellationToken cancellationToken
-	)
-	{
-		foreach (var hook in _postActionHooks)
-		{
-			try
-			{
-				await hook.OnAssignmentChangedAsync(caseRecord, change, user, cancellationToken);
-			}
-			catch (Exception ex)
-			{
-				_logger.LogError(
-					ex,
-					"Post-action assignment hook {HookType} failed for case {CaseId} change {Change}",
-					hook.GetType().FullName,
-					caseRecord.Id,
-					change
-				);
-			}
-		}
 	}
 }

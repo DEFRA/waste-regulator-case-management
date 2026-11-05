@@ -15,8 +15,6 @@ public static class CaseModuleExtensions
 			.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { UseProxy = false })
 			.AddHeaderPropagation();
 		services.AddSingleton<ICaseCallbackClient, CaseCallbackClient>();
-		services.AddSingleton<ICaseTimelineAppender, CaseTimelineAppender>();
-		services.AddHostedService<CaseMigrationHostedService>();
 		return services;
 	}
 }

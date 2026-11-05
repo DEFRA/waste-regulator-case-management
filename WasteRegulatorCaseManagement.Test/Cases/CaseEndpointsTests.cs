@@ -2728,17 +2728,6 @@ public class CaseEndpointsTests
 						states: _states
 					)
 				);
-
-				// Background services call QueryAsync at startup which sets
-				// Recording.LastQuery and contaminates tests that assert the
-				// query was never issued. Remove the offender.
-				var migrationDescriptor = services.FirstOrDefault(d =>
-					d.ImplementationType == typeof(CaseMigrationHostedService)
-				);
-				if (migrationDescriptor is not null)
-				{
-					services.Remove(migrationDescriptor);
-				}
 			});
 		}
 
