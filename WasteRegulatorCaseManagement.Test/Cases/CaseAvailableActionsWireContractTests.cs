@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using WasteRegulatorCaseManagement.Auth;
+using NUlid;
 
 namespace WasteRegulatorCaseManagement.Test.Cases;
 
@@ -105,11 +106,11 @@ public class CaseAvailableActionsWireContractTests
         }
     }
 
-    private static async Task<Guid> SeedAsync(
+    private static async Task<string> SeedAsync(
         ContractFactory factory,
         CancellationToken cancellationToken)
     {
-        var caseId = Guid.NewGuid();
+        var caseId = Ulid.NewUlid().ToString();
         await factory.SeedAsync(
             new Case
             {

@@ -33,7 +33,7 @@ public sealed record CaseListResponse(
 /// a list view can render rich rows without a per-row round-trip.
 /// </summary>
 public sealed record CaseListItemResponse(
-    Guid Id,
+    string Id,
     string TypeId,
     string StateId,
     DateTime SubmittedAt,

@@ -7,9 +7,9 @@ namespace WasteRegulatorCaseManagement.Cases;
 /// it as <see cref="CaseActionFailureCode.ConcurrencyConflict"/> (HTTP
 /// 409) so the caller can retry against the latest state.
 /// </summary>
-public sealed class CaseConcurrencyException(Guid caseId, int expectedVersion)
+public sealed class CaseConcurrencyException(string caseId, int expectedVersion)
     : Exception($"Case '{caseId}' was modified concurrently (expected version {expectedVersion}).")
 {
-    public Guid CaseId { get; } = caseId;
+    public string CaseId { get; } = caseId;
     public int ExpectedVersion { get; } = expectedVersion;
 }

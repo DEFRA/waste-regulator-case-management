@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using WasteRegulatorCaseManagement.Auth;
+using NUlid;
 
 namespace WasteRegulatorCaseManagement.Test.Cases;
 
@@ -46,7 +47,7 @@ public class CaseAuthBoundaryTests
         await using var factory = new BoundaryFactory(_fixture, userId: "alice-1");
         using var client = factory.CreateClient();
 
-        var id = Guid.NewGuid();
+        var id = Ulid.NewUlid().ToString();
         await factory.SeedAsync(NewSubmittedItem(id), cancellationToken);
 
         var response = await client.PostAsJsonAsync(
@@ -68,7 +69,7 @@ public class CaseAuthBoundaryTests
         await using var factory = new BoundaryFactory(_fixture, userId: "alice-1");
         using var client = factory.CreateClient();
 
-        var id = Guid.NewGuid();
+        var id = Ulid.NewUlid().ToString();
         var seeded = NewSubmittedItem(id);
         seeded.AssignedToId = "bob-2";
         seeded.AssignedToName = "Bob";
@@ -93,7 +94,7 @@ public class CaseAuthBoundaryTests
         await using var factory = new BoundaryFactory(_fixture, userId: "alice-1");
         using var client = factory.CreateClient();
 
-        var id = Guid.NewGuid();
+        var id = Ulid.NewUlid().ToString();
         var seeded = NewSubmittedItem(id);
         seeded.AssignedToId = "alice-1";
         seeded.AssignedToName = "Alice";
@@ -114,7 +115,7 @@ public class CaseAuthBoundaryTests
 
     // ---------------------------- Helpers ----------------------------
 
-    private static Case NewSubmittedItem(Guid id) => new()
+    private static Case NewSubmittedItem(string id) => new()
     {
         Id = id,
         TypeId = TypeId,

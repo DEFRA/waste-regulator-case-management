@@ -16,7 +16,7 @@ public interface ICasePersistence
 {
     Task CreateAsync(Case caseRecord, CancellationToken cancellationToken = default);
 
-    Task<Case?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<Case?> GetByIdAsync(string id, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Return a single page of cases matching <paramref name="query"/>,
@@ -75,7 +75,7 @@ public sealed class CasePersistence
     }
 
     public async Task<Case?> GetByIdAsync(
-        Guid id,
+        string id,
         CancellationToken cancellationToken = default
     )
     {

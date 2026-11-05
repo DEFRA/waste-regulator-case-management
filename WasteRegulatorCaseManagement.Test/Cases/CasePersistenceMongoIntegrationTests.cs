@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using NUlid;
 
 namespace WasteRegulatorCaseManagement.Test.Cases;
 
@@ -508,7 +509,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
     {
         var ct = TestContext.Current.CancellationToken;
         var now = _time.GetUtcNow().UtcDateTime;
-        var id = Guid.NewGuid();
+        var id = Ulid.NewUlid().ToString();
 
         // Camel-cased element names to match the CamelCaseElementNameConvention
         // the production serializers register (MongoConversions).

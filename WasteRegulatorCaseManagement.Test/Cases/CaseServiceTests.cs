@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 using NSubstitute;
+using NUlid;
 
 namespace WasteRegulatorCaseManagement.Test.Cases;
 
@@ -79,7 +80,7 @@ public class CaseServiceTests : IAsyncDisposable
     {
         var caseRecord = new Case
         {
-            Id = Guid.NewGuid(),
+            Id = Ulid.NewUlid().ToString(),
             TypeId = TypeId,
             StateId = stateId,
             SubmittedAt = InitialNow,
@@ -91,7 +92,7 @@ public class CaseServiceTests : IAsyncDisposable
         return caseRecord;
     }
 
-    private async Task<Case> GetAsync(Guid id)
+    private async Task<Case> GetAsync(string id)
     {
         var fetched = await _persistence.GetByIdAsync(id, TestContext.Current.CancellationToken);
         Assert.NotNull(fetched);
@@ -416,7 +417,7 @@ public class CaseServiceTests : IAsyncDisposable
         // same code path.
         var caseRecord = new Case
         {
-            Id = Guid.NewGuid(),
+            Id = Ulid.NewUlid().ToString(),
             TypeId = TypeId,
             StateId = "submitted",
             SubmittedAt = InitialNow,
@@ -461,7 +462,7 @@ public class CaseServiceTests : IAsyncDisposable
         );
         var caseRecord = new Case
         {
-            Id = Guid.NewGuid(),
+            Id = Ulid.NewUlid().ToString(),
             TypeId = TypeId,
             StateId = "submitted",
             SubmittedAt = InitialNow,
@@ -491,7 +492,7 @@ public class CaseServiceTests : IAsyncDisposable
         );
         var caseRecord = new Case
         {
-            Id = Guid.NewGuid(),
+            Id = Ulid.NewUlid().ToString(),
             TypeId = TypeId,
             StateId = "submitted",
             SubmittedAt = InitialNow,
@@ -528,7 +529,7 @@ public class CaseServiceTests : IAsyncDisposable
         );
         var caseRecord = new Case
         {
-            Id = Guid.NewGuid(),
+            Id = Ulid.NewUlid().ToString(),
             TypeId = TypeId,
             StateId = "submitted",
             SubmittedAt = InitialNow,
@@ -550,7 +551,7 @@ public class CaseServiceTests : IAsyncDisposable
         );
         var caseRecord = new Case
         {
-            Id = Guid.NewGuid(),
+            Id = Ulid.NewUlid().ToString(),
             TypeId = TypeId,
             StateId = "approved",
             SubmittedAt = InitialNow,
@@ -570,7 +571,7 @@ public class CaseServiceTests : IAsyncDisposable
         var type = BuildType();
 
         var projection = await BuildService(type)
-            .ProjectAsync(Guid.NewGuid(), TestContext.Current.CancellationToken);
+            .ProjectAsync(Ulid.NewUlid().ToString(), TestContext.Current.CancellationToken);
 
         Assert.Null(projection);
     }
@@ -604,7 +605,7 @@ public class CaseServiceTests : IAsyncDisposable
         var orphanTypeId = "no-longer-registered-type";
         var caseRecord = new Case
         {
-            Id = Guid.NewGuid(),
+            Id = Ulid.NewUlid().ToString(),
             TypeId = orphanTypeId,
             StateId = "submitted",
             SubmittedAt = InitialNow,
@@ -1161,7 +1162,7 @@ public class CaseServiceTests : IAsyncDisposable
     {
         var caseRecord = new Case
         {
-            Id = Guid.NewGuid(),
+            Id = Ulid.NewUlid().ToString(),
             TypeId = "not-registered",
             StateId = "submitted",
             SubmittedAt = InitialNow,
@@ -1241,7 +1242,7 @@ public class CaseServiceTests : IAsyncDisposable
         var actor = UserWithRoles("actor-1", "assign");
         var result = await BuildService(type)
             .AssignAsync(
-                Guid.NewGuid(),
+                Ulid.NewUlid().ToString(),
                 "alice-1",
                 "Alice",
                 actor,
@@ -1258,7 +1259,7 @@ public class CaseServiceTests : IAsyncDisposable
         var type = BuildType();
         var actor = UserWithRoles("actor-1", "assign");
         var result = await BuildService(type)
-            .UnassignAsync(Guid.NewGuid(), actor, TestContext.Current.CancellationToken);
+            .UnassignAsync(Ulid.NewUlid().ToString(), actor, TestContext.Current.CancellationToken);
 
         Assert.False(result.IsSuccess);
         Assert.Equal(CaseActionFailureCode.CaseNotFound, result.FailureCode);
@@ -1453,7 +1454,7 @@ public class CaseServiceTests : IAsyncDisposable
 
         var result = await BuildService(type)
             .AddNoteAsync(
-                Guid.NewGuid(),
+                Ulid.NewUlid().ToString(),
                 "anything",
                 User(),
                 TestContext.Current.CancellationToken
@@ -1954,7 +1955,7 @@ public class CaseServiceTests : IAsyncDisposable
     /// load and replace, triggering the optimistic-concurrency exception
     /// for real (no mocked throws — see epr-efp).
     /// </summary>
-    private CaseService BuildRacingService(ICaseType type, Guid id)
+    private CaseService BuildRacingService(ICaseType type, string id)
     {
         var racing = new RacingPersistence(
             _persistence,
@@ -1980,7 +1981,7 @@ public class CaseServiceTests : IAsyncDisposable
             inner.CreateAsync(caseRecord, cancellationToken);
 
         public Task<Case?> GetByIdAsync(
-            Guid id,
+            string id,
             CancellationToken cancellationToken = default
         ) => inner.GetByIdAsync(id, cancellationToken);
 

@@ -51,29 +51,29 @@ public static class CaseEndpoints
             .WithMetadata(new RequestSizeLimitAttribute(MaxSubmitBodyBytes))
             .RequireAuthorization();
 
-        group.MapGet("/{id:guid}", GetById).WithName("GetCaseById").RequireAuthorization();
+        group.MapGet("/{id}", GetById).WithName("GetCaseById").RequireAuthorization();
 
         group.MapGet(string.Empty, GetAll).WithName("ListCases").RequireAuthorization();
 
         group
-            .MapPost("/{id:guid}/actions/{actionId}", ApplyAction)
+            .MapPost("/{id}/actions/{actionId}", ApplyAction)
             .WithName("ApplyCaseAction")
             .RequireAuthorization();
 
         group
-            .MapPost("/{id:guid}/assign", Assign)
+            .MapPost("/{id}/assign", Assign)
             .WithName("AssignCase")
             .DisableValidation()
             .WithMetadata(new RequestSizeLimitAttribute(MaxAssignBodyBytes))
             .RequireAuthorization();
 
         group
-            .MapPost("/{id:guid}/unassign", Unassign)
+            .MapPost("/{id}/unassign", Unassign)
             .WithName("UnassignCase")
             .RequireAuthorization();
 
         group
-            .MapPost("/{id:guid}/notes", AddNote)
+            .MapPost("/{id}/notes", AddNote)
             .WithName("AddCaseNote")
             .DisableValidation()
             .WithMetadata(new RequestSizeLimitAttribute(MaxNoteBodyBytes))
@@ -308,7 +308,7 @@ public static class CaseEndpoints
         );
 
     internal static async Task<Results<Ok<CaseResponse>, NotFound>> GetById(
-        [FromRoute] Guid id,
+        [FromRoute] string id,
         HttpContext httpContext,
         [FromServices] ICasePersistence persistence,
         [FromServices] ICaseService engine,
@@ -363,7 +363,7 @@ public static class CaseEndpoints
     internal static async Task<
         Results<Ok<CaseResponse>, NotFound, ProblemHttpResult>
     > ApplyAction(
-        [FromRoute] Guid id,
+        [FromRoute] string id,
         [FromRoute] string actionId,
         HttpContext httpContext,
         [FromServices] ICasePersistence persistence,
@@ -419,7 +419,7 @@ public static class CaseEndpoints
     }
 
     internal static async Task<Results<Ok<CaseResponse>, NotFound, ProblemHttpResult>> Assign(
-        [FromRoute] Guid id,
+        [FromRoute] string id,
         JsonElement body,
         HttpContext httpContext,
         [FromServices] ICaseService engine,
@@ -470,7 +470,7 @@ public static class CaseEndpoints
     }
 
     internal static async Task<Results<Ok<CaseResponse>, NotFound, ProblemHttpResult>> Unassign(
-        [FromRoute] Guid id,
+        [FromRoute] string id,
         HttpContext httpContext,
         [FromServices] ICaseService engine,
         CancellationToken cancellationToken
@@ -485,7 +485,7 @@ public static class CaseEndpoints
     }
 
     internal static async Task<Results<Ok<CaseResponse>, NotFound, ProblemHttpResult>> AddNote(
-        [FromRoute] Guid id,
+        [FromRoute] string id,
         JsonElement body,
         HttpContext httpContext,
         [FromServices] ICaseService engine,

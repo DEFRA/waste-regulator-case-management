@@ -1,5 +1,4 @@
-using MongoDB.Bson;
-using MongoDB.Bson.Serialization.Attributes;
+using NUlid;
 
 namespace WasteRegulatorCaseManagement.Cases;
 
@@ -17,8 +16,7 @@ namespace WasteRegulatorCaseManagement.Cases;
 /// </summary>
 public sealed class CaseAuditEntry
 {
-    [BsonRepresentation(BsonType.String)]
-    public Guid Id { get; init; } = Guid.NewGuid();
+    public string Id { get; init; } = Ulid.NewUlid().ToString();
 
     /// <summary>
     /// Stable machine-readable identifier of the action that produced this

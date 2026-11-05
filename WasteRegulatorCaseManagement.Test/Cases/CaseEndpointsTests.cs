@@ -13,6 +13,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using NSubstitute;
 using WasteRegulatorCaseManagement.Auth;
+using NUlid;
 
 namespace WasteRegulatorCaseManagement.Test.Cases;
 
@@ -149,6 +150,7 @@ public class CaseEndpointsTests
         Assert.NotNull(response.Headers.Location);
         Assert.StartsWith("/cases/", response.Headers.Location!.AbsolutePath);
 
+        Assert.True(Ulid.TryParse(body.Id, out _), $"'{body.Id}' is not a ULID");
         Assert.Equal(TypeId, body.TypeId);
         Assert.Equal("submitted", body.StateId);
         Assert.Equal("test-client", body.SubmittedBy);
@@ -353,7 +355,7 @@ public class CaseEndpointsTests
         await using var factory = NewFactory();
         using var client = factory.CreateClient();
 
-        var id = Guid.NewGuid();
+        var id = Ulid.NewUlid().ToString();
         await factory.SeedAsync(
             new Case
             {
@@ -380,7 +382,7 @@ public class CaseEndpointsTests
         await using var factory = NewFactory();
         using var client = factory.CreateClient();
 
-        var response = await client.GetAsync($"/cases/{Guid.NewGuid()}", cancellationToken);
+        var response = await client.GetAsync($"/cases/{Ulid.NewUlid().ToString()}", cancellationToken);
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
@@ -394,7 +396,7 @@ public class CaseEndpointsTests
         await using var factory = NewFactory();
         using var client = factory.CreateClient();
 
-        var id = Guid.NewGuid();
+        var id = Ulid.NewUlid().ToString();
         await factory.SeedAsync(
             new Case
             {
@@ -420,7 +422,7 @@ public class CaseEndpointsTests
         await factory.SeedAsync(
             new Case
             {
-                Id = Guid.NewGuid(),
+                Id = Ulid.NewUlid().ToString(),
                 TypeId = TypeId,
                 StateId = "submitted",
                 SubmittedBy = "test-client",
@@ -430,7 +432,7 @@ public class CaseEndpointsTests
         await factory.SeedAsync(
             new Case
             {
-                Id = Guid.NewGuid(),
+                Id = Ulid.NewUlid().ToString(),
                 TypeId = TypeId,
                 StateId = "submitted",
                 SubmittedBy = "other-tenant",
@@ -464,7 +466,7 @@ public class CaseEndpointsTests
         await factory.SeedAsync(
             new Case
             {
-                Id = Guid.NewGuid(),
+                Id = Ulid.NewUlid().ToString(),
                 TypeId = TypeId,
                 StateId = "submitted",
                 SubmittedBy = "test-client",
@@ -474,7 +476,7 @@ public class CaseEndpointsTests
         await factory.SeedAsync(
             new Case
             {
-                Id = Guid.NewGuid(),
+                Id = Ulid.NewUlid().ToString(),
                 TypeId = TypeId,
                 StateId = "submitted",
                 SubmittedBy = "other-tenant",
@@ -546,7 +548,7 @@ public class CaseEndpointsTests
         var engine = Substitute.For<ICaseService>();
         var submittedCase = new Case
         {
-            Id = Guid.NewGuid(),
+            Id = Ulid.NewUlid().ToString(),
             TypeId = TypeId,
             StateId = "submitted",
             SubmittedAt = DateTime.UtcNow,
@@ -659,7 +661,7 @@ public class CaseEndpointsTests
         // confirm the endpoint maps the failure code correctly.
         var cancellationToken = TestContext.Current.CancellationToken;
         var engine = Substitute.For<ICaseService>();
-        var caseId = Guid.NewGuid();
+        var caseId = Ulid.NewUlid().ToString();
         engine
             .AssignAsync(
                 caseId,
@@ -772,7 +774,7 @@ public class CaseEndpointsTests
         await factory.SeedAsync(
             new Case
             {
-                Id = Guid.NewGuid(),
+                Id = Ulid.NewUlid().ToString(),
                 TypeId = TypeId,
                 StateId = "submitted",
                 SubmittedBy = "test-client",
@@ -782,7 +784,7 @@ public class CaseEndpointsTests
         await factory.SeedAsync(
             new Case
             {
-                Id = Guid.NewGuid(),
+                Id = Ulid.NewUlid().ToString(),
                 TypeId = TypeId,
                 StateId = "submitted",
                 SubmittedBy = "test-client",
@@ -815,7 +817,7 @@ public class CaseEndpointsTests
         var assignedAt = new DateTime(2026, 4, 27, 9, 0, 0, DateTimeKind.Utc);
         var caseRecord = new Case
         {
-            Id = Guid.NewGuid(),
+            Id = Ulid.NewUlid().ToString(),
             TypeId = TypeId,
             StateId = "submitted",
             SubmittedBy = "test-client",
@@ -905,7 +907,7 @@ public class CaseEndpointsTests
         await using var factory = NewFactory(userId: "actor-1");
         using var client = factory.CreateClient();
 
-        var id = Guid.NewGuid();
+        var id = Ulid.NewUlid().ToString();
         await factory.SeedAsync(
             new Case
             {
@@ -942,7 +944,7 @@ public class CaseEndpointsTests
         await using var factory = NewFactory(userId: "actor-1");
         using var client = factory.CreateClient();
 
-        var id = Guid.NewGuid();
+        var id = Ulid.NewUlid().ToString();
         await factory.SeedAsync(
             new Case
             {
@@ -970,7 +972,7 @@ public class CaseEndpointsTests
         await using var factory = NewFactory(userId: "actor-1");
         using var client = factory.CreateClient();
 
-        var id = Guid.NewGuid();
+        var id = Ulid.NewUlid().ToString();
         await factory.SeedAsync(
             new Case
             {
@@ -1001,7 +1003,7 @@ public class CaseEndpointsTests
         await using var factory = NewFactory(userId: "actor-1");
         using var client = factory.CreateClient();
 
-        var id = Guid.NewGuid();
+        var id = Ulid.NewUlid().ToString();
         await factory.SeedAsync(
             new Case
             {
@@ -1033,7 +1035,7 @@ public class CaseEndpointsTests
         await using var factory = NewFactory(userId: "alice-1");
         using var client = factory.CreateClient();
 
-        var id = Guid.NewGuid();
+        var id = Ulid.NewUlid().ToString();
         await factory.SeedAsync(
             new Case
             {
@@ -1062,7 +1064,7 @@ public class CaseEndpointsTests
         using var client = factory.CreateClient();
 
         var response = await client.PostAsJsonAsync(
-            $"/cases/{Guid.NewGuid()}/assign",
+            $"/cases/{Ulid.NewUlid().ToString()}/assign",
             new { assigneeId = "alice-1", assigneeName = "Alice" },
             cancellationToken
         );
@@ -1077,7 +1079,7 @@ public class CaseEndpointsTests
         await using var factory = NewFactory(userId: "actor-1");
         using var client = factory.CreateClient();
 
-        var id = Guid.NewGuid();
+        var id = Ulid.NewUlid().ToString();
         await factory.SeedAsync(
             new Case
             {
@@ -1115,7 +1117,7 @@ public class CaseEndpointsTests
         await using var factory = NewFactory(userId: "alice-1");
         using var client = factory.CreateClient();
 
-        var id = Guid.NewGuid();
+        var id = Ulid.NewUlid().ToString();
         await factory.SeedAsync(
             new Case
             {
@@ -1144,7 +1146,7 @@ public class CaseEndpointsTests
         await using var factory = NewFactory(userId: "actor-1");
         using var client = factory.CreateClient();
 
-        var id = Guid.NewGuid();
+        var id = Ulid.NewUlid().ToString();
         await factory.SeedAsync(
             new Case
             {
@@ -1180,7 +1182,7 @@ public class CaseEndpointsTests
         await using var factory = NewFactory(userId: "actor-1");
         using var client = factory.CreateClient();
 
-        var id = Guid.NewGuid();
+        var id = Ulid.NewUlid().ToString();
         await factory.SeedAsync(
             new Case
             {
@@ -1230,7 +1232,7 @@ public class CaseEndpointsTests
         await using var factory = NewFactory(userId: "actor-1", states: TerminalStateMachine);
         using var client = factory.CreateClient();
 
-        var id = Guid.NewGuid();
+        var id = Ulid.NewUlid().ToString();
         await factory.SeedAsync(
             new Case
             {
@@ -1272,7 +1274,7 @@ public class CaseEndpointsTests
         await using var factory = NewFactory(userId: "actor-1", states: TerminalStateMachine);
         using var client = factory.CreateClient();
 
-        var id = Guid.NewGuid();
+        var id = Ulid.NewUlid().ToString();
         await factory.SeedAsync(
             new Case
             {
@@ -1316,7 +1318,7 @@ public class CaseEndpointsTests
         await using var factory = NewFactory(userId: "actor-1", states: TerminalStateMachine);
         using var client = factory.CreateClient();
 
-        var id = Guid.NewGuid();
+        var id = Ulid.NewUlid().ToString();
         await factory.SeedAsync(
             new Case
             {
@@ -1353,7 +1355,7 @@ public class CaseEndpointsTests
         await using var factory = NewFactory(userId: "alice-1");
         using var client = factory.CreateClient();
 
-        var id = Guid.NewGuid();
+        var id = Ulid.NewUlid().ToString();
         await factory.SeedAsync(
             new Case
             {
@@ -1380,7 +1382,7 @@ public class CaseEndpointsTests
         await using var factory = NewFactory(userId: "alice-1", userName: "Alice Example");
         using var client = factory.CreateClient();
 
-        var id = Guid.NewGuid();
+        var id = Ulid.NewUlid().ToString();
         await factory.SeedAsync(
             new Case
             {
@@ -1427,7 +1429,7 @@ public class CaseEndpointsTests
         await using var factory = NewFactory(userId: "alice-1");
         using var client = factory.CreateClient();
 
-        var id = Guid.NewGuid();
+        var id = Ulid.NewUlid().ToString();
         var older = new DateTime(2026, 4, 27, 9, 0, 0, DateTimeKind.Utc);
         var newer = new DateTime(2026, 4, 27, 11, 0, 0, DateTimeKind.Utc);
         await factory.SeedAsync(
@@ -1475,7 +1477,7 @@ public class CaseEndpointsTests
         await using var factory = NewFactory();
         using var client = factory.CreateClient();
 
-        var id = Guid.NewGuid();
+        var id = Ulid.NewUlid().ToString();
         await factory.SeedAsync(
             new Case
             {
@@ -1504,7 +1506,7 @@ public class CaseEndpointsTests
         using var client = factory.CreateClient();
 
         var response = await client.PostAsJsonAsync(
-            $"/cases/{Guid.NewGuid()}/notes",
+            $"/cases/{Ulid.NewUlid().ToString()}/notes",
             new { text = "anything" },
             cancellationToken
         );
@@ -1520,7 +1522,7 @@ public class CaseEndpointsTests
         using var client = factory.CreateClient();
 
         var response = await client.PostAsJsonAsync(
-            $"/cases/{Guid.NewGuid()}/notes",
+            $"/cases/{Ulid.NewUlid().ToString()}/notes",
             new { text = "anything" },
             cancellationToken
         );
@@ -1535,7 +1537,7 @@ public class CaseEndpointsTests
         await using var factory = NewFactory();
         using var client = factory.CreateClient();
 
-        var id = Guid.NewGuid();
+        var id = Ulid.NewUlid().ToString();
         var older = new DateTime(2026, 4, 27, 9, 0, 0, DateTimeKind.Utc);
         var newer = new DateTime(2026, 4, 27, 11, 0, 0, DateTimeKind.Utc);
         await factory.SeedAsync(
@@ -1607,7 +1609,7 @@ public class CaseEndpointsTests
         await using var factory = NewFactory();
         using var client = factory.CreateClient();
 
-        var id = Guid.NewGuid();
+        var id = Ulid.NewUlid().ToString();
         var t = new DateTime(2026, 4, 30, 9, 0, 0, DateTimeKind.Utc);
         await factory.SeedAsync(
             new Case
@@ -1700,7 +1702,7 @@ public class CaseEndpointsTests
         await using var factory = NewFactory(userId: "actor-1");
         using var client = factory.CreateClient();
 
-        var id = Guid.NewGuid();
+        var id = Ulid.NewUlid().ToString();
         await factory.SeedAsync(
             new Case
             {
@@ -1878,7 +1880,7 @@ public class CaseEndpointsTests
             Inner.CreateAsync(caseRecord, cancellationToken);
 
         public Task<Case?> GetByIdAsync(
-            Guid id,
+            string id,
             CancellationToken cancellationToken = default
         ) => Inner.GetByIdAsync(id, cancellationToken);
 

@@ -36,7 +36,7 @@ public interface ICaseService
     );
 
     Task<CaseActionResult> ApplyActionAsync(
-        Guid caseId,
+        string caseId,
         string actionId,
         ClaimsPrincipal user,
         CancellationToken cancellationToken = default
@@ -50,7 +50,7 @@ public interface ICaseService
     /// item — there is no separate permission tier.
     /// </summary>
     Task<CaseActionResult> AssignAsync(
-        Guid caseId,
+        string caseId,
         string assigneeId,
         string? assigneeName,
         ClaimsPrincipal user,
@@ -62,7 +62,7 @@ public interface ICaseService
     /// unassign (RA-323).
     /// </summary>
     Task<CaseActionResult> UnassignAsync(
-        Guid caseId,
+        string caseId,
         ClaimsPrincipal user,
         CancellationToken cancellationToken = default
     );
@@ -78,7 +78,7 @@ public interface ICaseService
     /// been removed.
     /// </summary>
     Task<CaseActionResult> AddNoteAsync(
-        Guid caseId,
+        string caseId,
         string text,
         ClaimsPrincipal user,
         CancellationToken cancellationToken = default
@@ -89,7 +89,7 @@ public interface ICaseService
     /// <c>null</c> when no case exists with the supplied id.
     /// </summary>
     Task<CaseEngineProjection?> ProjectAsync(
-        Guid caseId,
+        string caseId,
         CancellationToken cancellationToken = default
     );
 
@@ -240,7 +240,7 @@ public sealed class CaseService : ICaseService
     }
 
     public async Task<CaseActionResult> ApplyActionAsync(
-        Guid caseId,
+        string caseId,
         string actionId,
         ClaimsPrincipal user,
         CancellationToken cancellationToken = default
@@ -352,7 +352,7 @@ public sealed class CaseService : ICaseService
     }
 
     public async Task<CaseActionResult> AssignAsync(
-        Guid caseId,
+        string caseId,
         string assigneeId,
         string? assigneeName,
         ClaimsPrincipal user,
@@ -461,7 +461,7 @@ public sealed class CaseService : ICaseService
     }
 
     public async Task<CaseActionResult> UnassignAsync(
-        Guid caseId,
+        string caseId,
         ClaimsPrincipal user,
         CancellationToken cancellationToken = default
     )
@@ -550,7 +550,7 @@ public sealed class CaseService : ICaseService
     public const int MaxNoteLength = 4000;
 
     public async Task<CaseActionResult> AddNoteAsync(
-        Guid caseId,
+        string caseId,
         string text,
         ClaimsPrincipal user,
         CancellationToken cancellationToken = default
@@ -657,7 +657,7 @@ public sealed class CaseService : ICaseService
     }
 
     public async Task<CaseEngineProjection?> ProjectAsync(
-        Guid caseId,
+        string caseId,
         CancellationToken cancellationToken = default
     )
     {
@@ -718,7 +718,7 @@ public sealed class CaseService : ICaseService
         Case? Case,
         ICaseTemplate? Template,
         CaseActionResult? Failure
-    )> LoadAsync(Guid caseId, CancellationToken cancellationToken)
+    )> LoadAsync(string caseId, CancellationToken cancellationToken)
     {
         var caseRecord = await _persistence.GetByIdAsync(caseId, cancellationToken);
         if (caseRecord is null)
@@ -881,7 +881,7 @@ public sealed class CaseService : ICaseService
         );
     }
 
-    private static CaseActionResult ConcurrencyConflict(Guid caseId) =>
+    private static CaseActionResult ConcurrencyConflict(string caseId) =>
         CaseActionResult.Failure(
             CaseActionFailureCode.ConcurrencyConflict,
             $"Case '{caseId}' was modified concurrently. Reload the case and retry."

@@ -18,7 +18,7 @@ public interface ICaseAuditAppender
     /// retries.
     /// </summary>
     Task<bool> AppendAsync(
-        Guid caseId,
+        string caseId,
         string action,
         string actionDisplayName,
         Dictionary<string, string?> details,

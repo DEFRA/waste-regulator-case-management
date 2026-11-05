@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using WasteRegulatorCaseManagement.Auth;
+using NUlid;
 
 namespace WasteRegulatorCaseManagement.Test.Cases;
 
@@ -36,7 +37,7 @@ public class CaseEngineEndpointsTests
         await using var factory = new EngineFactory(_fixture);
         using var client = factory.CreateClient();
 
-        var caseId = Guid.NewGuid();
+        var caseId = Ulid.NewUlid().ToString();
         await factory.SeedAsync(new Case
         {
             Id = caseId,
@@ -60,7 +61,7 @@ public class CaseEngineEndpointsTests
         await using var factory = new EngineFactory(_fixture);
         using var client = factory.CreateClient();
 
-        var caseId = Guid.NewGuid();
+        var caseId = Ulid.NewUlid().ToString();
         await factory.SeedAsync(new Case
         {
             Id = caseId,
@@ -86,7 +87,7 @@ public class CaseEngineEndpointsTests
         using var client = factory.CreateClient();
 
         var response = await client.PostAsync(
-            $"/cases/{Guid.NewGuid()}/actions/approve", content: null, cancellationToken);
+            $"/cases/{Ulid.NewUlid().ToString()}/actions/approve", content: null, cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -98,7 +99,7 @@ public class CaseEngineEndpointsTests
         await using var factory = new EngineFactory(_fixture);
         using var client = factory.CreateClient();
 
-        var caseId = Guid.NewGuid();
+        var caseId = Ulid.NewUlid().ToString();
         await factory.SeedAsync(new Case
         {
             Id = caseId,
@@ -136,7 +137,7 @@ public class CaseEngineEndpointsTests
             [
                 new CaseTransition("resume-a", "Resume", "submitted", "approved", CallerInvocable: false)
             ]);
-        var caseId = Guid.NewGuid();
+        var caseId = Ulid.NewUlid().ToString();
         await factory.SeedAsync(new Case
         {
             Id = caseId,
@@ -165,7 +166,7 @@ public class CaseEngineEndpointsTests
         await using var factory = new EngineFactory(_fixture);
         using var client = factory.CreateClient();
 
-        var caseId = Guid.NewGuid();
+        var caseId = Ulid.NewUlid().ToString();
         await factory.SeedAsync(new Case
         {
             Id = caseId,

@@ -13,7 +13,7 @@ namespace WasteRegulatorCaseManagement.Cases;
 /// template for faithful historical rendering.
 /// </summary>
 public sealed record CaseResponse(
-    Guid Id,
+    string Id,
     string TypeId,
     string StateId,
     DateTime SubmittedAt,
@@ -50,7 +50,7 @@ public sealed record CaseNoteResponse(
 /// bottom timeline, most recent first, without re-sorting (RA-568).
 /// </summary>
 public sealed record CaseAuditEntryResponse(
-    Guid Id,
+    string Id,
     string Action,
     string ActionDisplayName,
     IReadOnlyDictionary<string, string?> Details,

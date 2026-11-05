@@ -18,7 +18,7 @@ internal sealed class CaseAuditAppender(
     private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
 
     public async Task<bool> AppendAsync(
-        Guid caseId,
+        string caseId,
         string action,
         string actionDisplayName,
         Dictionary<string, string?> details,

@@ -2,6 +2,7 @@ using System.Security.Claims;
 using WasteRegulatorCaseManagement.Cases;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
+using NUlid;
 
 namespace WasteRegulatorCaseManagement.Test.Cases;
 
@@ -94,7 +95,7 @@ public class CaseTemplateVersioningTests
 
         var caseRecord = new Case
         {
-            Id = Guid.NewGuid(),
+            Id = Ulid.NewUlid().ToString(),
             TypeId = TypeId,
             StateId = "submitted",
             SubmittedAt = Now,

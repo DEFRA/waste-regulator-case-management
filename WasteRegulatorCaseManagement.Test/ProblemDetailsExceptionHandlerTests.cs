@@ -84,7 +84,7 @@ public class ProblemDetailsExceptionHandlerTests
         public Task CreateAsync(Case caseRecord, CancellationToken cancellationToken = default) =>
             inner.CreateAsync(caseRecord, cancellationToken);
 
-        public Task<Case?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+        public Task<Case?> GetByIdAsync(string id, CancellationToken cancellationToken = default) =>
             inner.GetByIdAsync(id, cancellationToken);
 
         public Task<CasePage> QueryAsync(CaseQuery query, CancellationToken cancellationToken = default) =>

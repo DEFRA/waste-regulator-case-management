@@ -1,6 +1,6 @@
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
-using MongoDB.Bson.Serialization.IdGenerators;
+using NUlid;
 
 namespace WasteRegulatorCaseManagement.Cases;
 
@@ -22,9 +22,8 @@ namespace WasteRegulatorCaseManagement.Cases;
 [BsonIgnoreExtraElements]
 public sealed class Case
 {
-    [BsonId(IdGenerator = typeof(GuidGenerator))]
-    [BsonRepresentation(BsonType.String)]
-    public Guid Id { get; init; } = Guid.NewGuid();
+    [BsonId]
+    public string Id { get; init; } = Ulid.NewUlid().ToString();
 
     /// <summary>The <see cref="ICaseType.TypeId"/> this item is an instance of.</summary>
     public required string TypeId { get; init; }

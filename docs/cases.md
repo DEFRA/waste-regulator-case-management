@@ -319,7 +319,7 @@ the case document. An entry carries:
 
 | Field | Purpose |
 | --- | --- |
-| `Id` | Server-generated GUID. |
+| `Id` | Server-generated ULID. |
 | `Action` | Stable machine id of the action: `work-item-submitted`, `action-applied`, `assigned`, `unassigned`, `note-added`. Modules append their own alongside these (e.g. `accreditation-issued`, `sla-clock-stopped`). |
 | `ActionDisplayName` | Human-readable description (e.g. `Action applied`). |
 | `Details` | `Dictionary<string, string?>` of contextual fields per action: `typeId`/`stateId`/`templateVersion` (submission); `actionId`/`actionDisplayName`/`fromStateId`/`toStateId`; `assigneeId`/`assigneeName`/`previousAssigneeId`/`previousAssigneeName`; `previousAssigneeId`/`previousAssigneeName`; `noteId`. |

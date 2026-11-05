@@ -4,6 +4,7 @@ using WasteRegulatorCaseManagement.Cases;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using MongoDB.Bson;
+using NUlid;
 
 namespace WasteRegulatorCaseManagement.Test.Cases;
 
@@ -70,7 +71,7 @@ public class CaseServiceTimestampTests
         return caseRecord;
     }
 
-    private async Task<Case> GetAsync(Guid id)
+    private async Task<Case> GetAsync(string id)
     {
         var fetched = await _persistence.GetByIdAsync(id, TestContext.Current.CancellationToken);
         Assert.NotNull(fetched);
@@ -100,7 +101,7 @@ public class CaseServiceTimestampTests
     {
         var caseRecord = await SeedAsync(new Case
         {
-            Id = Guid.NewGuid(),
+            Id = Ulid.NewUlid().ToString(),
             TypeId = TypeId,
             StateId = "submitted",
             SubmittedAt = T.UtcDateTime,

@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using MongoDB.Bson;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
+using NUlid;
 
 namespace WasteRegulatorCaseManagement.Test.Cases;
 
@@ -85,7 +86,7 @@ public class CaseAuditAppenderTests
         var sut = BuildSut();
 
         var ok = await sut.AppendAsync(
-            Guid.NewGuid(),
+            Ulid.NewUlid().ToString(),
             action: "notification-sent",
             actionDisplayName: "Email sent",
             details: new Dictionary<string, string?>(),
@@ -118,7 +119,7 @@ public class CaseAuditAppenderTests
         // CaseConcurrencyException on the first ReplaceAsync call
         // and verify the appender retries and ultimately succeeds.
         var ct = TestContext.Current.CancellationToken;
-        var caseId = Guid.NewGuid();
+        var caseId = Ulid.NewUlid().ToString();
         var storedCase = new Case
         {
             Id = caseId,
