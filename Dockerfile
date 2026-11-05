@@ -4,7 +4,6 @@ WORKDIR /src
 COPY WasteRegulatorCaseManagement.sln ./
 COPY WasteRegulatorCaseManagement/WasteRegulatorCaseManagement.csproj WasteRegulatorCaseManagement/
 COPY WasteRegulatorCaseManagement.Test/WasteRegulatorCaseManagement.Test.csproj WasteRegulatorCaseManagement.Test/
-COPY tools/CustomAnalyzers/CustomAnalyzers.csproj tools/CustomAnalyzers/
 RUN dotnet restore WasteRegulatorCaseManagement.sln
 COPY . .
 RUN dotnet publish WasteRegulatorCaseManagement -c Release -o /app/publish /p:UseAppHost=false

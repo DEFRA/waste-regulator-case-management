@@ -7,10 +7,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WasteRegulatorCaseManagemen
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WasteRegulatorCaseManagement.Test", "WasteRegulatorCaseManagement.Test\WasteRegulatorCaseManagement.Test.csproj", "{69170922-DFE3-485D-B53F-EDBA6646185A}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{91468319-2A8F-4092-BB4C-D84846CEF5F3}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CustomAnalyzers", "tools\CustomAnalyzers\CustomAnalyzers.csproj", "{736A8D23-F554-414A-AB9A-A04CB4F0DD40}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -45,23 +41,8 @@ Global
 		{69170922-DFE3-485D-B53F-EDBA6646185A}.Release|x64.Build.0 = Release|Any CPU
 		{69170922-DFE3-485D-B53F-EDBA6646185A}.Release|x86.ActiveCfg = Release|Any CPU
 		{69170922-DFE3-485D-B53F-EDBA6646185A}.Release|x86.Build.0 = Release|Any CPU
-		{736A8D23-F554-414A-AB9A-A04CB4F0DD40}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{736A8D23-F554-414A-AB9A-A04CB4F0DD40}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{736A8D23-F554-414A-AB9A-A04CB4F0DD40}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{736A8D23-F554-414A-AB9A-A04CB4F0DD40}.Debug|x64.Build.0 = Debug|Any CPU
-		{736A8D23-F554-414A-AB9A-A04CB4F0DD40}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{736A8D23-F554-414A-AB9A-A04CB4F0DD40}.Debug|x86.Build.0 = Debug|Any CPU
-		{736A8D23-F554-414A-AB9A-A04CB4F0DD40}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{736A8D23-F554-414A-AB9A-A04CB4F0DD40}.Release|Any CPU.Build.0 = Release|Any CPU
-		{736A8D23-F554-414A-AB9A-A04CB4F0DD40}.Release|x64.ActiveCfg = Release|Any CPU
-		{736A8D23-F554-414A-AB9A-A04CB4F0DD40}.Release|x64.Build.0 = Release|Any CPU
-		{736A8D23-F554-414A-AB9A-A04CB4F0DD40}.Release|x86.ActiveCfg = Release|Any CPU
-		{736A8D23-F554-414A-AB9A-A04CB4F0DD40}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
-	EndGlobalSection
-	GlobalSection(NestedProjects) = preSolution
-		{736A8D23-F554-414A-AB9A-A04CB4F0DD40} = {91468319-2A8F-4092-BB4C-D84846CEF5F3}
 	EndGlobalSection
 EndGlobal
