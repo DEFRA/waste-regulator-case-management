@@ -1,4 +1,3 @@
-using WasteRegulatorCaseManagement.Config;
 using WasteRegulatorCaseManagement.Test.TestSupport;
 using WasteRegulatorCaseManagement.WorkItems.Core;
 using Microsoft.AspNetCore.Hosting;
@@ -13,8 +12,7 @@ namespace WasteRegulatorCaseManagement.Test.WorkItems.Core;
 /// reference stub user identifiers, so it must only be wired up when the
 /// host is in Development AND <c>WorkItems:SeedOnStartup=true</c>. These
 /// tests pin the gating contract so a misconfigured production deploy
-/// cannot pollute the live Mongo collection, and (RA-000) when the e2e-
-/// fixture reset comes with it.
+/// cannot pollute the live Mongo collection.
 ///
 /// The seed flag is supplied via <see cref="IWebHostBuilder.UseSetting"/>,
 /// which feeds <c>WebApplicationBuilder.Configuration</c> before
@@ -36,32 +34,23 @@ public class WorkItemSeederGatingTests
     public WorkItemSeederGatingTests(MongoIntegrationFixture fixture) => _fixture = fixture;
 
     /// <summary>
-    /// RA-000 gate matrix for <see cref="WorkItemModuleExtensions.AddWorkItemSeeders"/>:
-    /// the demo set needs Development + the flag (a non-Development flag only
-    /// warns); the e2e- fixtures come with the demo set and, on their own,
-    /// with TestOrganisations__Enabled in any environment, so CDP test gets
-    /// the fixtures without the demo items. Prod + TestOrganisations refusing
-    /// to start is pinned by TestOrganisationsWiringTests.
+    /// Gate matrix for <see cref="WorkItemModuleExtensions.AddWorkItemSeeders"/>:
+    /// the demo set needs Development + the flag; a non-Development flag only
+    /// warns.
     /// </summary>
     [Theory]
-    [InlineData("Development", true, false, true, false, true)]
-    [InlineData("Development", true, true, true, false, true)]
-    [InlineData("Development", false, false, false, false, false)]
-    [InlineData("Development", false, true, false, false, true)]
-    [InlineData("Production", true, false, false, true, false)]
-    [InlineData("Production", false, true, false, false, true)]
-    [InlineData("Production", true, true, false, true, true)]
-    [InlineData("Production", false, false, false, false, false)]
-    public void Seeders_registered_match_the_environment_and_flags(
+    [InlineData("Development", true, true, false)]
+    [InlineData("Development", false, false, false)]
+    [InlineData("Production", true, false, true)]
+    [InlineData("Production", false, false, false)]
+    public void Seeders_registered_match_the_environment_and_flag(
         string environment,
         bool seedOnStartup,
-        bool testOrganisations,
         bool expectDemoSeeder,
-        bool expectMisconfigurationWarning,
-        bool expectFixtureReset
+        bool expectMisconfigurationWarning
     )
     {
-        using var factory = CreateFactory(environment, seedOnStartup, testOrganisations);
+        using var factory = CreateFactory(environment, seedOnStartup);
 
         var hostedServices = factory.Services.GetServices<IHostedService>().ToList();
 
@@ -70,20 +59,11 @@ public class WorkItemSeederGatingTests
             expectMisconfigurationWarning,
             hostedServices.Any(s => s is WorkItemSeederMisconfigurationWarningHostedService)
         );
-        Assert.Equal(
-            expectFixtureReset,
-            hostedServices.Any(s => s is TestOrganisationFixtureHostedService)
-        );
     }
 
-    private EphemeralMongoTestFactory CreateFactory(
-        string environment,
-        bool seedOnStartup,
-        bool testOrganisations
-    ) =>
+    private EphemeralMongoTestFactory CreateFactory(string environment, bool seedOnStartup) =>
         new(_fixture, "seeder-gating", environment, new Dictionary<string, string?>
         {
             [SeedFlagConfigKey] = seedOnStartup ? "true" : "false",
-            [TestOrganisations.EnabledKey] = testOrganisations ? "true" : "false",
         });
 }

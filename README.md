@@ -180,14 +180,10 @@ per-environment list — the tables below summarise it.
 | `AUTH_SHARED_SECRET__MANAGEMENT_FE` | Yes | Verifies inbound signed requests from `epr-register-enrol-management-fe` — must match management-fe's `BACKEND_API_SHARED_SECRET` exactly |
 | `Auth__BackendClientId` | No | Expected `x-cdp-client-id` on inbound calls from backend (default `epr-register-enrol-backend`) |
 | `Auth__ManagementFeClientId` | No | Expected `x-cdp-client-id` on inbound calls from management-fe (default `frontend`) — must differ from `Auth__BackendClientId` or the service throws at first request |
-| `TestOrganisations__Enabled` | No | Default `false`. CDP **test** only (RA-000): enables the mgmt-tests caller below. The service refuses to start with it `true` when `ENVIRONMENT=prod` |
-| `AUTH_SHARED_SECRET__MGMT_TESTS` | Yes | Verifies inbound signed requests from the `epr-register-enrol-mgmt-tests` journey suite — must match the suite's `MANAGEMENT_BE_SHARED_SECRET`. Registered only when `TestOrganisations__Enabled=true`; never set in prod |
-| `Auth__MgmtTestsClientId` | No | Expected `x-cdp-client-id` on inbound calls from the mgmt-tests suite (default `epr-register-enrol-mgmt-tests`) |
 
 The `BACKEND` and `MANAGEMENT_FE` secrets are optional in Development (the
 handler falls back to header-trust mode while no caller secret at all is
-registered) but required in every other environment. `AUTH_SHARED_SECRET__MGMT_TESTS` is
-optional everywhere and set only on CDP test.
+registered) but required in every other environment.
 
 ### GOV.UK Notify
 

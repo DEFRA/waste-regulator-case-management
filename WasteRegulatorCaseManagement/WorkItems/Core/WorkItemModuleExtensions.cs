@@ -36,28 +36,16 @@ public static class WorkItemModuleExtensions
     }
 
     /// <summary>
-    /// Conditionally register the two startup seeders.
-    /// <list type="bullet">
-    ///   <item><see cref="WorkItemSeederHostedService"/> — the demo data set.
-    ///   It writes records that reference stub user identifiers
-    ///   (e.g. <c>stub-standard-1</c>, <c>stub-assign-1</c>,
-    ///   <c>stub-portal-client</c>), so it must NEVER run outside a developer
-    ///   environment: it needs both <see cref="IHostEnvironment.IsDevelopment"/>
-    ///   and <c>WorkItems:SeedOnStartup</c>. If the flag is observed in any
-    ///   other environment a one-shot warning hosted service is registered
-    ///   instead, so the misconfiguration is visible in startup logs without
-    ///   ever touching the database.</item>
-    ///   <item><see cref="TestOrganisationFixtureHostedService"/> (RA-000) —
-    ///   the <c>e2e-</c> journey-test fixtures, reset on every boot. It runs
-    ///   alongside the demo set (Development + <c>WorkItems:SeedOnStartup</c>,
-    ///   i.e. the compose stack) and on its own wherever
-    ///   <c>TestOrganisations__Enabled</c> is on (CDP test), so the journey
-    ///   suite finds the same fixtures on both. Outside Development the demo
-    ///   set never comes with it, so manual testers on CDP test do not see
-    ///   demo items. Prod cannot reach it: the demo gate needs Development,
-    ///   and <see cref="TestOrganisations.EnsureNotEnabledInProd"/> refuses
-    ///   to start with test organisations on.</item>
-    /// </list>
+    /// Conditionally register the startup seeder,
+    /// <see cref="WorkItemSeederHostedService"/>. It writes demo records
+    /// that reference stub user identifiers (e.g. <c>stub-standard-1</c>,
+    /// <c>stub-assign-1</c>, <c>stub-portal-client</c>), so it must NEVER run
+    /// outside a developer environment: it needs both
+    /// <see cref="IHostEnvironment.IsDevelopment"/> and
+    /// <c>WorkItems:SeedOnStartup</c>. If the flag is observed in any other
+    /// environment a one-shot warning hosted service is registered instead, so
+    /// the misconfiguration is visible in startup logs without ever touching
+    /// the database.
     /// </summary>
     public static IServiceCollection AddWorkItemSeeders(
         this IServiceCollection services,
@@ -75,11 +63,6 @@ public static class WorkItemModuleExtensions
         if (seedDemoData)
         {
             services.AddHostedService<WorkItemSeederHostedService>();
-        }
-
-        if (seedDemoData || TestOrganisations.IsEnabled(configuration))
-        {
-            services.AddHostedService<TestOrganisationFixtureHostedService>();
         }
 
         return services;

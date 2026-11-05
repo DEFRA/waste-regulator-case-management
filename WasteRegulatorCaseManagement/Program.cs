@@ -72,10 +72,6 @@ static void ConfigureServices(WebApplicationBuilder builder)
     // Trust material must be loaded before anything creates outbound connections.
     services.LoadCustomTrustStoreFromEnvironment();
 
-    // RA-000: refuse to start with end-to-end test organisations (and the
-    // mgmt-tests caller they unlock) enabled in CDP prod.
-    TestOrganisations.EnsureNotEnabledInProd(configuration, CdpEnvironment.Read());
-
     // HttpClient.DefaultProxy MUST also be set before any bare HttpClient
     // is constructed. The GovukNotify SDK does `new HttpClient()` and
     // therefore depends on DefaultProxy — in CDP the runtime's
@@ -174,12 +170,6 @@ static void ConfigureWorkItems(WebApplicationBuilder builder)
     // See docs in WasteRegulatorCaseManagement/WorkItems/Core for the contract a module must implement.
     services.AddWorkItemFramework();
     services.AddSingleton<IWorkItemPersistence, WorkItemPersistence>();
-    // RA-000: the e2e- fixture reset writes through the same persistence
-    // instance (a single writer of the collection), via an interface the
-    // engine and endpoints never see.
-    services.AddSingleton<IWorkItemFixtureStore>(sp =>
-        (IWorkItemFixtureStore)sp.GetRequiredService<IWorkItemPersistence>()
-    );
     // RA-131: SLA extend / override is a cross-cutting framework concern
     // (universal rules: audit shape, operator notify on extend via
     // post-action hooks) so it lives next to the framework, not in a
@@ -192,8 +182,7 @@ static void ConfigureWorkItems(WebApplicationBuilder builder)
     // The demo seeder writes records referencing stub user ids, so it is
     // gated to Development hosts even when WorkItems:SeedOnStartup=true.
     // A misconfiguration warning is emitted at startup if the flag is
-    // observed in any other environment. RA-000: TestOrganisations__Enabled
-    // separately resets the e2e- journey-test fixtures on every boot. See
+    // observed in any other environment. See
     // WorkItemModuleExtensions.AddWorkItemSeeders.
     services.AddWorkItemSeeders(builder.Environment, builder.Configuration);
 }
@@ -284,21 +273,6 @@ static IReadOnlyDictionary<string, string> BuildClientSecrets(IConfiguration con
         clientIdDefault: "epr-register-enrol-backend",
         secretKey: "AUTH_SHARED_SECRET:BACKEND"
     );
-    // RA-000: the mgmt-tests journey suite creates its own work items on CDP
-    // test. Its caller exists only where test organisations are enabled, which
-    // startup refuses in prod (TestOrganisations.EnsureNotEnabledInProd), so a
-    // stray AUTH_SHARED_SECRET__MGMT_TESTS can never open a door in prod.
-    if (TestOrganisations.IsEnabled(config))
-    {
-        AddCallerSecret(
-            map,
-            config,
-            callerName: "MgmtTests",
-            clientIdKey: "Auth:MgmtTestsClientId",
-            clientIdDefault: "epr-register-enrol-mgmt-tests",
-            secretKey: "AUTH_SHARED_SECRET:MGMT_TESTS"
-        );
-    }
     return map;
 }
 
