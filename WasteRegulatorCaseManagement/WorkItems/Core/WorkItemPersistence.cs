@@ -483,28 +483,9 @@ public sealed class WorkItemPersistence
             clauses.Add(builder.Eq(w => w.SubmittedBy, submittedBy));
         }
 
-        // RA-313: there is deliberately NO terminal-state exclusion here.
-        //
-        // RA-224 used to hide every terminal state (approved/rejected/withdrawn)
-        // from the list unless IncludeArchived was set, so that the worklist
-        // showed only in-flight work. That ticket was closed as incorrectly
-        // filed and should never have been built: RA-313 AC01 requires a
-        // withdrawn application to be visible in the regulator's worklist with
-        // its "Withdrawn" status, and the same reasoning applies to the other
-        // two terminal states — a regulator looking for a decided application
-        // should find it where every other application is.
-        //
-        // WorkItemQuery.IncludeArchived is retained and still bound from the
-        // query string: management-fe continues to send it and the snapshot /
-        // backfill migrations pass IncludeArchived: true. It now selects
-        // nothing, because nothing is excluded. See epr-kenf for retiring the
-        // parameter and its "Show archived items" checkbox — deliberately NOT
-        // done here, because the Applications page UI was signed off against a
-        // prototype that no story captures.
-        //
-        // payload.archivedAt is untouched: ArchiveBackgroundService still
-        // stamps it after ArchiveAfterDays, and the list still renders it as
-        // "Archived: <date>" on the card. It is now purely informational.
+        // RA-313: there is deliberately NO terminal-state exclusion here. A
+        // regulator looking for a decided item should find it where every
+        // other item is.
 
         return clauses.Count == 0 ? builder.Empty : builder.And(clauses);
     }

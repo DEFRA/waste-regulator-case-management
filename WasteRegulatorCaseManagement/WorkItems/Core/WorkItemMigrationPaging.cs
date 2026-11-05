@@ -23,8 +23,7 @@ internal static class WorkItemMigrationPaging
                 new WorkItemQuery(
                     TypeIds: [typeId],
                     Page: page,
-                    PageSize: WorkItemQuery.MaxPageSize,
-                    IncludeArchived: true),
+                    PageSize: WorkItemQuery.MaxPageSize),
                 cancellationToken);
 
             foreach (var candidate in result.Items)

@@ -47,15 +47,6 @@ namespace WasteRegulatorCaseManagement.WorkItems.Core;
 /// Supplying both buckets is equivalent to supplying neither: every item
 /// matches exactly one, so the filter becomes "any type".
 /// </param>
-/// <param name="IncludeArchived">
-/// When <c>false</c> (the default), items whose <see cref="WorkItem.StateId"/>
-/// is <c>"approved"</c> are excluded from the results. The approved state is the
-/// only archive trigger in the current workflow; items arrive there as the BPMN
-/// happy-path terminal step and are hidden from the active worklist to keep it
-/// focused on in-flight work. Pass <c>true</c> to reveal them (e.g. when the
-/// user ticks "Show archived"). Background jobs that need to scan approved items
-/// (e.g. <c>ArchiveBackgroundService</c>) must also pass <c>true</c>.
-/// </param>
 public sealed record WorkItemQuery(
     IReadOnlyCollection<string>? TypeIds = null,
     IReadOnlyCollection<string>? StateIds = null,
@@ -66,7 +57,6 @@ public sealed record WorkItemQuery(
     int PageSize = 20,
     string? SubmittedBy = null,
     IReadOnlyCollection<string>? WasteProcessingTypes = null,
-    bool IncludeArchived = false,
     string? OrgId = null,
     string? RegistrationId = null,
     string? OrgName = null,

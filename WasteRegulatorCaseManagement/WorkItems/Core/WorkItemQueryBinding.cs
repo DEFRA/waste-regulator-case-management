@@ -17,7 +17,6 @@ internal static class WorkItemQueryBinding
     internal const string PageParam = "page";
     internal const string PageSizeParam = "pageSize";
     internal const string WasteProcessingTypeParam = "wasteProcessingType";
-    internal const string IncludeArchivedParam = "includeArchived";
     internal const string OrgIdParam = "orgId";
     internal const string RegistrationIdParam = "registrationId";
     internal const string OrgNameParam = "orgName";
@@ -44,7 +43,6 @@ internal static class WorkItemQueryBinding
             PageSize: ReadInt(query, PageSizeParam, defaultValue: WorkItemQuery.DefaultPageSize),
             SubmittedBy: ReadString(query, SubmittedByParam),
             WasteProcessingTypes: ReadStrings(query, WasteProcessingTypeParam),
-            IncludeArchived: ReadBool(query, IncludeArchivedParam),
             OrgId: ReadString(query, OrgIdParam),
             RegistrationId: ReadString(query, RegistrationIdParam),
             OrgName: ReadString(query, OrgNameParam),

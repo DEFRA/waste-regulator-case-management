@@ -204,7 +204,6 @@ Notify-testing walkthrough.
 | `Mongo__DatabaseUri` | No | MongoDB connection string (default `mongodb://127.0.0.1:27017`; IAM auth in deployed environments) |
 | `Mongo__DatabaseName` | No | MongoDB database name (default `epr-register-case-management`) |
 | `Cors__AllowedOrigins` | No | CORS allow-list (array). Empty = deny-all |
-| `ArchiveJob__IntervalHours` / `ArchiveJob__BatchSize` | No | Background archive job tuning |
 | `WorkItems__SeedOnStartup` | No | Runs registered work item seeders on boot. Honoured in Development only |
 | `ENVIRONMENT` | No | Platform environment name (`local`/`dev`/`test`/`perf-test`/`ext-test`/`prod`) |
 

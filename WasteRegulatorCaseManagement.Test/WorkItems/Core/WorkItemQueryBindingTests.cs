@@ -100,38 +100,6 @@ public class WorkItemQueryBindingTests
         Assert.Null(query.SubmittedBy);
     }
 
-
-    // ──────────────────────────── IncludeArchived ────────────────────────────
-
-    [Fact]
-    public void IncludeArchivedDefaultsToFalse()
-    {
-        var query = WorkItemQueryBinding.FromQueryString(new QueryCollection());
-
-        Assert.False(query.IncludeArchived);
-    }
-
-    [Theory]
-    [InlineData("true")]
-    [InlineData("1")]
-    [InlineData("on")]
-    [InlineData("yes")]
-    [InlineData("TRUE")]
-    public void IncludeArchivedTrueVariantsAreBound(string value)
-    {
-        var query = WorkItemQueryBinding.FromQueryString(Q(("includeArchived", value)));
-
-        Assert.True(query.IncludeArchived);
-    }
-
-    [Fact]
-    public void IncludeArchivedFalseStringBindsToFalse()
-    {
-        var query = WorkItemQueryBinding.FromQueryString(Q(("includeArchived", "false")));
-
-        Assert.False(query.IncludeArchived);
-    }
-
     // ──────────────────────────── OrgId / RegistrationId / OrgName ──────────────────────────────
 
     [Fact]

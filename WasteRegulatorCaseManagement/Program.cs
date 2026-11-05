@@ -146,7 +146,6 @@ static void ConfigureWorkItems(WebApplicationBuilder builder)
     // See docs in WasteRegulatorCaseManagement/WorkItems/Core for the contract a module must implement.
     services.AddWorkItemFramework();
     services.AddSingleton<IWorkItemPersistence, WorkItemPersistence>();
-    services.AddHostedService<ArchiveBackgroundService>();
 
     // The demo seeder writes records referencing stub user ids, so it is
     // gated to Development hosts even when WorkItems:SeedOnStartup=true.

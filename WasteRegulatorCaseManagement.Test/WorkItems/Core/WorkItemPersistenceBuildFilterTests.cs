@@ -55,18 +55,6 @@ public class WorkItemPersistenceBuildFilterTests
         Assert.Equal(new BsonDocument(), doc);
     }
 
-    [Fact]
-    public void IncludeArchivedMakesNoDifferenceToTheFilter()
-    {
-        // RA-313 retains IncludeArchived on the query (management-fe still
-        // sends it, and the migrations pass true) but it no longer selects
-        // anything. Both values must render identically — if this ever fails,
-        // an archive exclusion has crept back in.
-        Assert.Equal(
-            Render(new WorkItemQuery(IncludeArchived: true)),
-            Render(new WorkItemQuery(IncludeArchived: false)));
-    }
-
     [Theory]
     [InlineData("approved")]
     [InlineData("rejected")]
@@ -74,13 +62,10 @@ public class WorkItemPersistenceBuildFilterTests
     public void TerminalStateIsNeverExcluded(string terminalStateId)
     {
         // RA-313 AC01, at the filter level: nothing anywhere in the rendered
-        // filter may exclude a terminal state, with or without IncludeArchived.
-        foreach (var includeArchived in new[] { true, false })
-        {
-            var doc = Render(new WorkItemQuery(IncludeArchived: includeArchived));
+        // filter may exclude a terminal state.
+        var doc = Render(new WorkItemQuery());
 
-            Assert.DoesNotContain(terminalStateId, doc.ToJson());
-        }
+        Assert.DoesNotContain(terminalStateId, doc.ToJson());
     }
 
     [Fact]
@@ -96,10 +81,8 @@ public class WorkItemPersistenceBuildFilterTests
     [Fact]
     public void StateIdsRenderAsInClause()
     {
-        // RA-313: filtering to non-terminal states used to ALSO emit a $nin of
-        // every terminal state, so this could only assert the whole document
-        // once IncludeArchived: true had suppressed it. The caller's selection
-        // is now the entire stateId clause — what you ask for is what you get.
+        // RA-313: the caller's selection is the entire stateId clause — what
+        // you ask for is what you get.
         var doc = Render(new WorkItemQuery(StateIds: s_stateIdsSubmittedAndInReview));
 
         var expected = new BsonDocument("stateId", new BsonDocument("$in",

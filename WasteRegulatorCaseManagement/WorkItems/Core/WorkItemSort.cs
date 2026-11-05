@@ -36,9 +36,9 @@ internal static class WorkItemSort
 
     /// <summary>
     /// Map each state id to a workflow rank derived from the order states are
-    /// declared in on their <see cref="IWorkItemType"/>. Mirrors
-    /// <see cref="TerminalStates.Ids"/>: data-driven from the registry rather
-    /// than hardcoded, so a module's declared state order IS its sort order.
+    /// declared in on their <see cref="IWorkItemType"/>: data-driven from the
+    /// registry rather than hardcoded, so a module's declared state order IS its
+    /// sort order.
     /// First declaration wins when types share an id.
     /// </summary>
     internal static IReadOnlyDictionary<string, int> StatusRank(IWorkItemRegistry registry)
