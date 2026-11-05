@@ -522,6 +522,87 @@ public class CaseEndpointsTests
     }
 
     [Fact]
+    public async Task Post_starts_a_loaded_case_in_the_supplied_initial_state()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var factory = NewFactory(
+            states: [new CaseState("submitted", "Submitted"), new CaseState("accepted", "Accepted", IsTerminal: true)]
+        );
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync(
+            "/cases",
+            new
+            {
+                caseType = CaseType,
+                sourceSystemId = Ulid.NewUlid().ToString(),
+                callbackUrl = "https://source-system.test/callback",
+                nation = "ENGLAND",
+                orgId = "test-org",
+                initialState = "accepted",
+            },
+            cancellationToken
+        );
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
+        Assert.Equal("accepted", body!.StateId);
+        Assert.True(body.IsTerminal);
+    }
+
+    [Fact]
+    public async Task Post_returns_problem_when_the_initial_state_is_not_a_state_of_the_case_type()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var factory = NewFactory();
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync(
+            "/cases",
+            new
+            {
+                caseType = CaseType,
+                sourceSystemId = Ulid.NewUlid().ToString(),
+                callbackUrl = "https://source-system.test/callback",
+                nation = "ENGLAND",
+                orgId = "test-org",
+                initialState = "accepted",
+            },
+            cancellationToken
+        );
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken);
+        Assert.Contains("initialState", problem?.Detail);
+    }
+
+    [Fact]
+    public async Task Post_keeps_the_original_submission_time_of_a_loaded_case()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var factory = NewFactory();
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync(
+            "/cases",
+            new
+            {
+                caseType = CaseType,
+                sourceSystemId = Ulid.NewUlid().ToString(),
+                callbackUrl = "https://source-system.test/callback",
+                nation = "ENGLAND",
+                orgId = "test-org",
+                createdAt = "2024-11-01T10:32:00Z",
+            },
+            cancellationToken
+        );
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
+        Assert.Equal(new DateTime(2024, 11, 1, 10, 32, 0, DateTimeKind.Utc), body!.SubmittedAt);
+    }
+
+    [Fact]
     public async Task Get_by_id_returns_case_when_present()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

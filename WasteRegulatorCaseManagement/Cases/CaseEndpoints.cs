@@ -140,9 +140,9 @@ public static class CaseEndpoints
         }
 
         if (
-            !body.TryGetProperty("caseType", out var typeIdElement)
-            || typeIdElement.ValueKind != JsonValueKind.String
-            || string.IsNullOrWhiteSpace(typeIdElement.GetString())
+            !body.TryGetProperty("caseType", out var caseTypeElement)
+            || caseTypeElement.ValueKind != JsonValueKind.String
+            || string.IsNullOrWhiteSpace(caseTypeElement.GetString())
         )
         {
             log.Log(
@@ -156,7 +156,7 @@ public static class CaseEndpoints
             );
         }
 
-        var caseType = typeIdElement.GetString()!;
+        var caseType = caseTypeElement.GetString()!;
         var type = registry.Find(caseType);
         if (type is null)
         {
@@ -183,6 +183,17 @@ public static class CaseEndpoints
                 }
             );
             return BadRequest(InvalidRequestTitle, intakeError);
+        }
+
+        if (
+            intake!.InitialStateId is { } initialStateId
+            && !type.States.Any(s => string.Equals(s.Id, initialStateId, StringComparison.Ordinal))
+        )
+        {
+            return BadRequest(
+                InvalidRequestTitle,
+                $"'initialState' must be a state of case type '{caseType}'."
+            );
         }
 
         var submittedBy =

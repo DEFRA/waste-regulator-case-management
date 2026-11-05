@@ -79,7 +79,43 @@ internal static class CaseIntakeBinding
             }
         }
 
-        intake = new CaseIntake(sourceSystemId!, callbackUrl!, nation!, orgId!, producerType, displayData);
+        string? initialStateId = null;
+        if (body.TryGetProperty("initialState", out _))
+        {
+            if (ReadRequiredString(body, "initialState", out initialStateId) is { } initialStateError)
+            {
+                return initialStateError;
+            }
+        }
+
+        DateTime? createdAt = null;
+        if (body.TryGetProperty("createdAt", out var createdAtElement))
+        {
+            if (
+                createdAtElement.ValueKind != JsonValueKind.String
+                || !DateTimeOffset.TryParse(
+                    createdAtElement.GetString(),
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.AssumeUniversal,
+                    out var parsed
+                )
+            )
+            {
+                return "'createdAt' must be an ISO 8601 date-time string.";
+            }
+            createdAt = parsed.UtcDateTime;
+        }
+
+        intake = new CaseIntake(
+            sourceSystemId!,
+            callbackUrl!,
+            nation!,
+            orgId!,
+            producerType,
+            displayData,
+            initialStateId,
+            createdAt
+        );
         return null;
     }
 

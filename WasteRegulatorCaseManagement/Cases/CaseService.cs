@@ -160,13 +160,16 @@ public sealed class CaseService : ICaseService
         var now = _timeProvider.GetUtcNow().UtcDateTime;
 
         var snapshot = CaseTemplateSnapshot.Capture(type);
+        var initialState = intake.InitialStateId is { } initialStateId
+            ? type.States.Single(state => state.Id == initialStateId)
+            : type.InitialState;
 
         var caseRecord = new Case
         {
             CaseType = type.CaseType,
-            StateId = type.InitialState.Id,
-            IsTerminal = type.InitialState.IsTerminal,
-            SubmittedAt = now,
+            StateId = initialState.Id,
+            IsTerminal = initialState.IsTerminal,
+            SubmittedAt = intake.CreatedAt ?? now,
             LastModifiedAt = now,
             SubmittedBy = submittedBy,
             TemplateSnapshot = snapshot,

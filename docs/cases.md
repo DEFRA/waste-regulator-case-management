@@ -62,6 +62,8 @@ header (`x-cdp-client-id`) per RA-89/RA-85b.
 | `orgId` | Yes | The submitting organisation's id in the source system. |
 | `producerType` | No | Stored and returned uninterpreted (for CSoC, `DIRECT_PRODUCER` or `COMPLIANCE_SCHEME`). |
 | `displayData` | No | Map of field name to `{ "value": string, "type": "string" \| "number" \| "date" \| "boolean" }`, rendered by the caseworker dashboard. Stored and returned without interpretation. |
+| `initialState` | No | Bulk load of existing submissions only: start the case in this state of its case type instead of the initial state, so already-decided cases arrive decided. |
+| `createdAt` | No | Bulk load only: ISO 8601 submission time to keep as `submittedAt`, preserving queue order. |
 
 The case management service holds a reference to the submission, not its
 content: anything else a caseworker needs is fetched from the source system.
