@@ -153,6 +153,7 @@ public class CaseEndpointsTests
         Assert.True(Ulid.TryParse(body.Id, out _), $"'{body.Id}' is not a ULID");
         Assert.Equal(TypeId, body.TypeId);
         Assert.Equal("submitted", body.StateId);
+        Assert.False(body.IsTerminal);
         Assert.Equal("test-client", body.SubmittedBy);
         Assert.Equal("v1", body.TemplateVersion);
         Assert.Equal(JsonValueKind.Object, body.Payload.ValueKind);

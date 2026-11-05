@@ -32,6 +32,13 @@ public sealed class Case
     public required string StateId { get; set; }
 
     /// <summary>
+    /// Whether <see cref="StateId"/> is a terminal state of this case's
+    /// template. Written with every state change so completed cases can be
+    /// queried without knowing which state ids are terminal for each type.
+    /// </summary>
+    public bool IsTerminal { get; set; }
+
+    /// <summary>
     /// UTC timestamp the case was first accepted into the system. Has no
     /// default initializer — the engine must always stamp this from the
     /// injected <see cref="TimeProvider"/> at submission so tests with a

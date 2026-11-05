@@ -151,6 +151,7 @@ public class CaseServiceTests : IAsyncDisposable
         Assert.True(result.IsSuccess);
         var fetched = await GetAsync(caseRecord.Id);
         Assert.Equal("approved", fetched.StateId);
+        Assert.True(fetched.IsTerminal);
         Assert.Equal(1, fetched.Version);
     }
 
@@ -1812,6 +1813,7 @@ public class CaseServiceTests : IAsyncDisposable
         var fetched = await GetAsync(result.Case!.Id);
         Assert.Equal(TypeId, fetched.TypeId);
         Assert.Equal("submitted", fetched.StateId);
+        Assert.False(fetched.IsTerminal);
         Assert.Equal("test-client", fetched.SubmittedBy);
         Assert.Equal(TickedNow, fetched.SubmittedAt);
         Assert.Equal(TickedNow, fetched.LastModifiedAt);

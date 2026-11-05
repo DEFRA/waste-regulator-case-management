@@ -16,6 +16,7 @@ public sealed record CaseResponse(
     string Id,
     string TypeId,
     string StateId,
+    bool IsTerminal,
     DateTime SubmittedAt,
     DateTime LastModifiedAt,
     string? SubmittedBy,

@@ -35,6 +35,7 @@ public sealed record CaseListItemResponse(
     string Id,
     string TypeId,
     string StateId,
+    bool IsTerminal,
     DateTime SubmittedAt,
     DateTime LastModifiedAt,
     string? SubmittedBy,

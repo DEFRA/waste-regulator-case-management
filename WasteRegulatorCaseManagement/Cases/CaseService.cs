@@ -168,6 +168,7 @@ public sealed class CaseService : ICaseService
         {
             TypeId = type.TypeId,
             StateId = type.InitialState.Id,
+            IsTerminal = type.InitialState.IsTerminal,
             SubmittedAt = now,
             LastModifiedAt = now,
             SubmittedBy = submittedBy,
@@ -308,6 +309,7 @@ public sealed class CaseService : ICaseService
         var previousState = caseRecord.StateId;
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         caseRecord.StateId = transition.ToStateId;
+        caseRecord.IsTerminal = TerminalStates.Find(template, transition.ToStateId) is not null;
         caseRecord.LastModifiedAt = now;
         AppendTimelineEntry(
             caseRecord,
