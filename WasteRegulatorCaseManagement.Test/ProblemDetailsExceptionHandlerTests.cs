@@ -27,77 +27,77 @@ namespace WasteRegulatorCaseManagement.Test;
 /// </summary>
 public class ProblemDetailsExceptionHandlerTests
 {
-    private readonly MongoIntegrationFixture _fixture;
+	private readonly MongoIntegrationFixture _fixture;
 
-    public ProblemDetailsExceptionHandlerTests(MongoIntegrationFixture fixture)
-    {
-        _fixture = fixture;
-    }
+	public ProblemDetailsExceptionHandlerTests(MongoIntegrationFixture fixture)
+	{
+		_fixture = fixture;
+	}
 
-    [Fact]
-    public async Task Unhandled_exception_is_returned_as_problem_details_with_500()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        await using var factory = new ThrowingFactory(_fixture);
-        using var client = factory.CreateClient();
-        client.DefaultRequestHeaders.Add(ClientIdDefaults.DefaultHeaderName, "test-client");
-        client.DefaultRequestHeaders.Add("x-cdp-user-nation", "ENGLAND");
+	[Fact]
+	public async Task Unhandled_exception_is_returned_as_problem_details_with_500()
+	{
+		var ct = TestContext.Current.CancellationToken;
+		await using var factory = new ThrowingFactory(_fixture);
+		using var client = factory.CreateClient();
+		client.DefaultRequestHeaders.Add(ClientIdDefaults.DefaultHeaderName, "test-client");
+		client.DefaultRequestHeaders.Add("x-cdp-user-nation", "ENGLAND");
 
-        var response = await client.GetAsync("/cases", ct);
+		var response = await client.GetAsync("/cases", ct);
 
-        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
-        Assert.Equal("application/problem+json",
-            response.Content.Headers.ContentType?.MediaType);
-        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(ct);
-        Assert.NotNull(problem);
-        Assert.Equal(StatusCodes.Status500InternalServerError, problem!.Status);
-    }
+		Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+		Assert.Equal("application/problem+json",
+			response.Content.Headers.ContentType?.MediaType);
+		var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(ct);
+		Assert.NotNull(problem);
+		Assert.Equal(StatusCodes.Status500InternalServerError, problem!.Status);
+	}
 
-    private sealed class ThrowingFactory(MongoIntegrationFixture fixture) : WebApplicationFactory<Program>
-    {
-        private readonly string _databaseName = MongoIntegrationFixture.NewDatabaseName("problem_details");
+	private sealed class ThrowingFactory(MongoIntegrationFixture fixture) : WebApplicationFactory<Program>
+	{
+		private readonly string _databaseName = MongoIntegrationFixture.NewDatabaseName("problem_details");
 
-        protected override void ConfigureWebHost(IWebHostBuilder builder)
-        {
-            builder.ConfigureServices(services =>
-            {
-                services.UseEphemeralMongoPersistence(fixture, _databaseName);
+		protected override void ConfigureWebHost(IWebHostBuilder builder)
+		{
+			builder.ConfigureServices(services =>
+			{
+				services.UseEphemeralMongoPersistence(fixture, _databaseName);
 
-                // Wrap the real persistence so QueryAsync throws — the
-                // rest of the service surface is the production code
-                // path.
-                services.RemoveAll<ICasePersistence>();
-                var clientFactory = new TestMongoDbClientFactory(
-                    fixture.ConnectionString, _databaseName);
-                var real = new CasePersistence(clientFactory, NullLoggerFactory.Instance, new CaseRegistry([]), new AuditEventService(clientFactory, TimeProvider.System));
-                services.AddSingleton<ICasePersistence>(new ThrowingOnQueryPersistence(real));
-            });
-        }
-    }
+				// Wrap the real persistence so QueryAsync throws — the
+				// rest of the service surface is the production code
+				// path.
+				services.RemoveAll<ICasePersistence>();
+				var clientFactory = new TestMongoDbClientFactory(
+					fixture.ConnectionString, _databaseName);
+				var real = new CasePersistence(clientFactory, NullLoggerFactory.Instance, new CaseRegistry([]), new AuditEventService(clientFactory, TimeProvider.System));
+				services.AddSingleton<ICasePersistence>(new ThrowingOnQueryPersistence(real));
+			});
+		}
+	}
 
-    /// <summary>
-    /// Wraps a real <see cref="ICasePersistence"/> and throws on
-    /// <see cref="ICasePersistence.QueryAsync"/> only. Every other
-    /// member delegates so the fault is surgical: the exception handler
-    /// is the only thing under test.
-    /// </summary>
-    private sealed class ThrowingOnQueryPersistence(ICasePersistence inner) : ICasePersistence
-    {
-        public Task CreateAsync(Case caseRecord, CancellationToken cancellationToken = default) =>
-            inner.CreateAsync(caseRecord, cancellationToken);
+	/// <summary>
+	/// Wraps a real <see cref="ICasePersistence"/> and throws on
+	/// <see cref="ICasePersistence.QueryAsync"/> only. Every other
+	/// member delegates so the fault is surgical: the exception handler
+	/// is the only thing under test.
+	/// </summary>
+	private sealed class ThrowingOnQueryPersistence(ICasePersistence inner) : ICasePersistence
+	{
+		public Task CreateAsync(Case caseRecord, CancellationToken cancellationToken = default) =>
+			inner.CreateAsync(caseRecord, cancellationToken);
 
-        public Task<Case?> GetByIdAsync(string id, CancellationToken cancellationToken = default) =>
-            inner.GetByIdAsync(id, cancellationToken);
+		public Task<Case?> GetByIdAsync(string id, CancellationToken cancellationToken = default) =>
+			inner.GetByIdAsync(id, cancellationToken);
 
-        public Task<Case?> FindBySourceSystemIdAsync(
-            string sourceSystemId,
-            CancellationToken cancellationToken = default
-        ) => inner.FindBySourceSystemIdAsync(sourceSystemId, cancellationToken);
+		public Task<Case?> FindBySourceSystemIdAsync(
+			string sourceSystemId,
+			CancellationToken cancellationToken = default
+		) => inner.FindBySourceSystemIdAsync(sourceSystemId, cancellationToken);
 
-        public Task<CasePage> QueryAsync(CaseQuery query, CancellationToken cancellationToken = default) =>
-            throw new InvalidOperationException("boom");
+		public Task<CasePage> QueryAsync(CaseQuery query, CancellationToken cancellationToken = default) =>
+			throw new InvalidOperationException("boom");
 
-        public Task ReplaceAsync(Case caseRecord, CancellationToken cancellationToken = default) =>
-            inner.ReplaceAsync(caseRecord, cancellationToken);
-    }
+		public Task ReplaceAsync(Case caseRecord, CancellationToken cancellationToken = default) =>
+			inner.ReplaceAsync(caseRecord, cancellationToken);
+	}
 }

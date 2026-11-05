@@ -11,123 +11,123 @@ namespace WasteRegulatorCaseManagement.Test.Cases;
 public class CaseQueryBindingTests
 {
 
-    private static IQueryCollection Q(params (string Key, string Value)[] pairs)
-    {
-        var dict = new Dictionary<string, Microsoft.Extensions.Primitives.StringValues>(
-            StringComparer.OrdinalIgnoreCase);
-        foreach (var (k, v) in pairs)
-        {
-            dict[k] = v;
-        }
-        return new QueryCollection(dict);
-    }
+	private static IQueryCollection Q(params (string Key, string Value)[] pairs)
+	{
+		var dict = new Dictionary<string, Microsoft.Extensions.Primitives.StringValues>(
+			StringComparer.OrdinalIgnoreCase);
+		foreach (var (k, v) in pairs)
+		{
+			dict[k] = v;
+		}
+		return new QueryCollection(dict);
+	}
 
-    [Theory]
-    [InlineData("submittedBy")]
-    [InlineData("SubmittedBy")]
-    [InlineData("SUBMITTEDBY")]
-    [InlineData("submittedby")]
-    public void SubmittedByQueryParameterIsBoundRegardlessOfCase(string key)
-    {
-        var query = CaseQueryBinding.FromQueryString(Q((key, "other-tenant-id")));
+	[Theory]
+	[InlineData("submittedBy")]
+	[InlineData("SubmittedBy")]
+	[InlineData("SUBMITTEDBY")]
+	[InlineData("submittedby")]
+	public void SubmittedByQueryParameterIsBoundRegardlessOfCase(string key)
+	{
+		var query = CaseQueryBinding.FromQueryString(Q((key, "other-tenant-id")));
 
-        Assert.Equal("other-tenant-id", query.SubmittedBy);
-        Assert.Equal("other-tenant-id", query.NormalisedSubmittedBy);
-    }
+		Assert.Equal("other-tenant-id", query.SubmittedBy);
+		Assert.Equal("other-tenant-id", query.NormalisedSubmittedBy);
+	}
 
-    [Fact]
-    public void SubmittedByIsBoundAlongsideOtherParameters()
-    {
-        var query = CaseQueryBinding.FromQueryString(Q(
-            ("submittedBy", "other-tenant-id"),
-            ("caseType", "re-accreditation"),
-            ("page", "2"),
-            ("pageSize", "10")));
+	[Fact]
+	public void SubmittedByIsBoundAlongsideOtherParameters()
+	{
+		var query = CaseQueryBinding.FromQueryString(Q(
+			("submittedBy", "other-tenant-id"),
+			("caseType", "re-accreditation"),
+			("page", "2"),
+			("pageSize", "10")));
 
-        Assert.Equal("other-tenant-id", query.SubmittedBy);
-        Assert.Equal(2, query.Page);
-        Assert.Equal(10, query.PageSize);
-        Assert.NotNull(query.CaseTypes);
-        Assert.Contains("re-accreditation", query.CaseTypes!);
-    }
+		Assert.Equal("other-tenant-id", query.SubmittedBy);
+		Assert.Equal(2, query.Page);
+		Assert.Equal(10, query.PageSize);
+		Assert.NotNull(query.CaseTypes);
+		Assert.Contains("re-accreditation", query.CaseTypes!);
+	}
 
-    [Fact]
-    public void SubmittedByIsNullWhenTheQueryValueIsWhitespace()
-    {
-        // Covers ReadString's `IsNullOrWhiteSpace` true arm — every other
-        // test supplies a real value.
-        var query = CaseQueryBinding.FromQueryString(Q(("submittedBy", "   ")));
+	[Fact]
+	public void SubmittedByIsNullWhenTheQueryValueIsWhitespace()
+	{
+		// Covers ReadString's `IsNullOrWhiteSpace` true arm — every other
+		// test supplies a real value.
+		var query = CaseQueryBinding.FromQueryString(Q(("submittedBy", "   ")));
 
-        Assert.Null(query.SubmittedBy);
-    }
+		Assert.Null(query.SubmittedBy);
+	}
 
-    [Fact]
-    public void PageFallsBackToTheDefaultWhenTheQueryValueIsNotAnInteger()
-    {
-        // Covers ReadInt's `int.TryParse` false arm.
-        var query = CaseQueryBinding.FromQueryString(Q(("page", "not-a-number")));
+	[Fact]
+	public void PageFallsBackToTheDefaultWhenTheQueryValueIsNotAnInteger()
+	{
+		// Covers ReadInt's `int.TryParse` false arm.
+		var query = CaseQueryBinding.FromQueryString(Q(("page", "not-a-number")));
 
-        Assert.Equal(1, query.Page);
-    }
+		Assert.Equal(1, query.Page);
+	}
 
-    [Fact]
-    public void UnassignedIsFalseWhenTheQueryValueIsWhitespace()
-    {
-        // Covers ReadBool's `IsNullOrWhiteSpace` true arm.
-        var query = CaseQueryBinding.FromQueryString(Q(("unassigned", "   ")));
+	[Fact]
+	public void UnassignedIsFalseWhenTheQueryValueIsWhitespace()
+	{
+		// Covers ReadBool's `IsNullOrWhiteSpace` true arm.
+		var query = CaseQueryBinding.FromQueryString(Q(("unassigned", "   ")));
 
-        Assert.False(query.UnassignedOnly);
-    }
+		Assert.False(query.UnassignedOnly);
+	}
 
-    [Fact]
-    public void EmptyQueryProducesNullSubmittedBy()
-    {
-        var query = CaseQueryBinding.FromQueryString(new QueryCollection());
+	[Fact]
+	public void EmptyQueryProducesNullSubmittedBy()
+	{
+		var query = CaseQueryBinding.FromQueryString(new QueryCollection());
 
-        Assert.Null(query.SubmittedBy);
-    }
+		Assert.Null(query.SubmittedBy);
+	}
 
-    // ───────────────────────── Sort (RA-324) ─────────────────────────
+	// ───────────────────────── Sort (RA-324) ─────────────────────────
 
-    [Theory]
-    [InlineData("status")]
-    public void SortTokenIsBound(string token)
-    {
-        var query = CaseQueryBinding.FromQueryString(Q(("sort", token)));
+	[Theory]
+	[InlineData("status")]
+	public void SortTokenIsBound(string token)
+	{
+		var query = CaseQueryBinding.FromQueryString(Q(("sort", token)));
 
-        Assert.Equal(token, query.Sort);
-    }
+		Assert.Equal(token, query.Sort);
+	}
 
-    [Theory]
-    [InlineData("desc", true)]
-    [InlineData("DESC", true)]
-    [InlineData("descending", true)]
-    [InlineData("asc", false)]
-    [InlineData("ascending", false)]
-    public void SortDirectionIsParsed(string dir, bool expectedDescending)
-    {
-        var query = CaseQueryBinding.FromQueryString(Q(("dir", dir)));
+	[Theory]
+	[InlineData("desc", true)]
+	[InlineData("DESC", true)]
+	[InlineData("descending", true)]
+	[InlineData("asc", false)]
+	[InlineData("ascending", false)]
+	public void SortDirectionIsParsed(string dir, bool expectedDescending)
+	{
+		var query = CaseQueryBinding.FromQueryString(Q(("dir", dir)));
 
-        Assert.Equal(expectedDescending, query.SortDescending);
-    }
+		Assert.Equal(expectedDescending, query.SortDescending);
+	}
 
-    [Theory]
-    [InlineData("sideways")]
-    [InlineData("")]
-    [InlineData("   ")]
-    public void UnrecognisedOrBlankSortDirectionIsNull(string dir)
-    {
-        var query = CaseQueryBinding.FromQueryString(Q(("dir", dir)));
+	[Theory]
+	[InlineData("sideways")]
+	[InlineData("")]
+	[InlineData("   ")]
+	public void UnrecognisedOrBlankSortDirectionIsNull(string dir)
+	{
+		var query = CaseQueryBinding.FromQueryString(Q(("dir", dir)));
 
-        Assert.Null(query.SortDescending);
-    }
+		Assert.Null(query.SortDescending);
+	}
 
-    [Fact]
-    public void MissingSortAndDirectionDefaultToNull()
-    {
-        var query = CaseQueryBinding.FromQueryString(new QueryCollection());
+	[Fact]
+	public void MissingSortAndDirectionDefaultToNull()
+	{
+		var query = CaseQueryBinding.FromQueryString(new QueryCollection());
 
-        Assert.Null(query.Sort);
-        Assert.Null(query.SortDescending);
-    }
+		Assert.Null(query.Sort);
+		Assert.Null(query.SortDescending);
+	}
 }

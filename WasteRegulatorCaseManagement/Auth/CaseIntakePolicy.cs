@@ -6,10 +6,10 @@ namespace WasteRegulatorCaseManagement.Auth;
 /// </summary>
 public static class CaseIntakePolicy
 {
-    public const string Name = "CaseIntake";
+	public const string Name = "CaseIntake";
 
-    /// <summary>Configuration key overriding <see cref="DefaultClientId"/>.</summary>
-    public const string ClientIdKey = "Auth:CaseIntakeClientId";
+	/// <summary>Configuration key overriding <see cref="DefaultClientId"/>.</summary>
+	public const string ClientIdKey = "Auth:CaseIntakeClientId";
 
-    public const string DefaultClientId = "case-intake-processor";
+	public const string DefaultClientId = "case-intake-processor";
 }

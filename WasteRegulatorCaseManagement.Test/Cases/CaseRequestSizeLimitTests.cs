@@ -24,74 +24,74 @@ namespace WasteRegulatorCaseManagement.Test.Cases;
 /// </summary>
 public class CaseRequestSizeLimitTests
 {
-    private readonly MongoIntegrationFixture _fixture;
+	private readonly MongoIntegrationFixture _fixture;
 
-    public CaseRequestSizeLimitTests(MongoIntegrationFixture fixture) => _fixture = fixture;
+	public CaseRequestSizeLimitTests(MongoIntegrationFixture fixture) => _fixture = fixture;
 
-    public static IEnumerable<TheoryDataRow<string, long>> EndpointSizeCases() => new TheoryDataRow<string, long>[]
-    {
-        new("SubmitCase",                          CaseEndpoints.MaxSubmitBodyBytes)             { TestDisplayName = "Submit"                },
-        new("AssignCase",                          CaseEndpoints.MaxAssignBodyBytes)             { TestDisplayName = "Assign"                },
-        new("AddCaseNote",                         CaseEndpoints.MaxNoteBodyBytes)               { TestDisplayName = "AddNote"               }
-    };
+	public static IEnumerable<TheoryDataRow<string, long>> EndpointSizeCases() => new TheoryDataRow<string, long>[]
+	{
+		new("SubmitCase",                          CaseEndpoints.MaxSubmitBodyBytes)             { TestDisplayName = "Submit"                },
+		new("AssignCase",                          CaseEndpoints.MaxAssignBodyBytes)             { TestDisplayName = "Assign"                },
+		new("AddCaseNote",                         CaseEndpoints.MaxNoteBodyBytes)               { TestDisplayName = "AddNote"               }
+	};
 
-    [Theory]
-    [MemberData(nameof(EndpointSizeCases))]
-    public void Endpoint_metadata_carries_request_size_limit(string endpointName, long expectedBytes)
-    {
-        using var factory = new EphemeralMongoTestFactory(_fixture, "size-limit");
-        // Resolve EndpointDataSource to inspect the registered endpoints
-        // without making a live HTTP call. Failing here means the
-        // .WithMetadata(new RequestSizeLimitAttribute(...)) call has been
-        // dropped from MapCaseFrameworkEndpoints — that's the
-        // regression we're guarding.
-        using var scope = factory.Services.CreateScope();
-        var sources = scope.ServiceProvider.GetRequiredService<IEnumerable<EndpointDataSource>>();
-        var endpoint = sources
-            .SelectMany(s => s.Endpoints)
-            .Single(e => e.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName == endpointName);
+	[Theory]
+	[MemberData(nameof(EndpointSizeCases))]
+	public void Endpoint_metadata_carries_request_size_limit(string endpointName, long expectedBytes)
+	{
+		using var factory = new EphemeralMongoTestFactory(_fixture, "size-limit");
+		// Resolve EndpointDataSource to inspect the registered endpoints
+		// without making a live HTTP call. Failing here means the
+		// .WithMetadata(new RequestSizeLimitAttribute(...)) call has been
+		// dropped from MapCaseFrameworkEndpoints — that's the
+		// regression we're guarding.
+		using var scope = factory.Services.CreateScope();
+		var sources = scope.ServiceProvider.GetRequiredService<IEnumerable<EndpointDataSource>>();
+		var endpoint = sources
+			.SelectMany(s => s.Endpoints)
+			.Single(e => e.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName == endpointName);
 
-        var sizeLimit = endpoint.Metadata
-            .OfType<Microsoft.AspNetCore.Http.Metadata.IRequestSizeLimitMetadata>()
-            .FirstOrDefault();
-        Assert.NotNull(sizeLimit);
-        Assert.Equal(expectedBytes, sizeLimit!.MaxRequestBodySize);
-    }
+		var sizeLimit = endpoint.Metadata
+			.OfType<Microsoft.AspNetCore.Http.Metadata.IRequestSizeLimitMetadata>()
+			.FirstOrDefault();
+		Assert.NotNull(sizeLimit);
+		Assert.Equal(expectedBytes, sizeLimit!.MaxRequestBodySize);
+	}
 
-    /// <summary>
-    /// Generic scan (epr-e5h): any endpoint registered anywhere in the
-    /// service — framework or module — that calls <c>.DisableValidation()</c>
-    /// MUST also carry an explicit <c>RequestSizeLimitAttribute</c>. This
-    /// catches new module endpoints that copy the manual-parse pattern
-    /// without copying the size cap.
-    /// </summary>
-    [Fact]
-    public void Every_endpoint_that_disables_validation_has_a_request_size_limit()
-    {
-        using var factory = new EphemeralMongoTestFactory(_fixture, "size-limit");
-        using var scope = factory.Services.CreateScope();
-        var sources = scope.ServiceProvider.GetRequiredService<IEnumerable<EndpointDataSource>>();
+	/// <summary>
+	/// Generic scan (epr-e5h): any endpoint registered anywhere in the
+	/// service — framework or module — that calls <c>.DisableValidation()</c>
+	/// MUST also carry an explicit <c>RequestSizeLimitAttribute</c>. This
+	/// catches new module endpoints that copy the manual-parse pattern
+	/// without copying the size cap.
+	/// </summary>
+	[Fact]
+	public void Every_endpoint_that_disables_validation_has_a_request_size_limit()
+	{
+		using var factory = new EphemeralMongoTestFactory(_fixture, "size-limit");
+		using var scope = factory.Services.CreateScope();
+		var sources = scope.ServiceProvider.GetRequiredService<IEnumerable<EndpointDataSource>>();
 
-        var offenders = sources
-            .SelectMany(s => s.Endpoints)
-            .Where(EndpointDisablesValidation)
-            .Where(e => e.Metadata.OfType<Microsoft.AspNetCore.Http.Metadata.IRequestSizeLimitMetadata>().FirstOrDefault() is null)
-            .Select(e => e.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName ?? e.DisplayName ?? "<unnamed>")
-            .ToArray();
+		var offenders = sources
+			.SelectMany(s => s.Endpoints)
+			.Where(EndpointDisablesValidation)
+			.Where(e => e.Metadata.OfType<Microsoft.AspNetCore.Http.Metadata.IRequestSizeLimitMetadata>().FirstOrDefault() is null)
+			.Select(e => e.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName ?? e.DisplayName ?? "<unnamed>")
+			.ToArray();
 
-        Assert.True(
-            offenders.Length == 0,
-            $"The following endpoints call .DisableValidation() without pairing it with a RequestSizeLimitAttribute: {string.Join(", ", offenders)}");
-    }
+		Assert.True(
+			offenders.Length == 0,
+			$"The following endpoints call .DisableValidation() without pairing it with a RequestSizeLimitAttribute: {string.Join(", ", offenders)}");
+	}
 
-    // Identify ".DisableValidation()" via metadata interface name rather
-    // than a hard reference to Microsoft.AspNetCore.Http.Validation —
-    // keeps this test resilient if the framework moves the marker
-    // interface, and avoids a direct dependency on a built-in type that
-    // is otherwise an implementation detail.
-    private static bool EndpointDisablesValidation(Microsoft.AspNetCore.Http.Endpoint endpoint) =>
-        endpoint.Metadata.Any(m =>
-            m.GetType().GetInterfaces()
-                .Append(m.GetType())
-                .Any(t => t.Name == "IDisableValidationMetadata"));
+	// Identify ".DisableValidation()" via metadata interface name rather
+	// than a hard reference to Microsoft.AspNetCore.Http.Validation —
+	// keeps this test resilient if the framework moves the marker
+	// interface, and avoids a direct dependency on a built-in type that
+	// is otherwise an implementation detail.
+	private static bool EndpointDisablesValidation(Microsoft.AspNetCore.Http.Endpoint endpoint) =>
+		endpoint.Metadata.Any(m =>
+			m.GetType().GetInterfaces()
+				.Append(m.GetType())
+				.Any(t => t.Name == "IDisableValidationMetadata"));
 }

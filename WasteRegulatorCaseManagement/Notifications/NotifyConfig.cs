@@ -8,126 +8,126 @@ namespace WasteRegulatorCaseManagement.Notifications;
 /// </summary>
 public sealed class NotifyConfig
 {
-    /// <summary>
-    /// RA-422: central master switch for ALL outbound case management email.
-    /// Defaults to <c>false</c>. When <c>false</c>, the no-op Notify client is
-    /// registered (nothing is sent). Re-enable per environment with the
-    /// <c>Notify__Enabled=true</c> environment override (CDP injects env vars).
-    /// The gate is read once at startup via
-    /// <see cref="NotifyFeature.NotificationsEnabled"/>, which reads the raw
-    /// configuration key directly (the options graph is not yet built at service
-    /// registration). This bound property is the config model for that key and
-    /// carries the same value at runtime, but it is NOT what the
-    /// registration gate consults — treat <see cref="NotifyFeature"/> as the
-    /// authoritative switch rather than an injected
-    /// <c>IOptions&lt;NotifyConfig&gt;.Enabled</c>.
-    /// </summary>
-    public bool Enabled { get; set; }
+	/// <summary>
+	/// RA-422: central master switch for ALL outbound case management email.
+	/// Defaults to <c>false</c>. When <c>false</c>, the no-op Notify client is
+	/// registered (nothing is sent). Re-enable per environment with the
+	/// <c>Notify__Enabled=true</c> environment override (CDP injects env vars).
+	/// The gate is read once at startup via
+	/// <see cref="NotifyFeature.NotificationsEnabled"/>, which reads the raw
+	/// configuration key directly (the options graph is not yet built at service
+	/// registration). This bound property is the config model for that key and
+	/// carries the same value at runtime, but it is NOT what the
+	/// registration gate consults — treat <see cref="NotifyFeature"/> as the
+	/// authoritative switch rather than an injected
+	/// <c>IOptions&lt;NotifyConfig&gt;.Enabled</c>.
+	/// </summary>
+	public bool Enabled { get; set; }
 
-    /// <summary>
-    /// Optional override for the Notify base URI. Defaults to the
-    /// production <c>https://api.notifications.service.gov.uk/</c> baked
-    /// into the GovukNotify SDK when null/empty.
-    /// </summary>
-    public string? BaseUri { get; set; }
+	/// <summary>
+	/// Optional override for the Notify base URI. Defaults to the
+	/// production <c>https://api.notifications.service.gov.uk/</c> baked
+	/// into the GovukNotify SDK when null/empty.
+	/// </summary>
+	public string? BaseUri { get; set; }
 
-    /// <summary>
-    /// Map of template keys (e.g. <c>SubmissionConfirmation</c>) to
-    /// Notify template GUIDs. Modules look up template ids by key so the
-    /// same code path works against Notify's preview / production
-    /// services with different ids.
-    /// </summary>
-    public Dictionary<string, string> Templates { get; set; } =
-        new(StringComparer.OrdinalIgnoreCase);
+	/// <summary>
+	/// Map of template keys (e.g. <c>SubmissionConfirmation</c>) to
+	/// Notify template GUIDs. Modules look up template ids by key so the
+	/// same code path works against Notify's preview / production
+	/// services with different ids.
+	/// </summary>
+	public Dictionary<string, string> Templates { get; set; } =
+		new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>
-    /// RA-211: map of region/regulator identifier (e.g. a nation such as
-    /// <c>England</c>) to
-    /// the Notify <c>reply_to_id</c> that should be used as the sender
-    /// identity for outbound emails relevant to that region, so replies land
-    /// in the correct regional regulator's no-reply mailbox.
-    ///
-    /// This is a developer working assumption pending Defra's actual
-    /// decision on shared vs. per-region sender addresses (RA-211) — it is
-    /// deliberately empty in shipped appsettings.json until that decision
-    /// lands. If Defra confirms a single shared address instead, this map
-    /// can stay empty and <see cref="DefaultReplyToId"/> alone covers every
-    /// send, with no further code change required.
-    /// </summary>
-    public Dictionary<string, string> RegionToReplyToId { get; set; } =
-        new(StringComparer.OrdinalIgnoreCase);
+	/// <summary>
+	/// RA-211: map of region/regulator identifier (e.g. a nation such as
+	/// <c>England</c>) to
+	/// the Notify <c>reply_to_id</c> that should be used as the sender
+	/// identity for outbound emails relevant to that region, so replies land
+	/// in the correct regional regulator's no-reply mailbox.
+	///
+	/// This is a developer working assumption pending Defra's actual
+	/// decision on shared vs. per-region sender addresses (RA-211) — it is
+	/// deliberately empty in shipped appsettings.json until that decision
+	/// lands. If Defra confirms a single shared address instead, this map
+	/// can stay empty and <see cref="DefaultReplyToId"/> alone covers every
+	/// send, with no further code change required.
+	/// </summary>
+	public Dictionary<string, string> RegionToReplyToId { get; set; } =
+		new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>
-    /// Notify <c>reply_to_id</c> used when the region is missing, unrecognised,
-    /// or has no entry in <see cref="RegionToReplyToId"/>. Also used for every
-    /// send when a single shared address is all Defra requires. <c>null</c>
-    /// means "no reply-to override" — the Notify template's own configured
-    /// sender identity is used, exactly as it is today.
-    /// </summary>
-    public string? DefaultReplyToId { get; set; }
+	/// <summary>
+	/// Notify <c>reply_to_id</c> used when the region is missing, unrecognised,
+	/// or has no entry in <see cref="RegionToReplyToId"/>. Also used for every
+	/// send when a single shared address is all Defra requires. <c>null</c>
+	/// means "no reply-to override" — the Notify template's own configured
+	/// sender identity is used, exactly as it is today.
+	/// </summary>
+	public string? DefaultReplyToId { get; set; }
 
-    /// <summary>
-    /// Resolve the Notify <c>reply_to_id</c> to use for a send relevant to
-    /// <paramref name="region"/>. Never throws: a missing, blank, or
-    /// unrecognised region falls back to <see cref="DefaultReplyToId"/>
-    /// (which may itself be <c>null</c>, meaning no override).
-    /// </summary>
-    public string? GetReplyToId(string? region)
-    {
-        if (
-            !string.IsNullOrWhiteSpace(region)
-            && RegionToReplyToId.TryGetValue(region, out var replyToId)
-        )
-        {
-            return replyToId;
-        }
-        return DefaultReplyToId;
-    }
+	/// <summary>
+	/// Resolve the Notify <c>reply_to_id</c> to use for a send relevant to
+	/// <paramref name="region"/>. Never throws: a missing, blank, or
+	/// unrecognised region falls back to <see cref="DefaultReplyToId"/>
+	/// (which may itself be <c>null</c>, meaning no override).
+	/// </summary>
+	public string? GetReplyToId(string? region)
+	{
+		if (
+			!string.IsNullOrWhiteSpace(region)
+			&& RegionToReplyToId.TryGetValue(region, out var replyToId)
+		)
+		{
+			return replyToId;
+		}
+		return DefaultReplyToId;
+	}
 
-    /// <summary>
-    /// Map of UK nation name (e.g. <c>England</c>) to the regional
-    /// regulator's shared mailbox address. The shipped
-    /// <c>appsettings.json</c> declares every nation with a blank value; real
-    /// addresses are set per environment in cdp-app-config
-    /// (<c>Notify__RegulatorMailboxes__&lt;Nation&gt;</c>), and the real
-    /// regulator inboxes live in prod's config only, so a non-prod
-    /// environment can never fall back to a real regulator. An empty/missing
-    /// entry resolves to <c>null</c> so downstream callers skip the send and
-    /// record a <c>missing-regulator-mailbox</c> audit entry (RA-236).
-    /// </summary>
-    public Dictionary<string, string> RegulatorMailboxes { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+	/// <summary>
+	/// Map of UK nation name (e.g. <c>England</c>) to the regional
+	/// regulator's shared mailbox address. The shipped
+	/// <c>appsettings.json</c> declares every nation with a blank value; real
+	/// addresses are set per environment in cdp-app-config
+	/// (<c>Notify__RegulatorMailboxes__&lt;Nation&gt;</c>), and the real
+	/// regulator inboxes live in prod's config only, so a non-prod
+	/// environment can never fall back to a real regulator. An empty/missing
+	/// entry resolves to <c>null</c> so downstream callers skip the send and
+	/// record a <c>missing-regulator-mailbox</c> audit entry (RA-236).
+	/// </summary>
+	public Dictionary<string, string> RegulatorMailboxes { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>
-    /// Per-attempt timeout (seconds) applied around each call into the
-    /// GovukNotify SDK. Defaults to 15s — short enough that a hanging
-    /// Notify endpoint surfaces as a logged failure inside the BFF's
-    /// request budget instead of stalling the originating HTTP request.
-    /// Set to 0 to disable the timeout.
-    /// </summary>
-    public int RequestTimeoutSeconds { get; set; } = 15;
+	/// <summary>
+	/// Per-attempt timeout (seconds) applied around each call into the
+	/// GovukNotify SDK. Defaults to 15s — short enough that a hanging
+	/// Notify endpoint surfaces as a logged failure inside the BFF's
+	/// request budget instead of stalling the originating HTTP request.
+	/// Set to 0 to disable the timeout.
+	/// </summary>
+	public int RequestTimeoutSeconds { get; set; } = 15;
 
-    /// <summary>
-    /// Per-template on/off switch, keyed the same way as <see cref="Templates"/>
-    /// (e.g. <c>SubmissionConfirmation</c>). Distinct from <see cref="Enabled"/>,
-    /// which is the single global kill switch for every outbound email — this
-    /// lets one specific lifecycle event's email be turned off without
-    /// affecting any other template.
-    ///
-    /// A key absent from this map is treated as enabled (see
-    /// <see cref="IsTriggerEnabled"/>): the map is an opt-out list, not an
-    /// opt-in allow-list, so a template nobody has configured an entry for
-    /// (including a brand-new one added after a deploy) still sends rather
-    /// than silently going dark.
-    /// </summary>
-    public Dictionary<string, bool> TriggersEnabled { get; set; } =
-        new(StringComparer.OrdinalIgnoreCase);
+	/// <summary>
+	/// Per-template on/off switch, keyed the same way as <see cref="Templates"/>
+	/// (e.g. <c>SubmissionConfirmation</c>). Distinct from <see cref="Enabled"/>,
+	/// which is the single global kill switch for every outbound email — this
+	/// lets one specific lifecycle event's email be turned off without
+	/// affecting any other template.
+	///
+	/// A key absent from this map is treated as enabled (see
+	/// <see cref="IsTriggerEnabled"/>): the map is an opt-out list, not an
+	/// opt-in allow-list, so a template nobody has configured an entry for
+	/// (including a brand-new one added after a deploy) still sends rather
+	/// than silently going dark.
+	/// </summary>
+	public Dictionary<string, bool> TriggersEnabled { get; set; } =
+		new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>
-    /// Whether the lifecycle email for <paramref name="templateKey"/> should
-    /// be sent. <c>true</c> when the key is absent from
-    /// <see cref="TriggersEnabled"/> (see that property's remarks) or
-    /// explicitly <c>true</c>; <c>false</c> only when explicitly switched off.
-    /// </summary>
-    public bool IsTriggerEnabled(string templateKey) =>
-        !TriggersEnabled.TryGetValue(templateKey, out var enabled) || enabled;
+	/// <summary>
+	/// Whether the lifecycle email for <paramref name="templateKey"/> should
+	/// be sent. <c>true</c> when the key is absent from
+	/// <see cref="TriggersEnabled"/> (see that property's remarks) or
+	/// explicitly <c>true</c>; <c>false</c> only when explicitly switched off.
+	/// </summary>
+	public bool IsTriggerEnabled(string templateKey) =>
+		!TriggersEnabled.TryGetValue(templateKey, out var enabled) || enabled;
 }

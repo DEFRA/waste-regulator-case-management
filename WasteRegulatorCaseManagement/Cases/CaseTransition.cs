@@ -25,8 +25,8 @@ namespace WasteRegulatorCaseManagement.Cases;
 /// </param>
 [BsonIgnoreExtraElements]
 public sealed record CaseTransition(
-    string ActionId,
-    string DisplayName,
-    string FromStateId,
-    string ToStateId,
-    IReadOnlyCollection<string>? RequiredDecisionFields = null);
+	string ActionId,
+	string DisplayName,
+	string FromStateId,
+	string ToStateId,
+	IReadOnlyCollection<string>? RequiredDecisionFields = null);

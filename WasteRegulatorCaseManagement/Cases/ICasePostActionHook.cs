@@ -21,54 +21,54 @@ namespace WasteRegulatorCaseManagement.Cases;
 /// </summary>
 public interface ICasePostActionHook
 {
-    /// <summary>
-    /// Fires after <see cref="ICaseService.SubmitAsync"/> has
-    /// successfully created and persisted a new case.
-    /// </summary>
-    Task OnSubmittedAsync(
-        Case caseRecord,
-        ClaimsPrincipal user,
-        CancellationToken cancellationToken);
+	/// <summary>
+	/// Fires after <see cref="ICaseService.SubmitAsync"/> has
+	/// successfully created and persisted a new case.
+	/// </summary>
+	Task OnSubmittedAsync(
+		Case caseRecord,
+		ClaimsPrincipal user,
+		CancellationToken cancellationToken);
 
-    /// <summary>
-    /// Fires after <see cref="ICaseService.ApplyActionAsync"/> has
-    /// successfully transitioned a case.
-    /// <paramref name="actionId"/> is the transition that was just
-    /// applied; <paramref name="fromStateId"/> is the state the work
-    /// item was in immediately before the transition.
-    /// </summary>
-    Task OnActionAppliedAsync(
-        Case caseRecord,
-        string actionId,
-        string fromStateId,
-        ClaimsPrincipal user,
-        CancellationToken cancellationToken);
+	/// <summary>
+	/// Fires after <see cref="ICaseService.ApplyActionAsync"/> has
+	/// successfully transitioned a case.
+	/// <paramref name="actionId"/> is the transition that was just
+	/// applied; <paramref name="fromStateId"/> is the state the work
+	/// item was in immediately before the transition.
+	/// </summary>
+	Task OnActionAppliedAsync(
+		Case caseRecord,
+		string actionId,
+		string fromStateId,
+		ClaimsPrincipal user,
+		CancellationToken cancellationToken);
 
-    /// <summary>
-    /// RA-237: fires after <see cref="ICaseService.AssignAsync"/> or
-    /// <see cref="ICaseService.UnassignAsync"/> has successfully changed
-    /// the assignment of a case. Assignment is a first-class envelope
-    /// operation rather than a declared action/transition, so it does not
-    /// flow through <see cref="OnActionAppliedAsync"/>; this hook gives
-    /// modules the same post-mutation chokepoint for assignment side
-    /// effects (e.g. notifying the regulator that an officer has been
-    /// assigned).
-    ///
-    /// Only fires on a real change — an idempotent no-op (re-assigning the
-    /// same user, unassigning an already-unassigned item) does not invoke
-    /// the hook, mirroring the framework rule that no-ops write no audit
-    /// entry. The <see cref="Case"/> passed in reflects the post-change
-    /// state, so <see cref="Case.AssignedToId"/> / <c>AssignedToName</c>
-    /// / <c>AssignedBy</c> are already the new values (all null on unassign).
-    ///
-    /// A default no-op implementation is provided so existing hooks that
-    /// only care about submission / action transitions are unaffected.
-    /// </summary>
-    Task OnAssignmentChangedAsync(
-        Case caseRecord,
-        CaseAssignmentChange change,
-        ClaimsPrincipal user,
-        CancellationToken cancellationToken) => Task.CompletedTask;
+	/// <summary>
+	/// RA-237: fires after <see cref="ICaseService.AssignAsync"/> or
+	/// <see cref="ICaseService.UnassignAsync"/> has successfully changed
+	/// the assignment of a case. Assignment is a first-class envelope
+	/// operation rather than a declared action/transition, so it does not
+	/// flow through <see cref="OnActionAppliedAsync"/>; this hook gives
+	/// modules the same post-mutation chokepoint for assignment side
+	/// effects (e.g. notifying the regulator that an officer has been
+	/// assigned).
+	///
+	/// Only fires on a real change — an idempotent no-op (re-assigning the
+	/// same user, unassigning an already-unassigned item) does not invoke
+	/// the hook, mirroring the framework rule that no-ops write no audit
+	/// entry. The <see cref="Case"/> passed in reflects the post-change
+	/// state, so <see cref="Case.AssignedToId"/> / <c>AssignedToName</c>
+	/// / <c>AssignedBy</c> are already the new values (all null on unassign).
+	///
+	/// A default no-op implementation is provided so existing hooks that
+	/// only care about submission / action transitions are unaffected.
+	/// </summary>
+	Task OnAssignmentChangedAsync(
+		Case caseRecord,
+		CaseAssignmentChange change,
+		ClaimsPrincipal user,
+		CancellationToken cancellationToken) => Task.CompletedTask;
 }
 
 /// <summary>
@@ -78,12 +78,12 @@ public interface ICasePostActionHook
 /// </summary>
 public enum CaseAssignmentChange
 {
-    /// <summary>A previously-unassigned item was assigned to an officer.</summary>
-    Assigned,
+	/// <summary>A previously-unassigned item was assigned to an officer.</summary>
+	Assigned,
 
-    /// <summary>An already-assigned item was re-assigned to a different officer.</summary>
-    Reassigned,
+	/// <summary>An already-assigned item was re-assigned to a different officer.</summary>
+	Reassigned,
 
-    /// <summary>An assigned item was unassigned.</summary>
-    Unassigned
+	/// <summary>An assigned item was unassigned.</summary>
+	Unassigned
 }

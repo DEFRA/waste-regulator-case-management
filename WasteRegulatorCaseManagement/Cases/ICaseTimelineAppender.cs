@@ -10,18 +10,18 @@ namespace WasteRegulatorCaseManagement.Cases;
 /// </summary>
 public interface ICaseTimelineAppender
 {
-    /// <summary>
-    /// Append a single <see cref="CaseTimelineEntry"/> to the work
-    /// item identified by <paramref name="caseId"/>. Returns
-    /// <c>true</c> when the entry was persisted; <c>false</c> when the
-    /// case could not be found or the write was abandoned after
-    /// retries.
-    /// </summary>
-    Task<bool> AppendAsync(
-        string caseId,
-        string action,
-        string actionDisplayName,
-        Dictionary<string, string?> details,
-        ClaimsPrincipal user,
-        CancellationToken cancellationToken = default);
+	/// <summary>
+	/// Append a single <see cref="CaseTimelineEntry"/> to the work
+	/// item identified by <paramref name="caseId"/>. Returns
+	/// <c>true</c> when the entry was persisted; <c>false</c> when the
+	/// case could not be found or the write was abandoned after
+	/// retries.
+	/// </summary>
+	Task<bool> AppendAsync(
+		string caseId,
+		string action,
+		string actionDisplayName,
+		Dictionary<string, string?> details,
+		ClaimsPrincipal user,
+		CancellationToken cancellationToken = default);
 }

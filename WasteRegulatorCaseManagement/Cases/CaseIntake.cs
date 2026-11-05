@@ -9,12 +9,12 @@ namespace WasteRegulatorCaseManagement.Cases;
 /// decided and keep their original queue order.
 /// </summary>
 public sealed record CaseIntake(
-    string SourceSystemId,
-    string CallbackUrl,
-    string Nation,
-    string OrgId,
-    string? ProducerType,
-    IReadOnlyDictionary<string, CaseDisplayField> DisplayData,
-    string? InitialStateId = null,
-    DateTime? CreatedAt = null
+	string SourceSystemId,
+	string CallbackUrl,
+	string Nation,
+	string OrgId,
+	string? ProducerType,
+	IReadOnlyDictionary<string, CaseDisplayField> DisplayData,
+	string? InitialStateId = null,
+	DateTime? CreatedAt = null
 );

@@ -15,68 +15,68 @@ namespace WasteRegulatorCaseManagement.Cases;
 /// </summary>
 public sealed class CaseTimelineEntry
 {
-    public string Id { get; init; } = Ulid.NewUlid().ToString();
+	public string Id { get; init; } = Ulid.NewUlid().ToString();
 
-    /// <summary>
-    /// Stable machine-readable identifier of the action that produced this
-    /// entry (e.g. <c>state-changed</c>, <c>note-added</c>,
-    /// <c>assigned</c>, <c>unassigned</c>, <c>note-added</c>). Useful for
-    /// filtering / styling without parsing the display name.
-    /// </summary>
-    public required string Action { get; init; }
+	/// <summary>
+	/// Stable machine-readable identifier of the action that produced this
+	/// entry (e.g. <c>state-changed</c>, <c>note-added</c>,
+	/// <c>assigned</c>, <c>unassigned</c>, <c>note-added</c>). Useful for
+	/// filtering / styling without parsing the display name.
+	/// </summary>
+	public required string Action { get; init; }
 
-    /// <summary>
-    /// Human-readable description of the action, suitable for direct
-    /// rendering by a UI (e.g. <c>Action applied</c>, <c>Note added</c>).
-    /// </summary>
-    public required string ActionDisplayName { get; init; }
+	/// <summary>
+	/// Human-readable description of the action, suitable for direct
+	/// rendering by a UI (e.g. <c>Action applied</c>, <c>Note added</c>).
+	/// </summary>
+	public required string ActionDisplayName { get; init; }
 
-    /// <summary>
-    /// Free-form contextual details — e.g. the action id, the
-    /// from/to states, the assignee id/name, the note id. Stored as a
-    /// string-to-string dictionary so the wire shape is stable and trivially
-    /// renderable; the framework decides what to put here per action.
-    /// </summary>
-    public Dictionary<string, string?> Details { get; init; } = new();
+	/// <summary>
+	/// Free-form contextual details — e.g. the action id, the
+	/// from/to states, the assignee id/name, the note id. Stored as a
+	/// string-to-string dictionary so the wire shape is stable and trivially
+	/// renderable; the framework decides what to put here per action.
+	/// </summary>
+	public Dictionary<string, string?> Details { get; init; } = new();
 
-    /// <summary>
-    /// UTC timestamp the entry was recorded. Has no default initializer — the
-    /// engine must stamp this from the injected <see cref="TimeProvider"/>
-    /// so tests with a <c>FakeTimeProvider</c> are not silently undermined
-    /// by a wallclock fallback.
-    /// </summary>
-    public DateTime PerformedAt { get; init; }
+	/// <summary>
+	/// UTC timestamp the entry was recorded. Has no default initializer — the
+	/// engine must stamp this from the injected <see cref="TimeProvider"/>
+	/// so tests with a <c>FakeTimeProvider</c> are not silently undermined
+	/// by a wallclock fallback.
+	/// </summary>
+	public DateTime PerformedAt { get; init; }
 
-    /// <summary>
-    /// Identifier of the actor that performed the action. Snapshotted from
-    /// the <c>user:id</c> claim, falling back to the client id when
-    /// the call carries no end-user identity.
-    /// </summary>
-    public string? PerformedById { get; init; }
+	/// <summary>
+	/// Identifier of the actor that performed the action. Snapshotted from
+	/// the <c>user:id</c> claim, falling back to the client id when
+	/// the call carries no end-user identity.
+	/// </summary>
+	public string? PerformedById { get; init; }
 
-    /// <summary>
-    /// Human-readable name of the actor at the time the entry was recorded
-    /// (<c>user:name</c> claim) so list views do not need a separate user
-    /// lookup.
-    /// </summary>
-    public string? PerformedByName { get; init; }
+	/// <summary>
+	/// Human-readable name of the actor at the time the entry was recorded
+	/// (<c>user:name</c> claim) so list views do not need a separate user
+	/// lookup.
+	/// </summary>
+	public string? PerformedByName { get; init; }
 
-    /// <summary>
-    /// Case state code as of this event — the state the item was in
-    /// immediately AFTER the event's mutation (epr-rr9s). Persisting a
-    /// per-event snapshot lets a UI render each historical entry with the
-    /// state it was actually in at the time, instead of stapling the live
-    /// current state onto every row.
-    ///
-    /// Nullable by design: audit entries written before epr-rr9s carry no
-    /// snapshot and leave this null. That is the defined fallback — the
-    /// frontend omits the State row when this is null. There is deliberately
-    /// no backfill migration.
-    ///
-    /// Every runtime producer stamps this, so on current data null means
-    /// "written before epr-rr9s" and nothing else. Keep it that way: if you
-    /// add a new site that constructs a CaseTimelineEntry, set StateId from
-    /// the case AFTER any state mutation.
-    /// </summary>
-    public string? StateId { get; init; }
+	/// <summary>
+	/// Case state code as of this event — the state the item was in
+	/// immediately AFTER the event's mutation (epr-rr9s). Persisting a
+	/// per-event snapshot lets a UI render each historical entry with the
+	/// state it was actually in at the time, instead of stapling the live
+	/// current state onto every row.
+	///
+	/// Nullable by design: audit entries written before epr-rr9s carry no
+	/// snapshot and leave this null. That is the defined fallback — the
+	/// frontend omits the State row when this is null. There is deliberately
+	/// no backfill migration.
+	///
+	/// Every runtime producer stamps this, so on current data null means
+	/// "written before epr-rr9s" and nothing else. Keep it that way: if you
+	/// add a new site that constructs a CaseTimelineEntry, set StateId from
+	/// the case AFTER any state mutation.
+	/// </summary>
+	public string? StateId { get; init; }
 }

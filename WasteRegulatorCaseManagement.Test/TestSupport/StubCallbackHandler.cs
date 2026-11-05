@@ -9,29 +9,29 @@ namespace WasteRegulatorCaseManagement.Test.TestSupport;
 /// </summary>
 public sealed class StubCallbackHandler : HttpMessageHandler
 {
-    public List<RecordedCallback> Requests { get; } = [];
+	public List<RecordedCallback> Requests { get; } = [];
 
-    public Func<HttpRequestMessage, HttpResponseMessage> Respond { get; set; } =
-        _ => new HttpResponseMessage(HttpStatusCode.OK);
+	public Func<HttpRequestMessage, HttpResponseMessage> Respond { get; set; } =
+		_ => new HttpResponseMessage(HttpStatusCode.OK);
 
-    protected override async Task<HttpResponseMessage> SendAsync(
-        HttpRequestMessage request,
-        CancellationToken cancellationToken
-    )
-    {
-        Requests.Add(
-            new RecordedCallback(
-                request.Method,
-                request.RequestUri!,
-                request.Headers.Authorization?.ToString(),
-                request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken)
-            )
-        );
-        return Respond(request);
-    }
+	protected override async Task<HttpResponseMessage> SendAsync(
+		HttpRequestMessage request,
+		CancellationToken cancellationToken
+	)
+	{
+		Requests.Add(
+			new RecordedCallback(
+				request.Method,
+				request.RequestUri!,
+				request.Headers.Authorization?.ToString(),
+				request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken)
+			)
+		);
+		return Respond(request);
+	}
 
-    // The client factory disposes expired handlers; this one lives as long as its test.
-    protected override void Dispose(bool disposing) { }
+	// The client factory disposes expired handlers; this one lives as long as its test.
+	protected override void Dispose(bool disposing) { }
 }
 
 public sealed record RecordedCallback(HttpMethod Method, Uri Uri, string? Authorization, string? Body);

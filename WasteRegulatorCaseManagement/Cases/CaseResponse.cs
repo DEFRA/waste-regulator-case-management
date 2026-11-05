@@ -10,26 +10,26 @@ namespace WasteRegulatorCaseManagement.Cases;
 /// template for faithful historical rendering.
 /// </summary>
 public sealed record CaseResponse(
-    string Id,
-    string CaseType,
-    string StateId,
-    bool IsTerminal,
-    DateTime SubmittedAt,
-    DateTime LastModifiedAt,
-    string? SubmittedBy,
-    string TemplateVersion,
-    string SourceSystemId,
-    string Nation,
-    string OrgId,
-    string? ProducerType,
-    IReadOnlyDictionary<string, CaseDisplayField> DisplayData,
-    IReadOnlyCollection<CaseTransition> AvailableActions,
-    IReadOnlyDictionary<string, string>? Decision,
-    string? AssignedToId = null,
-    string? AssignedToName = null,
-    DateTime? AssignedAt = null,
-    string? AssignedBy = null,
-    IReadOnlyCollection<CaseTimelineEntryResponse>? Timeline = null
+	string Id,
+	string CaseType,
+	string StateId,
+	bool IsTerminal,
+	DateTime SubmittedAt,
+	DateTime LastModifiedAt,
+	string? SubmittedBy,
+	string TemplateVersion,
+	string SourceSystemId,
+	string Nation,
+	string OrgId,
+	string? ProducerType,
+	IReadOnlyDictionary<string, CaseDisplayField> DisplayData,
+	IReadOnlyCollection<CaseTransition> AvailableActions,
+	IReadOnlyDictionary<string, string>? Decision,
+	string? AssignedToId = null,
+	string? AssignedToName = null,
+	DateTime? AssignedAt = null,
+	string? AssignedBy = null,
+	IReadOnlyCollection<CaseTimelineEntryResponse>? Timeline = null
 );
 
 /// <summary>
@@ -39,15 +39,15 @@ public sealed record CaseResponse(
 /// bottom timeline, most recent first, without re-sorting (RA-568).
 /// </summary>
 public sealed record CaseTimelineEntryResponse(
-    string Id,
-    string Action,
-    string ActionDisplayName,
-    IReadOnlyDictionary<string, string?> Details,
-    DateTime PerformedAt,
-    string? PerformedById,
-    string? PerformedByName,
-    // epr-rr9s: case state as of this event (serialises to stateId).
-    // Null for pre-epr-rr9s entries with no snapshot; the frontend omits the
-    // State row in that case.
-    string? StateId = null
+	string Id,
+	string Action,
+	string ActionDisplayName,
+	IReadOnlyDictionary<string, string?> Details,
+	DateTime PerformedAt,
+	string? PerformedById,
+	string? PerformedByName,
+	// epr-rr9s: case state as of this event (serialises to stateId).
+	// Null for pre-epr-rr9s entries with no snapshot; the frontend omits the
+	// State row in that case.
+	string? StateId = null
 );

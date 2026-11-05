@@ -11,22 +11,22 @@ namespace WasteRegulatorCaseManagement.Utils.Logging;
 /// non-structured entry that would split the stack trace across lines.
 /// </summary>
 public sealed class ExceptionLoggingHandler(
-    ILogger<ExceptionLoggingHandler> logger,
-    IProblemDetailsService problemDetailsService) : IExceptionHandler
+	ILogger<ExceptionLoggingHandler> logger,
+	IProblemDetailsService problemDetailsService) : IExceptionHandler
 {
-    public async ValueTask<bool> TryHandleAsync(
-        HttpContext httpContext,
-        Exception exception,
-        CancellationToken cancellationToken)
-    {
-        logger.LogError(exception, "Unhandled exception");
+	public async ValueTask<bool> TryHandleAsync(
+		HttpContext httpContext,
+		Exception exception,
+		CancellationToken cancellationToken)
+	{
+		logger.LogError(exception, "Unhandled exception");
 
-        httpContext.Response.StatusCode = StatusCodes.Status500InternalServerError;
+		httpContext.Response.StatusCode = StatusCodes.Status500InternalServerError;
 
-        return await problemDetailsService.TryWriteAsync(new ProblemDetailsContext
-        {
-            HttpContext = httpContext,
-            Exception = exception,
-        });
-    }
+		return await problemDetailsService.TryWriteAsync(new ProblemDetailsContext
+		{
+			HttpContext = httpContext,
+			Exception = exception,
+		});
+	}
 }

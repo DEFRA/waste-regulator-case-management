@@ -9,12 +9,12 @@ namespace WasteRegulatorCaseManagement.Cases;
 /// </summary>
 public interface ICaseTemplate
 {
-    /// <summary>Stable, machine-readable identifier of the template version (e.g. "v1").</summary>
-    string TemplateVersion { get; }
+	/// <summary>Stable, machine-readable identifier of the template version (e.g. "v1").</summary>
+	string TemplateVersion { get; }
 
-    /// <summary>All states this template recognises.</summary>
-    IReadOnlyCollection<CaseState> States { get; }
+	/// <summary>All states this template recognises.</summary>
+	IReadOnlyCollection<CaseState> States { get; }
 
-    /// <summary>Allowed transitions across <see cref="States"/>.</summary>
-    IReadOnlyCollection<CaseTransition> Transitions { get; }
+	/// <summary>Allowed transitions across <see cref="States"/>.</summary>
+	IReadOnlyCollection<CaseTransition> Transitions { get; }
 }

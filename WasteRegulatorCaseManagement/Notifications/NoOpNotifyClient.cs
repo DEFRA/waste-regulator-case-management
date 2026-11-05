@@ -22,34 +22,34 @@ namespace WasteRegulatorCaseManagement.Notifications;
 /// not send" — see <see cref="NotifySendingPolicy"/> for the values.
 /// </param>
 internal sealed class NoOpNotifyClient(
-    IStructuredLogger<NoOpNotifyClient> log,
-    string suppressionReason = NotifySendingPolicy.SuppressedByMissingApiKeyReason
+	IStructuredLogger<NoOpNotifyClient> log,
+	string suppressionReason = NotifySendingPolicy.SuppressedByMissingApiKeyReason
 ) : INotifyClient
 {
-    public Task<NotifySendResult> SendEmailAsync(
-        string templateKey,
-        string toEmail,
-        Dictionary<string, string> personalisation,
-        string reference,
-        string? region = null,
-        CancellationToken cancellationToken = default
-    )
-    {
-        log.Log(
-            LogLevel.Information,
-            "Notify send skipped (no-op client)",
-            new Dictionary<string, object?>
-            {
-                ["event.category"] = GovukNotifyClient.EventCategory,
-                ["event.action"] = GovukNotifyClient.EventAction,
-                ["event.outcome"] = "success",
-                ["event.duration"] = 0L,
-                ["event.reference"] = reference,
-                ["notify.template_key"] = templateKey,
-                ["notify.region"] = region,
-                ["notify.suppression_reason"] = suppressionReason,
-            }
-        );
-        return Task.FromResult(NotifySendResult.Success(providerMessageId: null));
-    }
+	public Task<NotifySendResult> SendEmailAsync(
+		string templateKey,
+		string toEmail,
+		Dictionary<string, string> personalisation,
+		string reference,
+		string? region = null,
+		CancellationToken cancellationToken = default
+	)
+	{
+		log.Log(
+			LogLevel.Information,
+			"Notify send skipped (no-op client)",
+			new Dictionary<string, object?>
+			{
+				["event.category"] = GovukNotifyClient.EventCategory,
+				["event.action"] = GovukNotifyClient.EventAction,
+				["event.outcome"] = "success",
+				["event.duration"] = 0L,
+				["event.reference"] = reference,
+				["notify.template_key"] = templateKey,
+				["notify.region"] = region,
+				["notify.suppression_reason"] = suppressionReason,
+			}
+		);
+		return Task.FromResult(NotifySendResult.Success(providerMessageId: null));
+	}
 }

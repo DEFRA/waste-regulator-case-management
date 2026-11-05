@@ -22,26 +22,26 @@ namespace WasteRegulatorCaseManagement.Cases;
 [BsonIgnoreExtraElements]
 public sealed class CaseTemplateSnapshot : ICaseTemplate
 {
-    public required string TemplateVersion { get; init; }
+	public required string TemplateVersion { get; init; }
 
-    public required IReadOnlyCollection<CaseState> States { get; init; }
+	public required IReadOnlyCollection<CaseState> States { get; init; }
 
-    public required IReadOnlyCollection<CaseTransition> Transitions { get; init; }
+	public required IReadOnlyCollection<CaseTransition> Transitions { get; init; }
 
-    /// <summary>
-    /// Build a snapshot from a live <see cref="CaseModuleConfig"/>, so the
-    /// snapshot is self-contained and does not need to call the live type
-    /// again later.
-    /// </summary>
-    public static CaseTemplateSnapshot Capture(CaseModuleConfig type)
-    {
-        ArgumentNullException.ThrowIfNull(type);
+	/// <summary>
+	/// Build a snapshot from a live <see cref="CaseModuleConfig"/>, so the
+	/// snapshot is self-contained and does not need to call the live type
+	/// again later.
+	/// </summary>
+	public static CaseTemplateSnapshot Capture(CaseModuleConfig type)
+	{
+		ArgumentNullException.ThrowIfNull(type);
 
-        return new CaseTemplateSnapshot
-        {
-            TemplateVersion = type.TemplateVersion,
-            States = type.States.ToList(),
-            Transitions = type.Transitions.ToList()
-        };
-    }
+		return new CaseTemplateSnapshot
+		{
+			TemplateVersion = type.TemplateVersion,
+			States = type.States.ToList(),
+			Transitions = type.Transitions.ToList()
+		};
+	}
 }

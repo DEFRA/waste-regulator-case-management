@@ -9,51 +9,51 @@ namespace WasteRegulatorCaseManagement.Test.Cases;
 /// </summary>
 public class CaseQueryTests
 {
-    [Fact]
-    public void NormalisedPage_clamps_a_page_below_one_up_to_one()
-    {
-        var query = new CaseQuery(Page: 0);
+	[Fact]
+	public void NormalisedPage_clamps_a_page_below_one_up_to_one()
+	{
+		var query = new CaseQuery(Page: 0);
 
-        Assert.Equal(1, query.NormalisedPage);
-    }
+		Assert.Equal(1, query.NormalisedPage);
+	}
 
-    [Fact]
-    public void NormalisedPage_clamps_a_page_above_the_cap_down_to_the_cap()
-    {
-        var query = new CaseQuery(Page: CaseQuery.MaxPage + 1);
+	[Fact]
+	public void NormalisedPage_clamps_a_page_above_the_cap_down_to_the_cap()
+	{
+		var query = new CaseQuery(Page: CaseQuery.MaxPage + 1);
 
-        Assert.Equal(CaseQuery.MaxPage, query.NormalisedPage);
-    }
+		Assert.Equal(CaseQuery.MaxPage, query.NormalisedPage);
+	}
 
-    [Fact]
-    public void NormalisedPage_passes_through_a_page_within_range()
-    {
-        var query = new CaseQuery(Page: 5);
+	[Fact]
+	public void NormalisedPage_passes_through_a_page_within_range()
+	{
+		var query = new CaseQuery(Page: 5);
 
-        Assert.Equal(5, query.NormalisedPage);
-    }
+		Assert.Equal(5, query.NormalisedPage);
+	}
 
-    [Fact]
-    public void NormalisedPageSize_clamps_a_size_below_the_minimum_up_to_the_minimum()
-    {
-        var query = new CaseQuery(PageSize: CaseQuery.MinPageSize - 1);
+	[Fact]
+	public void NormalisedPageSize_clamps_a_size_below_the_minimum_up_to_the_minimum()
+	{
+		var query = new CaseQuery(PageSize: CaseQuery.MinPageSize - 1);
 
-        Assert.Equal(CaseQuery.MinPageSize, query.NormalisedPageSize);
-    }
+		Assert.Equal(CaseQuery.MinPageSize, query.NormalisedPageSize);
+	}
 
-    [Fact]
-    public void NormalisedPageSize_clamps_a_size_above_the_maximum_down_to_the_maximum()
-    {
-        var query = new CaseQuery(PageSize: CaseQuery.MaxPageSize + 1);
+	[Fact]
+	public void NormalisedPageSize_clamps_a_size_above_the_maximum_down_to_the_maximum()
+	{
+		var query = new CaseQuery(PageSize: CaseQuery.MaxPageSize + 1);
 
-        Assert.Equal(CaseQuery.MaxPageSize, query.NormalisedPageSize);
-    }
+		Assert.Equal(CaseQuery.MaxPageSize, query.NormalisedPageSize);
+	}
 
-    [Fact]
-    public void NormalisedPageSize_passes_through_a_size_within_range()
-    {
-        var query = new CaseQuery(PageSize: 50);
+	[Fact]
+	public void NormalisedPageSize_passes_through_a_size_within_range()
+	{
+		var query = new CaseQuery(PageSize: 50);
 
-        Assert.Equal(50, query.NormalisedPageSize);
-    }
+		Assert.Equal(50, query.NormalisedPageSize);
+	}
 }

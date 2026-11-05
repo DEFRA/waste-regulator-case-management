@@ -12,13 +12,13 @@ namespace WasteRegulatorCaseManagement.Notifications;
 /// </summary>
 internal static class NotifyFeature
 {
-    /// <summary>Configuration key backing <see cref="NotifyConfig.Enabled"/>.</summary>
-    internal const string EnabledConfigKey = "Notify:Enabled";
+	/// <summary>Configuration key backing <see cref="NotifyConfig.Enabled"/>.</summary>
+	internal const string EnabledConfigKey = "Notify:Enabled";
 
-    /// <summary>
-    /// <c>true</c> only when <c>Notify:Enabled</c> is explicitly configured
-    /// true; defaults to <c>false</c> (emails off) when the key is absent.
-    /// </summary>
-    internal static bool NotificationsEnabled(IConfiguration configuration) =>
-        configuration.GetValue(EnabledConfigKey, false);
+	/// <summary>
+	/// <c>true</c> only when <c>Notify:Enabled</c> is explicitly configured
+	/// true; defaults to <c>false</c> (emails off) when the key is absent.
+	/// </summary>
+	internal static bool NotificationsEnabled(IConfiguration configuration) =>
+		configuration.GetValue(EnabledConfigKey, false);
 }

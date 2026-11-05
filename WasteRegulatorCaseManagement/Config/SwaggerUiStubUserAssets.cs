@@ -12,32 +12,32 @@ namespace WasteRegulatorCaseManagement.Config;
 /// </summary>
 internal static class SwaggerUiStubUserAssets
 {
-    /// <summary>
-    /// Path the JS bundle is served from. Swagger UI loads it via
-    /// <c>SwaggerUIOptions.InjectJavascript</c>.
-    /// </summary>
-    internal const string ScriptPath = "/swagger-ui-stub-users.js";
+	/// <summary>
+	/// Path the JS bundle is served from. Swagger UI loads it via
+	/// <c>SwaggerUIOptions.InjectJavascript</c>.
+	/// </summary>
+	internal const string ScriptPath = "/swagger-ui-stub-users.js";
 
-    /// <summary>
-    /// JS bundle served at <see cref="ScriptPath"/>. Two responsibilities:
-    /// 1. Add a stub-user picker to the Swagger UI topbar; selection is
-    ///    persisted in <c>localStorage</c>.
-    /// 2. Monkey-patch <c>window.fetch</c> so every same-origin Try it out
-    ///    call carries the three CDP trust headers that
-    ///    <c>ClientIdAuthenticationHandler</c> consumes in
-    ///    header-trust (no-shared-secret) mode. Patching <c>fetch</c>
-    ///    directly rather than going through Swashbuckle's
-    ///    <c>UseRequestInterceptor</c> avoids that helper's brittle
-    ///    arrow-function parsing — the interceptor was being injected but
-    ///    silently dropped, leaving every Try it out as anonymous.
-    ///
-    /// Kept as inline source so it ships with the assembly — no
-    /// static-file middleware required. The stub-user list mirrors
-    /// <c>STUB_USERS</c> in the BFF
-    /// (<c>src/server/routes/auth/stub/controller.js</c>); these are dev
-    /// fixtures only and not tied to any real identity.
-    /// </summary>
-    internal const string ScriptBody = """
+	/// <summary>
+	/// JS bundle served at <see cref="ScriptPath"/>. Two responsibilities:
+	/// 1. Add a stub-user picker to the Swagger UI topbar; selection is
+	///    persisted in <c>localStorage</c>.
+	/// 2. Monkey-patch <c>window.fetch</c> so every same-origin Try it out
+	///    call carries the three CDP trust headers that
+	///    <c>ClientIdAuthenticationHandler</c> consumes in
+	///    header-trust (no-shared-secret) mode. Patching <c>fetch</c>
+	///    directly rather than going through Swashbuckle's
+	///    <c>UseRequestInterceptor</c> avoids that helper's brittle
+	///    arrow-function parsing — the interceptor was being injected but
+	///    silently dropped, leaving every Try it out as anonymous.
+	///
+	/// Kept as inline source so it ships with the assembly — no
+	/// static-file middleware required. The stub-user list mirrors
+	/// <c>STUB_USERS</c> in the BFF
+	/// (<c>src/server/routes/auth/stub/controller.js</c>); these are dev
+	/// fixtures only and not tied to any real identity.
+	/// </summary>
+	internal const string ScriptBody = """
         (function () {
           'use strict';
 

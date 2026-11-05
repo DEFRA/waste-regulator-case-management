@@ -12,22 +12,22 @@ namespace WasteRegulatorCaseManagement.Health;
 /// </summary>
 public sealed class MongoHealthCheck(IMongoDbClientFactory factory) : IHealthCheck
 {
-    public async Task<HealthCheckResult> CheckHealthAsync(
-        HealthCheckContext context,
-        CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var client = factory.GetClient();
-            // Pinging the admin database is the canonical Mongo "are you
-            // there" check; cheap and unambiguous.
-            await client.GetDatabase("admin")
-                .RunCommandAsync<BsonDocument>(new BsonDocument("ping", 1), cancellationToken: cancellationToken);
-            return HealthCheckResult.Healthy("MongoDB ping succeeded.");
-        }
-        catch (Exception ex)
-        {
-            return HealthCheckResult.Unhealthy("MongoDB ping failed.", ex);
-        }
-    }
+	public async Task<HealthCheckResult> CheckHealthAsync(
+		HealthCheckContext context,
+		CancellationToken cancellationToken = default)
+	{
+		try
+		{
+			var client = factory.GetClient();
+			// Pinging the admin database is the canonical Mongo "are you
+			// there" check; cheap and unambiguous.
+			await client.GetDatabase("admin")
+				.RunCommandAsync<BsonDocument>(new BsonDocument("ping", 1), cancellationToken: cancellationToken);
+			return HealthCheckResult.Healthy("MongoDB ping succeeded.");
+		}
+		catch (Exception ex)
+		{
+			return HealthCheckResult.Unhealthy("MongoDB ping failed.", ex);
+		}
+	}
 }

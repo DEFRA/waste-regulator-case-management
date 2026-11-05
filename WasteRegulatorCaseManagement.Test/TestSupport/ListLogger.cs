@@ -13,75 +13,75 @@ namespace WasteRegulatorCaseManagement.Test.TestSupport;
 /// </summary>
 internal sealed class ListLogger<T> : ILogger<T>
 {
-    private readonly List<LogRecord> _records = [];
-    private readonly Stack<IEnumerable<KeyValuePair<string, object?>>> _scopes = new();
+	private readonly List<LogRecord> _records = [];
+	private readonly Stack<IEnumerable<KeyValuePair<string, object?>>> _scopes = new();
 
-    public IReadOnlyList<LogRecord> Records => _records;
+	public IReadOnlyList<LogRecord> Records => _records;
 
-    public IDisposable BeginScope<TState>(TState state) where TState : notnull
-    {
-        if (state is IEnumerable<KeyValuePair<string, object?>> kvs)
-        {
-            _scopes.Push(kvs);
-            return new PopOnDispose(_scopes);
-        }
-        return NullScope.Instance;
-    }
+	public IDisposable BeginScope<TState>(TState state) where TState : notnull
+	{
+		if (state is IEnumerable<KeyValuePair<string, object?>> kvs)
+		{
+			_scopes.Push(kvs);
+			return new PopOnDispose(_scopes);
+		}
+		return NullScope.Instance;
+	}
 
-    public bool IsEnabled(LogLevel logLevel) => true;
+	public bool IsEnabled(LogLevel logLevel) => true;
 
-    public void Log<TState>(
-        LogLevel logLevel,
-        EventId eventId,
-        TState state,
-        Exception? exception,
-        Func<TState, Exception?, string> formatter)
-    {
-        var props = new Dictionary<string, object?>();
-        // Scopes first (outermost → innermost so inner can override),
-        // then state last so state still wins on key conflicts.
-        foreach (var scope in _scopes.Reverse())
-        {
-            foreach (var kv in scope)
-            {
-                props[kv.Key] = kv.Value;
-            }
-        }
-        if (state is IEnumerable<KeyValuePair<string, object?>> stateKvs)
-        {
-            foreach (var kv in stateKvs)
-            {
-                props[kv.Key] = kv.Value;
-            }
-        }
-        _records.Add(new LogRecord(
-            logLevel,
-            formatter(state, exception),
-            exception,
-            props));
-    }
+	public void Log<TState>(
+		LogLevel logLevel,
+		EventId eventId,
+		TState state,
+		Exception? exception,
+		Func<TState, Exception?, string> formatter)
+	{
+		var props = new Dictionary<string, object?>();
+		// Scopes first (outermost → innermost so inner can override),
+		// then state last so state still wins on key conflicts.
+		foreach (var scope in _scopes.Reverse())
+		{
+			foreach (var kv in scope)
+			{
+				props[kv.Key] = kv.Value;
+			}
+		}
+		if (state is IEnumerable<KeyValuePair<string, object?>> stateKvs)
+		{
+			foreach (var kv in stateKvs)
+			{
+				props[kv.Key] = kv.Value;
+			}
+		}
+		_records.Add(new LogRecord(
+			logLevel,
+			formatter(state, exception),
+			exception,
+			props));
+	}
 
-    internal sealed record LogRecord(
-        LogLevel Level,
-        string Message,
-        Exception? Exception,
-        IReadOnlyDictionary<string, object?> Properties);
+	internal sealed record LogRecord(
+		LogLevel Level,
+		string Message,
+		Exception? Exception,
+		IReadOnlyDictionary<string, object?> Properties);
 
-    private sealed class PopOnDispose(Stack<IEnumerable<KeyValuePair<string, object?>>> stack) : IDisposable
-    {
-        public void Dispose()
-        {
-            if (stack.Count > 0)
-            {
-                stack.Pop();
-            }
-        }
-    }
+	private sealed class PopOnDispose(Stack<IEnumerable<KeyValuePair<string, object?>>> stack) : IDisposable
+	{
+		public void Dispose()
+		{
+			if (stack.Count > 0)
+			{
+				stack.Pop();
+			}
+		}
+	}
 
-    private sealed class NullScope : IDisposable
-    {
-        public static readonly NullScope Instance = new();
-        public void Dispose() { }
-    }
+	private sealed class NullScope : IDisposable
+	{
+		public static readonly NullScope Instance = new();
+		public void Dispose() { }
+	}
 }
 

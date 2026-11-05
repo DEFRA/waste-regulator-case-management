@@ -6,11 +6,11 @@ namespace WasteRegulatorCaseManagement.Cases;
 /// </summary>
 public sealed record CaseDisplayField(string Value, string Type)
 {
-    public static readonly IReadOnlySet<string> Types = new HashSet<string>(StringComparer.Ordinal)
-    {
-        "string",
-        "number",
-        "date",
-        "boolean",
-    };
+	public static readonly IReadOnlySet<string> Types = new HashSet<string>(StringComparer.Ordinal)
+	{
+		"string",
+		"number",
+		"date",
+		"boolean",
+	};
 }

@@ -16,41 +16,41 @@ namespace WasteRegulatorCaseManagement.Test.TestSupport;
 /// </summary>
 public static class TestServiceCollectionExtensions
 {
-    /// <summary>
-    /// Replace <see cref="IMongoDbClientFactory"/> and
-    /// <see cref="ICasePersistence"/> with implementations that
-    /// talk to <paramref name="fixture"/>'s ephemeral mongod against
-    /// a fresh per-test <paramref name="databaseName"/>. The
-    /// production <see cref="CasePersistence"/> class is used
-    /// verbatim — only its connection target is swapped.
-    /// </summary>
-    public static IServiceCollection UseEphemeralMongoPersistence(
-        this IServiceCollection services,
-        MongoIntegrationFixture fixture,
-        string databaseName)
-    {
-        services.RemoveAll<ICasePersistence>();
-        services.RemoveAll<IMongoDbClientFactory>();
+	/// <summary>
+	/// Replace <see cref="IMongoDbClientFactory"/> and
+	/// <see cref="ICasePersistence"/> with implementations that
+	/// talk to <paramref name="fixture"/>'s ephemeral mongod against
+	/// a fresh per-test <paramref name="databaseName"/>. The
+	/// production <see cref="CasePersistence"/> class is used
+	/// verbatim — only its connection target is swapped.
+	/// </summary>
+	public static IServiceCollection UseEphemeralMongoPersistence(
+		this IServiceCollection services,
+		MongoIntegrationFixture fixture,
+		string databaseName)
+	{
+		services.RemoveAll<ICasePersistence>();
+		services.RemoveAll<IMongoDbClientFactory>();
 
-        var clientFactory = new TestMongoDbClientFactory(fixture.ConnectionString, databaseName);
-        services.AddSingleton<IMongoDbClientFactory>(clientFactory);
-        services.AddSingleton<ICasePersistence>(sp =>
-            new CasePersistence(clientFactory, sp.GetRequiredService<ILoggerFactory>(), sp.GetRequiredService<CaseRegistry>(), new AuditEventService(clientFactory, TimeProvider.System)));
+		var clientFactory = new TestMongoDbClientFactory(fixture.ConnectionString, databaseName);
+		services.AddSingleton<IMongoDbClientFactory>(clientFactory);
+		services.AddSingleton<ICasePersistence>(sp =>
+			new CasePersistence(clientFactory, sp.GetRequiredService<ILoggerFactory>(), sp.GetRequiredService<CaseRegistry>(), new AuditEventService(clientFactory, TimeProvider.System)));
 
-        return services;
-    }
+		return services;
+	}
 
-    /// <summary>
-    /// Replace the database-backed case type store with one already holding
-    /// <paramref name="configs"/>, so a test host starts with those case
-    /// types (plus the embedded ones the loader writes) without a database.
-    /// </summary>
-    public static IServiceCollection UseCaseModuleConfigs(
-        this IServiceCollection services,
-        params CaseModuleConfig[] configs)
-    {
-        services.RemoveAll<ICaseModuleConfigStore>();
-        services.AddSingleton<ICaseModuleConfigStore>(new InMemoryCaseModuleConfigStore(configs));
-        return services;
-    }
+	/// <summary>
+	/// Replace the database-backed case type store with one already holding
+	/// <paramref name="configs"/>, so a test host starts with those case
+	/// types (plus the embedded ones the loader writes) without a database.
+	/// </summary>
+	public static IServiceCollection UseCaseModuleConfigs(
+		this IServiceCollection services,
+		params CaseModuleConfig[] configs)
+	{
+		services.RemoveAll<ICaseModuleConfigStore>();
+		services.AddSingleton<ICaseModuleConfigStore>(new InMemoryCaseModuleConfigStore(configs));
+		return services;
+	}
 }

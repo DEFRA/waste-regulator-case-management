@@ -31,32 +31,32 @@ namespace WasteRegulatorCaseManagement.Utils.Logging;
 /// </summary>
 public interface IStructuredLogger<T>
 {
-    /// <summary>
-    /// Emit a single log entry at <paramref name="level"/> with
-    /// <paramref name="properties"/> attached as structured fields.
-    /// </summary>
-    /// <param name="message">
-    /// Human-readable message; appears as the rendered log line and
-    /// (for Serilog) is also used as the <c>message_template</c>.
-    /// Do not interpolate property values into the string — pass
-    /// them via <paramref name="properties"/> so they remain
-    /// queryable structured fields.
-    /// </param>
-    /// <param name="properties">
-    /// Property bag. Keys may use dotted ECS names
-    /// (<c>event.category</c>, <c>error.type</c>, etc.) to land on
-    /// the corresponding ECS fields in OpenSearch.
-    /// </param>
-    /// <param name="exception">
-    /// Optional <see cref="Exception"/>. When present, Serilog
-    /// populates the ECS <c>error.message</c> / <c>error.type</c> /
-    /// <c>error.stack_trace</c> fields automatically.
-    /// </param>
-    void Log(
-        LogLevel level,
-        string message,
-        IReadOnlyDictionary<string, object?> properties,
-        Exception? exception = null);
+	/// <summary>
+	/// Emit a single log entry at <paramref name="level"/> with
+	/// <paramref name="properties"/> attached as structured fields.
+	/// </summary>
+	/// <param name="message">
+	/// Human-readable message; appears as the rendered log line and
+	/// (for Serilog) is also used as the <c>message_template</c>.
+	/// Do not interpolate property values into the string — pass
+	/// them via <paramref name="properties"/> so they remain
+	/// queryable structured fields.
+	/// </param>
+	/// <param name="properties">
+	/// Property bag. Keys may use dotted ECS names
+	/// (<c>event.category</c>, <c>error.type</c>, etc.) to land on
+	/// the corresponding ECS fields in OpenSearch.
+	/// </param>
+	/// <param name="exception">
+	/// Optional <see cref="Exception"/>. When present, Serilog
+	/// populates the ECS <c>error.message</c> / <c>error.type</c> /
+	/// <c>error.stack_trace</c> fields automatically.
+	/// </param>
+	void Log(
+		LogLevel level,
+		string message,
+		IReadOnlyDictionary<string, object?> properties,
+		Exception? exception = null);
 }
 
 /// <summary>
@@ -68,33 +68,33 @@ public interface IStructuredLogger<T>
 /// </summary>
 internal sealed class StructuredLogger<T>(ILogger<T> logger) : IStructuredLogger<T>
 {
-    private readonly ILogger<T> _logger = logger;
+	private readonly ILogger<T> _logger = logger;
 
-    public void Log(
-        LogLevel level,
-        string message,
-        IReadOnlyDictionary<string, object?> properties,
-        Exception? exception = null)
-    {
-        ArgumentNullException.ThrowIfNull(message);
-        ArgumentNullException.ThrowIfNull(properties);
+	public void Log(
+		LogLevel level,
+		string message,
+		IReadOnlyDictionary<string, object?> properties,
+		Exception? exception = null)
+	{
+		ArgumentNullException.ThrowIfNull(message);
+		ArgumentNullException.ThrowIfNull(properties);
 
-        if (!_logger.IsEnabled(level))
-        {
-            return;
-        }
+		if (!_logger.IsEnabled(level))
+		{
+			return;
+		}
 
-        // BeginScope with an IEnumerable<KeyValuePair<string, object?>>
-        // is the Serilog-recognised way to attach ad-hoc structured
-        // properties to the next log event. Each KV becomes a
-        // top-level property on the LogEvent (subject to the
-        // ECS-formatter's mapping rules), and the scope is disposed
-        // immediately after the Log call so nothing leaks across
-        // entries.
-        using var scope = _logger.BeginScope(properties);
+		// BeginScope with an IEnumerable<KeyValuePair<string, object?>>
+		// is the Serilog-recognised way to attach ad-hoc structured
+		// properties to the next log event. Each KV becomes a
+		// top-level property on the LogEvent (subject to the
+		// ECS-formatter's mapping rules), and the scope is disposed
+		// immediately after the Log call so nothing leaks across
+		// entries.
+		using var scope = _logger.BeginScope(properties);
 #pragma warning disable CA2254 // Message is the caller's template by design.
-        _logger.Log(level, exception, message);
+		_logger.Log(level, exception, message);
 #pragma warning restore CA2254
-    }
+	}
 }
 

@@ -17,9 +17,9 @@ namespace WasteRegulatorCaseManagement.Test.TestSupport;
 /// </summary>
 internal static class TestAssemblyInitializer
 {
-    [ModuleInitializer]
-    internal static void Init()
-    {
-        MongoConventions.Register();
-    }
+	[ModuleInitializer]
+	internal static void Init()
+	{
+		MongoConventions.Register();
+	}
 }

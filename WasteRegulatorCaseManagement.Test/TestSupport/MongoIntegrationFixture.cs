@@ -23,45 +23,45 @@ namespace WasteRegulatorCaseManagement.Test.TestSupport;
 /// </summary>
 public sealed class MongoIntegrationFixture : IAsyncLifetime
 {
-    private IMongoRunner? _runner;
+	private IMongoRunner? _runner;
 
-    static MongoIntegrationFixture()
-    {
-        // Match production startup ordering — these are the same calls
-        // Program.cs makes before any IMongoClient is constructed.
-        // Idempotent, so the static cctor is safe even though the
-        // fixture itself can be instantiated more than once across
-        // parallel test classes.
-        MongoConventions.Register();
-    }
+	static MongoIntegrationFixture()
+	{
+		// Match production startup ordering — these are the same calls
+		// Program.cs makes before any IMongoClient is constructed.
+		// Idempotent, so the static cctor is safe even though the
+		// fixture itself can be instantiated more than once across
+		// parallel test classes.
+		MongoConventions.Register();
+	}
 
-    public string ConnectionString =>
-        _runner?.ConnectionString
-        ?? throw new InvalidOperationException("Mongo runner has not started yet.");
+	public string ConnectionString =>
+		_runner?.ConnectionString
+		?? throw new InvalidOperationException("Mongo runner has not started yet.");
 
-    public async ValueTask InitializeAsync()
-    {
-        _runner = await MongoRunner.RunAsync(new MongoRunnerOptions
-        {
-            // A single-node replica set is the closest match to the CDP
-            // production topology and unlocks transactions / change
-            // streams should a future test need them.
-            UseSingleNodeReplicaSet = true,
-        });
-    }
+	public async ValueTask InitializeAsync()
+	{
+		_runner = await MongoRunner.RunAsync(new MongoRunnerOptions
+		{
+			// A single-node replica set is the closest match to the CDP
+			// production topology and unlocks transactions / change
+			// streams should a future test need them.
+			UseSingleNodeReplicaSet = true,
+		});
+	}
 
-    public ValueTask DisposeAsync()
-    {
-        _runner?.Dispose();
-        return ValueTask.CompletedTask;
-    }
+	public ValueTask DisposeAsync()
+	{
+		_runner?.Dispose();
+		return ValueTask.CompletedTask;
+	}
 
-    /// <summary>
-    /// Build a unique database name so each test gets a clean slate
-    /// without paying for a fresh mongod.
-    /// </summary>
-    public static string NewDatabaseName(string prefix = "test") =>
-        $"{prefix}_{Guid.NewGuid():N}";
+	/// <summary>
+	/// Build a unique database name so each test gets a clean slate
+	/// without paying for a fresh mongod.
+	/// </summary>
+	public static string NewDatabaseName(string prefix = "test") =>
+		$"{prefix}_{Guid.NewGuid():N}";
 }
 
 /// <summary>
@@ -72,17 +72,17 @@ public sealed class MongoIntegrationFixture : IAsyncLifetime
 /// </summary>
 public sealed class TestMongoDbClientFactory : IMongoDbClientFactory
 {
-    private readonly MongoClient _client;
-    private readonly IMongoDatabase _database;
+	private readonly MongoClient _client;
+	private readonly IMongoDatabase _database;
 
-    public TestMongoDbClientFactory(string connectionString, string databaseName)
-    {
-        _client = new MongoClient(connectionString);
-        _database = _client.GetDatabase(databaseName);
-    }
+	public TestMongoDbClientFactory(string connectionString, string databaseName)
+	{
+		_client = new MongoClient(connectionString);
+		_database = _client.GetDatabase(databaseName);
+	}
 
-    public IMongoClient GetClient() => _client;
+	public IMongoClient GetClient() => _client;
 
-    public IMongoCollection<T> GetCollection<T>(string collection) =>
-        _database.GetCollection<T>(collection);
+	public IMongoCollection<T> GetCollection<T>(string collection) =>
+		_database.GetCollection<T>(collection);
 }

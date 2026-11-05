@@ -14,184 +14,184 @@ namespace WasteRegulatorCaseManagement.Test.Cases;
 /// </summary>
 public class CaseTemplateVersioningTests
 {
-    private const string CaseType = "test-type";
-    private static readonly DateTime Now = new(2026, 4, 27, 10, 0, 0, DateTimeKind.Utc);
+	private const string CaseType = "test-type";
+	private static readonly DateTime Now = new(2026, 4, 27, 10, 0, 0, DateTimeKind.Utc);
 
-    private readonly ICasePersistence _persistence = Substitute.For<ICasePersistence>();
+	private readonly ICasePersistence _persistence = Substitute.For<ICasePersistence>();
 
-    private static ClaimsPrincipal User() =>
-        new(new ClaimsIdentity(
-        [
-            new Claim("client_id", "test-client"),
-            new Claim("user:nation", "ENGLAND"), new Claim("user:id", "test-user")
-        ], "test"));
+	private static ClaimsPrincipal User() =>
+		new(new ClaimsIdentity(
+		[
+			new Claim("client_id", "test-client"),
+			new Claim("user:nation", "ENGLAND"), new Claim("user:id", "test-user")
+		], "test"));
 
-    [Fact]
-    public void Capture_freezes_states_and_transitions()
-    {
-        var type = VersionedType(
-            templateVersion: "v3",
-            states:
-            [
-                new CaseState("submitted", "Submitted"),
-                new CaseState("approved", "Approved", IsTerminal: true)
-            ],
-            transitions: [new CaseTransition("approve", "Approve", "submitted", "approved")]);
+	[Fact]
+	public void Capture_freezes_states_and_transitions()
+	{
+		var type = VersionedType(
+			templateVersion: "v3",
+			states:
+			[
+				new CaseState("submitted", "Submitted"),
+				new CaseState("approved", "Approved", IsTerminal: true)
+			],
+			transitions: [new CaseTransition("approve", "Approve", "submitted", "approved")]);
 
-        var snapshot = CaseTemplateSnapshot.Capture(type);
+		var snapshot = CaseTemplateSnapshot.Capture(type);
 
-        Assert.Equal("v3", snapshot.TemplateVersion);
-        Assert.Equal(2, snapshot.States.Count);
-        Assert.Single(snapshot.Transitions);
-    }
+		Assert.Equal("v3", snapshot.TemplateVersion);
+		Assert.Equal(2, snapshot.States.Count);
+		Assert.Single(snapshot.Transitions);
+	}
 
-    [Fact]
-    public void Project_uses_stored_snapshot_in_preference_to_live_type()
-    {
-        // The case was assessed against v1 (one task: "check"). The live
-        // type has since been bumped to v2 and renamed the task to "review".
-        var snapshot = CaseTemplateSnapshot.Capture(VersionedType(
-            templateVersion: "v1",
-            states: [new CaseState("submitted", "Submitted")],
-            transitions: []));
+	[Fact]
+	public void Project_uses_stored_snapshot_in_preference_to_live_type()
+	{
+		// The case was assessed against v1 (one task: "check"). The live
+		// type has since been bumped to v2 and renamed the task to "review".
+		var snapshot = CaseTemplateSnapshot.Capture(VersionedType(
+			templateVersion: "v1",
+			states: [new CaseState("submitted", "Submitted")],
+			transitions: []));
 
-        var liveType = VersionedType(
-            templateVersion: "v2",
-            states: [new CaseState("submitted", "Submitted")],
-            transitions: []);
+		var liveType = VersionedType(
+			templateVersion: "v2",
+			states: [new CaseState("submitted", "Submitted")],
+			transitions: []);
 
-        var caseRecord = new Case
-        {
-            SourceSystemId = Ulid.NewUlid().ToString(),
-            CallbackUrl = "https://source-system.test/callback",
-            Nation = "ENGLAND",
-            OrgId = "test-org",
-            CaseType = CaseType,
-            StateId = "submitted",
-            SubmittedAt = Now,
-            LastModifiedAt = Now,
-            TemplateSnapshot = snapshot,
-            TemplateVersion = snapshot.TemplateVersion
-        };
+		var caseRecord = new Case
+		{
+			SourceSystemId = Ulid.NewUlid().ToString(),
+			CallbackUrl = "https://source-system.test/callback",
+			Nation = "ENGLAND",
+			OrgId = "test-org",
+			CaseType = CaseType,
+			StateId = "submitted",
+			SubmittedAt = Now,
+			LastModifiedAt = Now,
+			TemplateSnapshot = snapshot,
+			TemplateVersion = snapshot.TemplateVersion
+		};
 
-        var projection = BuildService(liveType).Project(caseRecord);
+		var projection = BuildService(liveType).Project(caseRecord);
 
-        Assert.Equal("v1", projection.TemplateVersion);
-    }
+		Assert.Equal("v1", projection.TemplateVersion);
+	}
 
-    [Fact]
-    public async Task ApplyAction_uses_snapshot_so_actions_removed_from_live_type_still_apply()
-    {
-        // Snapshot keeps an "approve" transition that the live type has dropped.
-        var snapshot = CaseTemplateSnapshot.Capture(VersionedType(
-            templateVersion: "v1",
-            states:
-            [
-                new CaseState("submitted", "Submitted"),
-                new CaseState("approved", "Approved", IsTerminal: true)
-            ],
-            transitions: [new CaseTransition("approve", "Approve", "submitted", "approved")]));
+	[Fact]
+	public async Task ApplyAction_uses_snapshot_so_actions_removed_from_live_type_still_apply()
+	{
+		// Snapshot keeps an "approve" transition that the live type has dropped.
+		var snapshot = CaseTemplateSnapshot.Capture(VersionedType(
+			templateVersion: "v1",
+			states:
+			[
+				new CaseState("submitted", "Submitted"),
+				new CaseState("approved", "Approved", IsTerminal: true)
+			],
+			transitions: [new CaseTransition("approve", "Approve", "submitted", "approved")]));
 
-        var liveType = VersionedType(
-            templateVersion: "v2",
-            states: [new CaseState("submitted", "Submitted")],
-            transitions: []);
+		var liveType = VersionedType(
+			templateVersion: "v2",
+			states: [new CaseState("submitted", "Submitted")],
+			transitions: []);
 
-        var caseRecord = new Case
-        {
-            SourceSystemId = Ulid.NewUlid().ToString(),
-            CallbackUrl = "https://source-system.test/callback",
-            Nation = "ENGLAND",
-            OrgId = "test-org",
-            Id = Ulid.NewUlid().ToString(),
-            CaseType = CaseType,
-            StateId = "submitted",
-            SubmittedAt = Now,
-            LastModifiedAt = Now,
-            TemplateSnapshot = snapshot,
-            TemplateVersion = snapshot.TemplateVersion
-        };
-        _persistence.GetByIdAsync(caseRecord.Id, Arg.Any<CancellationToken>()).Returns(caseRecord);
+		var caseRecord = new Case
+		{
+			SourceSystemId = Ulid.NewUlid().ToString(),
+			CallbackUrl = "https://source-system.test/callback",
+			Nation = "ENGLAND",
+			OrgId = "test-org",
+			Id = Ulid.NewUlid().ToString(),
+			CaseType = CaseType,
+			StateId = "submitted",
+			SubmittedAt = Now,
+			LastModifiedAt = Now,
+			TemplateSnapshot = snapshot,
+			TemplateVersion = snapshot.TemplateVersion
+		};
+		_persistence.GetByIdAsync(caseRecord.Id, Arg.Any<CancellationToken>()).Returns(caseRecord);
 
-        var result = await BuildService(liveType).ApplyActionAsync(
-            caseRecord.Id, "approve", decision: null, User(), TestContext.Current.CancellationToken);
+		var result = await BuildService(liveType).ApplyActionAsync(
+			caseRecord.Id, "approve", decision: null, User(), TestContext.Current.CancellationToken);
 
-        Assert.True(result.IsSuccess);
-        Assert.Equal("approved", caseRecord.StateId);
-    }
+		Assert.True(result.IsSuccess);
+		Assert.Equal("approved", caseRecord.StateId);
+	}
 
-    [Fact]
-    public void Project_falls_back_to_live_type_when_legacy_item_has_no_snapshot()
-    {
-        var liveType = VersionedType(
-            templateVersion: "v1",
-            states: [new CaseState("submitted", "Submitted")],
-            transitions: []);
+	[Fact]
+	public void Project_falls_back_to_live_type_when_legacy_item_has_no_snapshot()
+	{
+		var liveType = VersionedType(
+			templateVersion: "v1",
+			states: [new CaseState("submitted", "Submitted")],
+			transitions: []);
 
-        var legacy = new Case
-        {
-            SourceSystemId = Ulid.NewUlid().ToString(),
-            CallbackUrl = "https://source-system.test/callback",
-            Nation = "ENGLAND",
-            OrgId = "test-org",
-            CaseType = CaseType,
-            StateId = "submitted",
-            SubmittedAt = Now,
-            LastModifiedAt = Now
-            // No TemplateSnapshot, no TemplateVersion.
-        };
+		var legacy = new Case
+		{
+			SourceSystemId = Ulid.NewUlid().ToString(),
+			CallbackUrl = "https://source-system.test/callback",
+			Nation = "ENGLAND",
+			OrgId = "test-org",
+			CaseType = CaseType,
+			StateId = "submitted",
+			SubmittedAt = Now,
+			LastModifiedAt = Now
+			// No TemplateSnapshot, no TemplateVersion.
+		};
 
-        var projection = BuildService(liveType).Project(legacy);
+		var projection = BuildService(liveType).Project(legacy);
 
-        Assert.Equal("v1", projection.TemplateVersion);
-    }
+		Assert.Equal("v1", projection.TemplateVersion);
+	}
 
-    [Fact]
-    public void Project_returns_unknown_version_when_legacy_item_has_no_module()
-    {
-        // No live type registered, no snapshot — engine still produces a
-        // displayable projection so the audit UI can render the envelope.
-        var liveType = VersionedType(
-            templateVersion: "v1",
-            states: [new CaseState("submitted", "Submitted")],
-            transitions: []);
-        var registry = new CaseRegistry([liveType]);
+	[Fact]
+	public void Project_returns_unknown_version_when_legacy_item_has_no_module()
+	{
+		// No live type registered, no snapshot — engine still produces a
+		// displayable projection so the audit UI can render the envelope.
+		var liveType = VersionedType(
+			templateVersion: "v1",
+			states: [new CaseState("submitted", "Submitted")],
+			transitions: []);
+		var registry = new CaseRegistry([liveType]);
 
-        var orphan = new Case
-        {
-            SourceSystemId = Ulid.NewUlid().ToString(),
-            CallbackUrl = "https://source-system.test/callback",
-            Nation = "ENGLAND",
-            OrgId = "test-org",
-            CaseType = "different-type",
-            StateId = "anything"
-        };
+		var orphan = new Case
+		{
+			SourceSystemId = Ulid.NewUlid().ToString(),
+			CallbackUrl = "https://source-system.test/callback",
+			Nation = "ENGLAND",
+			OrgId = "test-org",
+			CaseType = "different-type",
+			StateId = "anything"
+		};
 
-        var projection = new CaseService(registry, _persistence, Substitute.For<ICaseCallbackClient>(), NullLogger<CaseService>.Instance)
-            .Project(orphan);
+		var projection = new CaseService(registry, _persistence, Substitute.For<ICaseCallbackClient>(), NullLogger<CaseService>.Instance)
+			.Project(orphan);
 
-        Assert.Equal("unknown", projection.TemplateVersion);
-        Assert.Empty(projection.AvailableActions);
-    }
+		Assert.Equal("unknown", projection.TemplateVersion);
+		Assert.Empty(projection.AvailableActions);
+	}
 
-    private CaseService BuildService(CaseModuleConfig type) =>
-        new(new CaseRegistry([type]), _persistence, Substitute.For<ICaseCallbackClient>(), NullLogger<CaseService>.Instance);
+	private CaseService BuildService(CaseModuleConfig type) =>
+		new(new CaseRegistry([type]), _persistence, Substitute.For<ICaseCallbackClient>(), NullLogger<CaseService>.Instance);
 
-    /// <summary>
-    /// Test fixture exposing TemplateVersion override so we can register
-    /// multiple incompatible template versions side by side.
-    /// </summary>
-    private static CaseModuleConfig VersionedType(
-        string templateVersion,
-        IReadOnlyCollection<CaseState> states,
-        IReadOnlyCollection<CaseTransition> transitions) =>
-        new()
-        {
-            CaseType = "test-type",
-            DisplayName = "Versioned test type",
-            TemplateVersion = templateVersion,
-            InitialStateId = states.First().Id,
-            States = states,
-            Transitions = transitions,
-        };
+	/// <summary>
+	/// Test fixture exposing TemplateVersion override so we can register
+	/// multiple incompatible template versions side by side.
+	/// </summary>
+	private static CaseModuleConfig VersionedType(
+		string templateVersion,
+		IReadOnlyCollection<CaseState> states,
+		IReadOnlyCollection<CaseTransition> transitions) =>
+		new()
+		{
+			CaseType = "test-type",
+			DisplayName = "Versioned test type",
+			TemplateVersion = templateVersion,
+			InitialStateId = states.First().Id,
+			States = states,
+			Transitions = transitions,
+		};
 }

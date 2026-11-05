@@ -9,15 +9,15 @@ namespace WasteRegulatorCaseManagement.Cases;
 /// </summary>
 internal static class CaseNationScope
 {
-    public const string ClaimType = "user:nation";
+	public const string ClaimType = "user:nation";
 
-    /// <summary>The caller's nation, or <c>null</c> when they carry none.</summary>
-    public static string? CallerNation(ClaimsPrincipal? user)
-    {
-        var nation = user?.FindFirstValue(ClaimType);
-        return string.IsNullOrWhiteSpace(nation) ? null : nation;
-    }
+	/// <summary>The caller's nation, or <c>null</c> when they carry none.</summary>
+	public static string? CallerNation(ClaimsPrincipal? user)
+	{
+		var nation = user?.FindFirstValue(ClaimType);
+		return string.IsNullOrWhiteSpace(nation) ? null : nation;
+	}
 
-    public static bool Includes(ClaimsPrincipal? user, Case caseRecord) =>
-        string.Equals(CallerNation(user), caseRecord.Nation, StringComparison.Ordinal);
+	public static bool Includes(ClaimsPrincipal? user, Case caseRecord) =>
+		string.Equals(CallerNation(user), caseRecord.Nation, StringComparison.Ordinal);
 }

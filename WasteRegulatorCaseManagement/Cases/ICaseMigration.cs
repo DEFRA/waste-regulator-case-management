@@ -11,13 +11,13 @@ namespace WasteRegulatorCaseManagement.Cases;
 /// </summary>
 public interface ICaseMigration
 {
-    /// <summary>Human-readable name logged at the start of each run.</summary>
-    string Name { get; }
+	/// <summary>Human-readable name logged at the start of each run.</summary>
+	string Name { get; }
 
-    /// <summary>
-    /// Apply the migration. Must be idempotent — calling it more than once
-    /// (e.g. on a rolling restart with multiple instances) must produce the
-    /// same result as calling it once.
-    /// </summary>
-    Task ApplyAsync(ICasePersistence persistence, CancellationToken cancellationToken);
+	/// <summary>
+	/// Apply the migration. Must be idempotent — calling it more than once
+	/// (e.g. on a rolling restart with multiple instances) must produce the
+	/// same result as calling it once.
+	/// </summary>
+	Task ApplyAsync(ICasePersistence persistence, CancellationToken cancellationToken);
 }

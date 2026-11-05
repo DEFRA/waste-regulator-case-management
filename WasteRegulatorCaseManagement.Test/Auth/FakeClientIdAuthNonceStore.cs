@@ -11,10 +11,10 @@ namespace WasteRegulatorCaseManagement.Test.Auth;
 // covered separately by ClientIdAuthNonceStoreTests against a real ephemeral mongod.
 public class FakeClientIdAuthNonceStore : IClientIdAuthNonceStore
 {
-    private readonly ConcurrentDictionary<string, byte> _consumed = new();
+	private readonly ConcurrentDictionary<string, byte> _consumed = new();
 
-    public void Clear() => _consumed.Clear();
+	public void Clear() => _consumed.Clear();
 
-    public Task<bool> TryConsumeAsync(string nonce, TimeSpan ttl, CancellationToken ct = default) =>
-        Task.FromResult(_consumed.TryAdd(nonce, 0));
+	public Task<bool> TryConsumeAsync(string nonce, TimeSpan ttl, CancellationToken ct = default) =>
+		Task.FromResult(_consumed.TryAdd(nonce, 0));
 }

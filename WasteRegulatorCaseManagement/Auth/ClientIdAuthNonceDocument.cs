@@ -10,9 +10,9 @@ namespace WasteRegulatorCaseManagement.Auth;
 /// </summary>
 public class ClientIdAuthNonceDocument
 {
-    [BsonId]
-    public required string Id { get; set; }
+	[BsonId]
+	public required string Id { get; set; }
 
-    /// <summary>TTL index target - matches ClientIdAuthenticationOptions.ReplayCacheTtl.</summary>
-    public DateTime ExpiresAt { get; set; }
+	/// <summary>TTL index target - matches ClientIdAuthenticationOptions.ReplayCacheTtl.</summary>
+	public DateTime ExpiresAt { get; set; }
 }

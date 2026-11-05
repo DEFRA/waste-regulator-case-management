@@ -26,102 +26,102 @@ namespace WasteRegulatorCaseManagement.Test.Notifications;
 [Collection(EnvVarMutationCollection.Name)]
 public class NotifyEnvironmentGatingTests : IClassFixture<MongoIntegrationFixture>
 {
-    private readonly MongoIntegrationFixture _fixture;
+	private readonly MongoIntegrationFixture _fixture;
 
-    public NotifyEnvironmentGatingTests(MongoIntegrationFixture fixture) => _fixture = fixture;
+	public NotifyEnvironmentGatingTests(MongoIntegrationFixture fixture) => _fixture = fixture;
 
-    [Theory]
-    [InlineData("local")]
-    [InlineData("dev")]
-    public void NoOpNotifyClient_is_registered_in_non_sending_environments_despite_an_api_key(
-        string environment
-    )
-    {
-        AssertClientType<NoOpNotifyClient>(cdpEnvironment: environment, hostEnvironment: "Production");
-    }
+	[Theory]
+	[InlineData("local")]
+	[InlineData("dev")]
+	public void NoOpNotifyClient_is_registered_in_non_sending_environments_despite_an_api_key(
+		string environment
+	)
+	{
+		AssertClientType<NoOpNotifyClient>(cdpEnvironment: environment, hostEnvironment: "Production");
+	}
 
-    [Fact]
-    public void NoOpNotifyClient_is_registered_on_a_Development_host_despite_an_api_key()
-    {
-        AssertClientType<NoOpNotifyClient>(cdpEnvironment: null, hostEnvironment: "Development");
-    }
+	[Fact]
+	public void NoOpNotifyClient_is_registered_on_a_Development_host_despite_an_api_key()
+	{
+		AssertClientType<NoOpNotifyClient>(cdpEnvironment: null, hostEnvironment: "Development");
+	}
 
-    [Theory]
-    [InlineData("test")]
-    [InlineData("prod")]
-    public void GovukNotifyClient_is_registered_in_sending_environments(string environment)
-    {
-        AssertClientType<GovukNotifyClient>(
-            cdpEnvironment: environment,
-            hostEnvironment: "Production"
-        );
-    }
+	[Theory]
+	[InlineData("test")]
+	[InlineData("prod")]
+	public void GovukNotifyClient_is_registered_in_sending_environments(string environment)
+	{
+		AssertClientType<GovukNotifyClient>(
+			cdpEnvironment: environment,
+			hostEnvironment: "Production"
+		);
+	}
 
-    [Fact]
-    public void Explicit_Notify_SendEmails_override_re_enables_sending_in_dev()
-    {
-        AssertClientType<GovukNotifyClient>(
-            cdpEnvironment: "dev",
-            hostEnvironment: "Development",
-            sendEmails: "true"
-        );
-    }
+	[Fact]
+	public void Explicit_Notify_SendEmails_override_re_enables_sending_in_dev()
+	{
+		AssertClientType<GovukNotifyClient>(
+			cdpEnvironment: "dev",
+			hostEnvironment: "Development",
+			sendEmails: "true"
+		);
+	}
 
-    [Fact]
-    public void Explicit_Notify_SendEmails_override_disables_sending_in_a_sending_environment()
-    {
-        AssertClientType<NoOpNotifyClient>(
-            cdpEnvironment: "test",
-            hostEnvironment: "Production",
-            sendEmails: "false"
-        );
-    }
+	[Fact]
+	public void Explicit_Notify_SendEmails_override_disables_sending_in_a_sending_environment()
+	{
+		AssertClientType<NoOpNotifyClient>(
+			cdpEnvironment: "test",
+			hostEnvironment: "Production",
+			sendEmails: "false"
+		);
+	}
 
-    private void AssertClientType<TExpected>(
-        string? cdpEnvironment,
-        string hostEnvironment,
-        string? sendEmails = null
-    )
-    {
-        var previous = Environment.GetEnvironmentVariable(
-            CdpEnvironment.Variable
-        );
-        try
-        {
-            Environment.SetEnvironmentVariable(
-                CdpEnvironment.Variable,
-                cdpEnvironment
-            );
+	private void AssertClientType<TExpected>(
+		string? cdpEnvironment,
+		string hostEnvironment,
+		string? sendEmails = null
+	)
+	{
+		var previous = Environment.GetEnvironmentVariable(
+			CdpEnvironment.Variable
+		);
+		try
+		{
+			Environment.SetEnvironmentVariable(
+				CdpEnvironment.Variable,
+				cdpEnvironment
+			);
 
-            var settings = new Dictionary<string, string?>
-            {
-                ["NOTIFY_API_KEY"] = NotifyTestConstants.FakeApiKey,
-                // RA-422 master switch: on, so the environment gate this class
-                // exists to assert is actually reached rather than short-
-                // circuited by the flag. NotifyApiKeyRegistrationTests covers
-                // the flag gate itself.
-                ["Notify:Enabled"] = "true",
-            };
-            if (sendEmails is not null)
-            {
-                settings[NotifySendingPolicy.SendEmailsKey] = sendEmails;
-            }
+			var settings = new Dictionary<string, string?>
+			{
+				["NOTIFY_API_KEY"] = NotifyTestConstants.FakeApiKey,
+				// RA-422 master switch: on, so the environment gate this class
+				// exists to assert is actually reached rather than short-
+				// circuited by the flag. NotifyApiKeyRegistrationTests covers
+				// the flag gate itself.
+				["Notify:Enabled"] = "true",
+			};
+			if (sendEmails is not null)
+			{
+				settings[NotifySendingPolicy.SendEmailsKey] = sendEmails;
+			}
 
-            using var factory = new EphemeralMongoTestFactory(
-                _fixture,
-                "notify-env",
-                environment: hostEnvironment,
-                settings: settings
-            );
+			using var factory = new EphemeralMongoTestFactory(
+				_fixture,
+				"notify-env",
+				environment: hostEnvironment,
+				settings: settings
+			);
 
-            Assert.IsType<TExpected>(factory.Services.GetRequiredService<INotifyClient>());
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable(
-                CdpEnvironment.Variable,
-                previous
-            );
-        }
-    }
+			Assert.IsType<TExpected>(factory.Services.GetRequiredService<INotifyClient>());
+		}
+		finally
+		{
+			Environment.SetEnvironmentVariable(
+				CdpEnvironment.Variable,
+				previous
+			);
+		}
+	}
 }

@@ -12,14 +12,14 @@ namespace WasteRegulatorCaseManagement.Config;
 /// </summary>
 internal sealed class CaseOpenApiExampleTransformer : IOpenApiDocumentTransformer
 {
-    /// <summary>
-    /// Maps each endpoint's <c>operationId</c> (set via <c>.WithName(...)</c>)
-    /// to a ready-to-use example <see cref="JsonNode"/>.
-    /// </summary>
-    private static readonly IReadOnlyDictionary<string, JsonNode?> s_examples =
-        new Dictionary<string, JsonNode?>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["SubmitCase"] = JsonNode.Parse("""
+	/// <summary>
+	/// Maps each endpoint's <c>operationId</c> (set via <c>.WithName(...)</c>)
+	/// to a ready-to-use example <see cref="JsonNode"/>.
+	/// </summary>
+	private static readonly IReadOnlyDictionary<string, JsonNode?> s_examples =
+		new Dictionary<string, JsonNode?>(StringComparer.OrdinalIgnoreCase)
+		{
+			["SubmitCase"] = JsonNode.Parse("""
                 {
                     "caseType": "CSoC",
                     "sourceSystemId": "csoc-2024-eng-00123",
@@ -35,37 +35,37 @@ internal sealed class CaseOpenApiExampleTransformer : IOpenApiDocumentTransforme
                 }
                 """),
 
-            ["AssignCase"] = JsonNode.Parse(
-                """{ "assigneeId": "caseworker-abc123", "assigneeName": "Jane Smith" }"""),
+			["AssignCase"] = JsonNode.Parse(
+				"""{ "assigneeId": "caseworker-abc123", "assigneeName": "Jane Smith" }"""),
 
-            ["AddCaseNote"] = JsonNode.Parse(
-                """{ "text": "Organisation details verified against Companies House. All directors confirmed active." }"""),
-        };
+			["AddCaseNote"] = JsonNode.Parse(
+				"""{ "text": "Organisation details verified against Companies House. All directors confirmed active." }"""),
+		};
 
-    public Task TransformAsync(
-        OpenApiDocument document,
-        OpenApiDocumentTransformerContext context,
-        CancellationToken cancellationToken)
-    {
-        foreach (var pathItem in document.Paths.Values)
-        {
-            if (pathItem.Operations is null) continue;
-            foreach (var operation in pathItem.Operations.Values)
-            {
-                if (operation.OperationId is null ||
-                    !s_examples.TryGetValue(operation.OperationId, out var example))
-                {
-                    continue;
-                }
+	public Task TransformAsync(
+		OpenApiDocument document,
+		OpenApiDocumentTransformerContext context,
+		CancellationToken cancellationToken)
+	{
+		foreach (var pathItem in document.Paths.Values)
+		{
+			if (pathItem.Operations is null) continue;
+			foreach (var operation in pathItem.Operations.Values)
+			{
+				if (operation.OperationId is null ||
+					!s_examples.TryGetValue(operation.OperationId, out var example))
+				{
+					continue;
+				}
 
-                if (operation.RequestBody?.Content?.TryGetValue(
-                        "application/json", out var mediaType) == true)
-                {
-                    mediaType.Example = example;
-                }
-            }
-        }
+				if (operation.RequestBody?.Content?.TryGetValue(
+						"application/json", out var mediaType) == true)
+				{
+					mediaType.Example = example;
+				}
+			}
+		}
 
-        return Task.CompletedTask;
-    }
+		return Task.CompletedTask;
+	}
 }

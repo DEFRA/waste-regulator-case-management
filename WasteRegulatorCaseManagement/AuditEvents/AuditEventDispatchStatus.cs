@@ -2,7 +2,7 @@ namespace WasteRegulatorCaseManagement.AuditEvents;
 
 public enum AuditEventDispatchStatus
 {
-    Dispatched,
-    Failed,
-    DeadLettered,
+	Dispatched,
+	Failed,
+	DeadLettered,
 }

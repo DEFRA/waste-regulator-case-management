@@ -16,10 +16,10 @@ namespace WasteRegulatorCaseManagement.Cases;
 /// <see cref="CaseResponse"/>.
 /// </summary>
 public sealed record CaseListResponse(
-    IReadOnlyList<CaseListItemResponse> Items,
-    long TotalCount,
-    int Page,
-    int PageSize);
+	IReadOnlyList<CaseListItemResponse> Items,
+	long TotalCount,
+	int Page,
+	int PageSize);
 
 /// <summary>
 /// Per-item shape returned by the list endpoint (epr-4pf). Mirrors
@@ -30,21 +30,21 @@ public sealed record CaseListResponse(
 /// a list view can render rich rows without a per-row round-trip.
 /// </summary>
 public sealed record CaseListItemResponse(
-    string Id,
-    string CaseType,
-    string StateId,
-    bool IsTerminal,
-    DateTime SubmittedAt,
-    DateTime LastModifiedAt,
-    string? SubmittedBy,
-    string TemplateVersion,
-    string SourceSystemId,
-    string Nation,
-    string OrgId,
-    string? ProducerType,
-    IReadOnlyDictionary<string, CaseDisplayField> DisplayData,
-    IReadOnlyCollection<CaseTransition> AvailableActions,
-    string? AssignedToId = null,
-    string? AssignedToName = null,
-    DateTime? AssignedAt = null,
-    string? AssignedBy = null);
+	string Id,
+	string CaseType,
+	string StateId,
+	bool IsTerminal,
+	DateTime SubmittedAt,
+	DateTime LastModifiedAt,
+	string? SubmittedBy,
+	string TemplateVersion,
+	string SourceSystemId,
+	string Nation,
+	string OrgId,
+	string? ProducerType,
+	IReadOnlyDictionary<string, CaseDisplayField> DisplayData,
+	IReadOnlyCollection<CaseTransition> AvailableActions,
+	string? AssignedToId = null,
+	string? AssignedToName = null,
+	DateTime? AssignedAt = null,
+	string? AssignedBy = null);

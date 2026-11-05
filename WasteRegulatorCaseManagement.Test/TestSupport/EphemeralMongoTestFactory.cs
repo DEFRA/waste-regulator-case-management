@@ -16,36 +16,36 @@ namespace WasteRegulatorCaseManagement.Test.TestSupport;
 /// </summary>
 public sealed class EphemeralMongoTestFactory : WebApplicationFactory<Program>
 {
-    private readonly MongoIntegrationFixture _fixture;
-    private readonly string _databaseName;
-    private readonly string? _environment;
-    private readonly IReadOnlyDictionary<string, string?> _settings;
+	private readonly MongoIntegrationFixture _fixture;
+	private readonly string _databaseName;
+	private readonly string? _environment;
+	private readonly IReadOnlyDictionary<string, string?> _settings;
 
-    public EphemeralMongoTestFactory(
-        MongoIntegrationFixture fixture,
-        string databaseNamePrefix,
-        string? environment = null,
-        IReadOnlyDictionary<string, string?>? settings = null)
-    {
-        _fixture = fixture;
-        _databaseName = MongoIntegrationFixture.NewDatabaseName(databaseNamePrefix);
-        _environment = environment;
-        _settings = settings ?? new Dictionary<string, string?>();
-    }
+	public EphemeralMongoTestFactory(
+		MongoIntegrationFixture fixture,
+		string databaseNamePrefix,
+		string? environment = null,
+		IReadOnlyDictionary<string, string?>? settings = null)
+	{
+		_fixture = fixture;
+		_databaseName = MongoIntegrationFixture.NewDatabaseName(databaseNamePrefix);
+		_environment = environment;
+		_settings = settings ?? new Dictionary<string, string?>();
+	}
 
-    protected override void ConfigureWebHost(IWebHostBuilder builder)
-    {
-        if (_environment is not null)
-        {
-            builder.UseEnvironment(_environment);
-        }
+	protected override void ConfigureWebHost(IWebHostBuilder builder)
+	{
+		if (_environment is not null)
+		{
+			builder.UseEnvironment(_environment);
+		}
 
-        foreach (var (key, value) in _settings)
-        {
-            builder.UseSetting(key, value);
-        }
+		foreach (var (key, value) in _settings)
+		{
+			builder.UseSetting(key, value);
+		}
 
-        builder.ConfigureServices(services =>
-            services.UseEphemeralMongoPersistence(_fixture, _databaseName));
-    }
+		builder.ConfigureServices(services =>
+			services.UseEphemeralMongoPersistence(_fixture, _databaseName));
+	}
 }

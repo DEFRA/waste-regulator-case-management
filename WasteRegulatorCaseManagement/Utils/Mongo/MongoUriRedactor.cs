@@ -14,37 +14,37 @@ namespace WasteRegulatorCaseManagement.Utils.Mongo;
 /// </summary>
 internal static class MongoUriRedactor
 {
-    private const string Mask = "***:***";
+	private const string Mask = "***:***";
 
-    public static string Redact(string? uri)
-    {
-        if (string.IsNullOrEmpty(uri))
-        {
-            return uri ?? string.Empty;
-        }
+	public static string Redact(string? uri)
+	{
+		if (string.IsNullOrEmpty(uri))
+		{
+			return uri ?? string.Empty;
+		}
 
-        // Find the scheme separator so we leave "mongodb://" /
-        // "mongodb+srv://" intact and only operate on the authority.
-        var schemeIndex = uri.IndexOf("://", StringComparison.Ordinal);
-        var authorityStart = schemeIndex >= 0 ? schemeIndex + 3 : 0;
+		// Find the scheme separator so we leave "mongodb://" /
+		// "mongodb+srv://" intact and only operate on the authority.
+		var schemeIndex = uri.IndexOf("://", StringComparison.Ordinal);
+		var authorityStart = schemeIndex >= 0 ? schemeIndex + 3 : 0;
 
-        // The authority section ends at the first '/', '?' or end-of-string.
-        var authorityEnd = uri.IndexOfAny(['/', '?'], authorityStart);
-        if (authorityEnd < 0)
-        {
-            authorityEnd = uri.Length;
-        }
+		// The authority section ends at the first '/', '?' or end-of-string.
+		var authorityEnd = uri.IndexOfAny(['/', '?'], authorityStart);
+		if (authorityEnd < 0)
+		{
+			authorityEnd = uri.Length;
+		}
 
-        var atIndex = uri.IndexOf('@', authorityStart, authorityEnd - authorityStart);
-        if (atIndex < 0)
-        {
-            // No credentials embedded — nothing to redact.
-            return uri;
-        }
+		var atIndex = uri.IndexOf('@', authorityStart, authorityEnd - authorityStart);
+		if (atIndex < 0)
+		{
+			// No credentials embedded — nothing to redact.
+			return uri;
+		}
 
-        return string.Concat(
-            uri.AsSpan(0, authorityStart),
-            Mask,
-            uri.AsSpan(atIndex, uri.Length - atIndex));
-    }
+		return string.Concat(
+			uri.AsSpan(0, authorityStart),
+			Mask,
+			uri.AsSpan(atIndex, uri.Length - atIndex));
+	}
 }

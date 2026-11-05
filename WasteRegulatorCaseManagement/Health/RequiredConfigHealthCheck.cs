@@ -13,37 +13,37 @@ namespace WasteRegulatorCaseManagement.Health;
 /// reports it (RA-441).
 /// </summary>
 public sealed class RequiredConfigHealthCheck(IConfiguration configuration, IHostEnvironment environment)
-    : IHealthCheck
+	: IHealthCheck
 {
-    public Task<HealthCheckResult> CheckHealthAsync(
-        HealthCheckContext context,
-        CancellationToken cancellationToken = default)
-    {
-        var missing = new List<string>();
+	public Task<HealthCheckResult> CheckHealthAsync(
+		HealthCheckContext context,
+		CancellationToken cancellationToken = default)
+	{
+		var missing = new List<string>();
 
-        // docs/cdp-deployment.md: both caller secrets are "Required in all
-        // non-Development environments." AddCallerSecret has no other signal when
-        // one is blank — the caller just never gets an entry in ClientSecrets.
-        if (!environment.IsDevelopment())
-        {
-            if (
-                string.IsNullOrWhiteSpace(
-                    configuration.GetValue<string>("AUTH_SHARED_SECRET:MANAGEMENT_FE")
-                )
-            )
-                missing.Add("AUTH_SHARED_SECRET__MANAGEMENT_FE");
-            if (
-                string.IsNullOrWhiteSpace(
-                    configuration.GetValue<string>("AUTH_SHARED_SECRET:CASE_INTAKE")
-                )
-            )
-                missing.Add("AUTH_SHARED_SECRET__CASE_INTAKE");
-        }
+		// docs/cdp-deployment.md: both caller secrets are "Required in all
+		// non-Development environments." AddCallerSecret has no other signal when
+		// one is blank — the caller just never gets an entry in ClientSecrets.
+		if (!environment.IsDevelopment())
+		{
+			if (
+				string.IsNullOrWhiteSpace(
+					configuration.GetValue<string>("AUTH_SHARED_SECRET:MANAGEMENT_FE")
+				)
+			)
+				missing.Add("AUTH_SHARED_SECRET__MANAGEMENT_FE");
+			if (
+				string.IsNullOrWhiteSpace(
+					configuration.GetValue<string>("AUTH_SHARED_SECRET:CASE_INTAKE")
+				)
+			)
+				missing.Add("AUTH_SHARED_SECRET__CASE_INTAKE");
+		}
 
-        return Task.FromResult(
-            missing.Count == 0
-                ? HealthCheckResult.Healthy()
-                : HealthCheckResult.Unhealthy($"Missing required config: {string.Join(", ", missing)}")
-        );
-    }
+		return Task.FromResult(
+			missing.Count == 0
+				? HealthCheckResult.Healthy()
+				: HealthCheckResult.Unhealthy($"Missing required config: {string.Join(", ", missing)}")
+		);
+	}
 }
