@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
@@ -99,6 +100,11 @@ public sealed class AnalyticsAuditEventProcessorTests : IAsyncDisposable
 		Assert.Equal("case.v1.0", sent.SchemaVersion);
 		Assert.Null(sent.Before);
 		Assert.Equal("WALES", sent.After!["nation"].AsString);
+		using var message = JsonDocument.Parse(JsonSerializer.Serialize(sent));
+		Assert.Equal(
+			"2026-11-05T09:30:00.000Z",
+			message.RootElement.GetProperty("after").GetProperty("submittedAt").GetString()
+		);
 	}
 
 	[Fact]
