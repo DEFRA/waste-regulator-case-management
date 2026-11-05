@@ -228,18 +228,8 @@ public sealed class CasePersistence
 		var search = query.NormalisedSearch;
 		if (!string.IsNullOrEmpty(search))
 		{
-			// Case-insensitive substring on submitter, plus prefix match on the
-			// string-serialised id (which lets a user paste a full or partial
-			// id into the search box).
 			var escaped = System.Text.RegularExpressions.Regex.Escape(search);
-			var pattern = new MongoDB.Bson.BsonRegularExpression(escaped, "i");
-
-			clauses.Add(
-				builder.Or(
-					builder.Regex("_id", pattern),
-					builder.Regex(nameof(Case.SubmittedBy), pattern)
-				)
-			);
+			clauses.Add(builder.Regex("_id", new MongoDB.Bson.BsonRegularExpression($"^{escaped}", "i")));
 		}
 
 		var assigneeId = query.NormalisedAssigneeId;
@@ -276,12 +266,6 @@ public sealed class CasePersistence
 		if (query.IsTerminal is { } isTerminal)
 		{
 			clauses.Add(builder.Eq(w => w.IsTerminal, isTerminal));
-		}
-
-		var submittedBy = query.NormalisedSubmittedBy;
-		if (submittedBy is not null)
-		{
-			clauses.Add(builder.Eq(w => w.SubmittedBy, submittedBy));
 		}
 
 		// RA-313: there is deliberately NO terminal-state exclusion here. A

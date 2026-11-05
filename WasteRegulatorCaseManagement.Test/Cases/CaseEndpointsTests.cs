@@ -1239,10 +1239,6 @@ public class CaseEndpointsTests
 		);
 		Assert.NotNull(body);
 		Assert.Equal(2, body!.Items.Count);
-
-		var lastQuery = factory.Recording.LastQuery;
-		Assert.NotNull(lastQuery);
-		Assert.Null(lastQuery!.SubmittedBy);
 	}
 
 	[Fact]
@@ -1294,59 +1290,6 @@ public class CaseEndpointsTests
 			IsTerminal = isTerminal,
 			SubmittedBy = "test-client",
 		};
-
-	[Fact]
-	public async Task Get_list_filters_by_submittedBy_query_param_when_supplied()
-	{
-		// Scoping ("give me only my items") is now something the frontend
-		// asks for explicitly, not something the backend infers from a
-		// role claim. The backend still applies whatever scope is asked
-		// for — this is a query filter, not an authorization gate.
-		var cancellationToken = TestContext.Current.CancellationToken;
-		await using var factory = NewFactory();
-		using var client = factory.CreateClient();
-
-		await factory.SeedAsync(
-			new Case
-			{
-				SourceSystemId = Ulid.NewUlid().ToString(),
-				CallbackUrl = "https://source-system.test/callback",
-				Nation = "ENGLAND",
-				OrgId = "test-org",
-				Id = Ulid.NewUlid().ToString(),
-				CaseType = CaseType,
-				StateId = "submitted",
-				SubmittedBy = "test-client",
-			},
-			cancellationToken
-		);
-		await factory.SeedAsync(
-			new Case
-			{
-				SourceSystemId = Ulid.NewUlid().ToString(),
-				CallbackUrl = "https://source-system.test/callback",
-				Nation = "ENGLAND",
-				OrgId = "test-org",
-				Id = Ulid.NewUlid().ToString(),
-				CaseType = CaseType,
-				StateId = "submitted",
-				SubmittedBy = "other-tenant",
-			},
-			cancellationToken
-		);
-
-		var body = await client.GetFromJsonAsync<CaseListResponse>(
-			"/cases?submittedBy=test-client",
-			cancellationToken
-		);
-		Assert.NotNull(body);
-		var item = Assert.Single(body!.Items);
-		Assert.Equal("test-client", item.SubmittedBy);
-
-		var lastQuery = factory.Recording.LastQuery;
-		Assert.NotNull(lastQuery);
-		Assert.Equal("test-client", lastQuery!.SubmittedBy);
-	}
 
 	[Fact]
 	public async Task Submit_logs_absent_body_when_no_json_body_is_supplied()

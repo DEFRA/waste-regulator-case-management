@@ -22,43 +22,12 @@ public class CaseQueryBindingTests
 		return new QueryCollection(dict);
 	}
 
-	[Theory]
-	[InlineData("submittedBy")]
-	[InlineData("SubmittedBy")]
-	[InlineData("SUBMITTEDBY")]
-	[InlineData("submittedby")]
-	public void SubmittedByQueryParameterIsBoundRegardlessOfCase(string key)
-	{
-		var query = CaseQueryBinding.FromQueryString(Q((key, "other-tenant-id")));
-
-		Assert.Equal("other-tenant-id", query.SubmittedBy);
-		Assert.Equal("other-tenant-id", query.NormalisedSubmittedBy);
-	}
-
 	[Fact]
-	public void SubmittedByIsBoundAlongsideOtherParameters()
+	public void OrgIdIsNullWhenTheQueryValueIsWhitespace()
 	{
-		var query = CaseQueryBinding.FromQueryString(Q(
-			("submittedBy", "other-tenant-id"),
-			("caseType", "re-accreditation"),
-			("page", "2"),
-			("pageSize", "10")));
+		var query = CaseQueryBinding.FromQueryString(Q(("orgId", "   ")));
 
-		Assert.Equal("other-tenant-id", query.SubmittedBy);
-		Assert.Equal(2, query.Page);
-		Assert.Equal(10, query.PageSize);
-		Assert.NotNull(query.CaseTypes);
-		Assert.Contains("re-accreditation", query.CaseTypes!);
-	}
-
-	[Fact]
-	public void SubmittedByIsNullWhenTheQueryValueIsWhitespace()
-	{
-		// Covers ReadString's `IsNullOrWhiteSpace` true arm — every other
-		// test supplies a real value.
-		var query = CaseQueryBinding.FromQueryString(Q(("submittedBy", "   ")));
-
-		Assert.Null(query.SubmittedBy);
+		Assert.Null(query.OrgId);
 	}
 
 	[Fact]
@@ -77,14 +46,6 @@ public class CaseQueryBindingTests
 		var query = CaseQueryBinding.FromQueryString(Q(("unassigned", "   ")));
 
 		Assert.False(query.UnassignedOnly);
-	}
-
-	[Fact]
-	public void EmptyQueryProducesNullSubmittedBy()
-	{
-		var query = CaseQueryBinding.FromQueryString(new QueryCollection());
-
-		Assert.Null(query.SubmittedBy);
 	}
 
 	// ───────────────────────── Sort (RA-324) ─────────────────────────

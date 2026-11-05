@@ -106,16 +106,11 @@ public class CasePersistenceBuildFilterTests
 	}
 
 	[Fact]
-	public void SearchRendersCaseInsensitiveOrAcrossIdAndSubmittedBy()
+	public void SearchRendersCaseInsensitivePrefixMatchOnId()
 	{
-		var doc = Render(new CaseQuery(Search: "  alice  "));
+		var doc = Render(new CaseQuery(Search: "  01kb  "));
 
-		// Trimmed search needle.
-		var pattern = new BsonRegularExpression("alice", "i");
-		var or = doc["$or"].AsBsonArray;
-		Assert.Equal(2, or.Count);
-		Assert.Equal(pattern, or[0]["_id"].AsBsonRegularExpression);
-		Assert.Equal(pattern, or[1]["submittedBy"].AsBsonRegularExpression);
+		Assert.Equal(new BsonRegularExpression("^01kb", "i"), doc["_id"].AsBsonRegularExpression);
 	}
 
 	[Fact]
@@ -123,8 +118,7 @@ public class CasePersistenceBuildFilterTests
 	{
 		var doc = Render(new CaseQuery(Search: "a.b*c"));
 
-		var or = doc["$or"].AsBsonArray;
-		var rendered = or[0]["_id"].AsBsonRegularExpression.Pattern;
+		var rendered = doc["_id"].AsBsonRegularExpression.Pattern;
 		// Regex.Escape backslash-escapes the metacharacters; the literal
 		// dot must not be interpreted as "any char".
 		Assert.Contains(@"\.", rendered);
@@ -175,33 +169,15 @@ public class CasePersistenceBuildFilterTests
 	}
 
 	[Fact]
-	public void SubmittedByRendersAsEquality()
-	{
-		var doc = Render(new CaseQuery(SubmittedBy: " bob "));
-
-		Assert.Equal("bob", doc["submittedBy"].AsString);
-	}
-
-	[Fact]
-	public void BlankSubmittedByIsIgnored()
-	{
-		var doc = Render(new CaseQuery(SubmittedBy: "   "));
-
-		Assert.Equal(new BsonDocument(), doc);
-	}
-
-	[Fact]
 	public void MultipleClausesAreCombined()
 	{
 		var doc = Render(new CaseQuery(
 			CaseTypes: s_typeIdsReAccreditation,
 			StateIds: s_stateIdsSubmitted,
-			AssigneeId: "user-1",
-			SubmittedBy: "bob"));
+			AssigneeId: "user-1"));
 
 		Assert.Equal("re-accreditation", doc["caseType"]["$in"].AsBsonArray[0].AsString);
 		Assert.Equal("submitted", doc["stateId"]["$in"].AsBsonArray[0].AsString);
 		Assert.Equal("user-1", doc["assignedToId"].AsString);
-		Assert.Equal("bob", doc["submittedBy"].AsString);
 	}
 }

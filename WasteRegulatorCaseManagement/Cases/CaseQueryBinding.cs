@@ -21,7 +21,6 @@ internal static class CaseQueryBinding
 	internal const string SortParam = "sort";
 	internal const string SortDirectionParam = "dir";
 
-	internal const string SubmittedByParam = "submittedBy";
 	internal const string OrgIdParam = "orgId";
 	internal const string IsTerminalParam = "isTerminal";
 
@@ -37,7 +36,6 @@ internal static class CaseQueryBinding
 			UnassignedOnly: ReadBool(query, UnassignedOnlyParam),
 			Page: ReadInt(query, PageParam, defaultValue: 1),
 			PageSize: ReadInt(query, PageSizeParam, defaultValue: CaseQuery.DefaultPageSize),
-			SubmittedBy: ReadString(query, SubmittedByParam),
 			Sort: ReadString(query, SortParam),
 			SortDescending: ReadSortDirection(query, SortDirectionParam),
 			OrgId: ReadString(query, OrgIdParam),

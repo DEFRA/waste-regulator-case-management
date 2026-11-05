@@ -13,9 +13,8 @@ namespace WasteRegulatorCaseManagement.Cases;
 /// Empty/null means "any state".
 /// </param>
 /// <param name="Search">
-/// Free-text needle. Matched case-insensitively against <see cref="Case.Id"/>
-/// (full or prefix) and <see cref="Case.SubmittedBy"/>. Whitespace-only
-/// values are ignored.
+/// Matched case-insensitively against the start of <see cref="Case.Id"/>, so a
+/// full or partial id finds the case. Whitespace-only values are ignored.
 /// </param>
 /// <param name="AssigneeId">
 /// Restrict to items assigned to this user id. Empty/null means "any
@@ -34,12 +33,6 @@ namespace WasteRegulatorCaseManagement.Cases;
 /// Restrict to cases of this nation. Set from the caller's
 /// <c>user:nation</c> claim, never from the query string.
 /// </param>
-/// <param name="SubmittedBy">
-/// Restrict to items submitted by this caller id. Caller-supplied via
-/// <c>?submittedBy=...</c>; RBAC (who is allowed to ask for whose items)
-/// is enforced by the frontend, not this filter — the backend applies
-/// whatever scope the request asks for. Empty/null means "any submitter".
-/// </param>
 /// <param name="OrgId">
 /// Restrict to cases of this organisation. Empty/null means "any organisation".
 /// </param>
@@ -55,7 +48,6 @@ public sealed record CaseQuery(
 	bool UnassignedOnly = false,
 	int Page = 1,
 	int PageSize = 20,
-	string? SubmittedBy = null,
 	string? Nation = null,
 	string? Sort = null,
 	bool? SortDescending = null,
@@ -99,10 +91,6 @@ public sealed record CaseQuery(
 	/// <summary>Trimmed organisation id, or <c>null</c> if blank/whitespace.</summary>
 	public string? NormalisedOrgId =>
 		string.IsNullOrWhiteSpace(OrgId) ? null : OrgId.Trim();
-
-	/// <summary>Trimmed submitted-by, or <c>null</c> if blank/whitespace.</summary>
-	public string? NormalisedSubmittedBy =>
-		string.IsNullOrWhiteSpace(SubmittedBy) ? null : SubmittedBy.Trim();
 }
 
 /// <summary>
