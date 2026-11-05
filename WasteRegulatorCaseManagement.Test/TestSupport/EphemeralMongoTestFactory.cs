@@ -11,7 +11,7 @@ namespace WasteRegulatorCaseManagement.Test.TestSupport;
 /// fixture's ephemeral mongod (<see cref="MongoIntegrationFixture"/> +
 /// <see cref="TestServiceCollectionExtensions.UseEphemeralMongoPersistence"/>)
 /// instead of the default, unreachable-in-tests connection string — that
-/// otherwise left <c>WorkItemPersistence</c>'s startup index reconciliation
+/// otherwise left <c>CasePersistence</c>'s startup index reconciliation
 /// to eat a ~90s Mongo server-selection timeout per test.
 /// </summary>
 public sealed class EphemeralMongoTestFactory : WebApplicationFactory<Program>
@@ -42,9 +42,9 @@ public sealed class EphemeralMongoTestFactory : WebApplicationFactory<Program>
 
         // Seeding is irrelevant to the DI/metadata contracts these tests
         // assert on; disable by default so it can never slow a test down.
-        // Settings applied below (e.g. WorkItemSeederGatingTests exercising
+        // Settings applied below (e.g. CaseSeederGatingTests exercising
         // the flag itself) override this on a per-key basis.
-        builder.UseSetting("WorkItems:SeedOnStartup", "false");
+        builder.UseSetting("Cases:SeedOnStartup", "false");
         foreach (var (key, value) in _settings)
         {
             builder.UseSetting(key, value);

@@ -1,7 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using WasteRegulatorCaseManagement.Auth;
-using WasteRegulatorCaseManagement.WorkItems.Core;
+using WasteRegulatorCaseManagement.Cases;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
@@ -26,7 +26,7 @@ public class ClientIdAuthenticationTests
         await using var factory = new BareFactory();
         using var client = factory.CreateClient();
 
-        var response = await client.GetAsync("/work-items", cancellationToken);
+        var response = await client.GetAsync("/cases", cancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -39,7 +39,7 @@ public class ClientIdAuthenticationTests
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add(ClientIdDefaults.DefaultHeaderName, string.Empty);
 
-        var response = await client.GetAsync("/work-items", cancellationToken);
+        var response = await client.GetAsync("/cases", cancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -50,13 +50,13 @@ public class ClientIdAuthenticationTests
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var factory = new BareFactory();
         factory
-            .MockPersistence.QueryAsync(Arg.Any<WorkItemQuery>(), Arg.Any<CancellationToken>())
-            .Returns(new WorkItemPage(Array.Empty<WorkItem>(), 0, 1, 20));
+            .MockPersistence.QueryAsync(Arg.Any<CaseQuery>(), Arg.Any<CancellationToken>())
+            .Returns(new CasePage(Array.Empty<Case>(), 0, 1, 20));
 
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add(ClientIdDefaults.DefaultHeaderName, ClientId);
 
-        var response = await client.GetAsync("/work-items", cancellationToken);
+        var response = await client.GetAsync("/cases", cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -81,14 +81,14 @@ public class ClientIdAuthenticationTests
             clientSecrets: new Dictionary<string, string> { [ClientId] = Secret }
         );
         factory
-            .MockPersistence.QueryAsync(Arg.Any<WorkItemQuery>(), Arg.Any<CancellationToken>())
-            .Returns(new WorkItemPage(Array.Empty<WorkItem>(), 0, 1, 20));
+            .MockPersistence.QueryAsync(Arg.Any<CaseQuery>(), Arg.Any<CancellationToken>())
+            .Returns(new CasePage(Array.Empty<Case>(), 0, 1, 20));
 
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add(ClientIdDefaults.DefaultHeaderName, ClientId);
         AddTimestampAndNonce(client, factory.FakeTime.GetUtcNow().ToString("O"), "nonce-1");
 
-        var response = await client.GetAsync("/work-items", cancellationToken);
+        var response = await client.GetAsync("/cases", cancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -106,7 +106,7 @@ public class ClientIdAuthenticationTests
         AddTimestampAndNonce(client, factory.FakeTime.GetUtcNow().ToString("O"), "nonce-2");
         client.DefaultRequestHeaders.Add("x-cdp-auth-signature", "AAAAtampered==");
 
-        var response = await client.GetAsync("/work-items", cancellationToken);
+        var response = await client.GetAsync("/cases", cancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -119,8 +119,8 @@ public class ClientIdAuthenticationTests
             clientSecrets: new Dictionary<string, string> { [ClientId] = Secret }
         );
         factory
-            .MockPersistence.QueryAsync(Arg.Any<WorkItemQuery>(), Arg.Any<CancellationToken>())
-            .Returns(new WorkItemPage(Array.Empty<WorkItem>(), 0, 1, 20));
+            .MockPersistence.QueryAsync(Arg.Any<CaseQuery>(), Arg.Any<CancellationToken>())
+            .Returns(new CasePage(Array.Empty<Case>(), 0, 1, 20));
 
         var timestamp = factory.FakeTime.GetUtcNow().ToString("O");
         var nonce = "nonce-valid";
@@ -134,7 +134,7 @@ public class ClientIdAuthenticationTests
         AddTimestampAndNonce(client, timestamp, nonce);
         client.DefaultRequestHeaders.Add("x-cdp-auth-signature", signature);
 
-        var response = await client.GetAsync("/work-items", cancellationToken);
+        var response = await client.GetAsync("/cases", cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -168,7 +168,7 @@ public class ClientIdAuthenticationTests
         AddTimestampAndNonce(client, timestamp, nonce);
         client.DefaultRequestHeaders.Add("x-cdp-auth-signature", signature);
 
-        var response = await client.GetAsync("/work-items", cancellationToken);
+        var response = await client.GetAsync("/cases", cancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -195,7 +195,7 @@ public class ClientIdAuthenticationTests
         AddTimestampAndNonce(client, timestamp, nonce);
         client.DefaultRequestHeaders.Add("x-cdp-auth-signature", signature);
 
-        var response = await client.GetAsync("/work-items", cancellationToken);
+        var response = await client.GetAsync("/cases", cancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -236,7 +236,7 @@ public class ClientIdAuthenticationTests
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add(ClientIdDefaults.DefaultHeaderName, "frontend");
 
-        var response = await client.GetAsync("/work-items", cancellationToken);
+        var response = await client.GetAsync("/cases", cancellationToken);
 
         // Options resolution throws InvalidOperationException; the app's
         // global exception handler (ExceptionLoggingHandler) turns that
@@ -261,8 +261,8 @@ public class ClientIdAuthenticationTests
             }
         );
         factory
-            .MockPersistence.QueryAsync(Arg.Any<WorkItemQuery>(), Arg.Any<CancellationToken>())
-            .Returns(new WorkItemPage(Array.Empty<WorkItem>(), 0, 1, 20));
+            .MockPersistence.QueryAsync(Arg.Any<CaseQuery>(), Arg.Any<CancellationToken>())
+            .Returns(new CasePage(Array.Empty<Case>(), 0, 1, 20));
 
         var timestamp = factory.FakeTime.GetUtcNow().ToString("O");
 
@@ -286,8 +286,8 @@ public class ClientIdAuthenticationTests
         AddTimestampAndNonce(clientB, timestamp, nonceB);
         clientB.DefaultRequestHeaders.Add("x-cdp-auth-signature", signatureB);
 
-        var responseA = await clientA.GetAsync("/work-items", cancellationToken);
-        var responseB = await clientB.GetAsync("/work-items", cancellationToken);
+        var responseA = await clientA.GetAsync("/cases", cancellationToken);
+        var responseB = await clientB.GetAsync("/cases", cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, responseA.StatusCode);
         Assert.Equal(HttpStatusCode.OK, responseB.StatusCode);
@@ -317,7 +317,7 @@ public class ClientIdAuthenticationTests
         client.DefaultRequestHeaders.Add("x-cdp-auth-nonce", "nonce-no-ts");
         client.DefaultRequestHeaders.Add("x-cdp-auth-signature", signature);
 
-        var response = await client.GetAsync("/work-items", cancellationToken);
+        var response = await client.GetAsync("/cases", cancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -343,7 +343,7 @@ public class ClientIdAuthenticationTests
         AddTimestampAndNonce(client, staleTimestamp, nonce);
         client.DefaultRequestHeaders.Add("x-cdp-auth-signature", signature);
 
-        var response = await client.GetAsync("/work-items", cancellationToken);
+        var response = await client.GetAsync("/cases", cancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -369,7 +369,7 @@ public class ClientIdAuthenticationTests
         AddTimestampAndNonce(client, futureTimestamp, nonce);
         client.DefaultRequestHeaders.Add("x-cdp-auth-signature", signature);
 
-        var response = await client.GetAsync("/work-items", cancellationToken);
+        var response = await client.GetAsync("/cases", cancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -393,7 +393,7 @@ public class ClientIdAuthenticationTests
         client.DefaultRequestHeaders.Add("x-cdp-auth-timestamp", timestamp);
         client.DefaultRequestHeaders.Add("x-cdp-auth-signature", signature);
 
-        var response = await client.GetAsync("/work-items", cancellationToken);
+        var response = await client.GetAsync("/cases", cancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -406,8 +406,8 @@ public class ClientIdAuthenticationTests
             clientSecrets: new Dictionary<string, string> { [ClientId] = Secret }
         );
         factory
-            .MockPersistence.QueryAsync(Arg.Any<WorkItemQuery>(), Arg.Any<CancellationToken>())
-            .Returns(new WorkItemPage(Array.Empty<WorkItem>(), 0, 1, 20));
+            .MockPersistence.QueryAsync(Arg.Any<CaseQuery>(), Arg.Any<CancellationToken>())
+            .Returns(new CasePage(Array.Empty<Case>(), 0, 1, 20));
 
         var timestamp = factory.FakeTime.GetUtcNow().ToString("O");
         var nonce = "nonce-replay";
@@ -421,8 +421,8 @@ public class ClientIdAuthenticationTests
         AddTimestampAndNonce(client, timestamp, nonce);
         client.DefaultRequestHeaders.Add("x-cdp-auth-signature", signature);
 
-        var first = await client.GetAsync("/work-items", cancellationToken);
-        var second = await client.GetAsync("/work-items", cancellationToken);
+        var first = await client.GetAsync("/cases", cancellationToken);
+        var second = await client.GetAsync("/cases", cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, first.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, second.StatusCode);
@@ -439,7 +439,7 @@ public class ClientIdAuthenticationTests
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add(ClientIdDefaults.DefaultHeaderName, ClientId);
 
-        var response = await client.GetAsync("/work-items", cancellationToken);
+        var response = await client.GetAsync("/cases", cancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -452,13 +452,13 @@ public class ClientIdAuthenticationTests
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var factory = new BareFactory(environment: "Development");
         factory
-            .MockPersistence.QueryAsync(Arg.Any<WorkItemQuery>(), Arg.Any<CancellationToken>())
-            .Returns(new WorkItemPage(Array.Empty<WorkItem>(), 0, 1, 20));
+            .MockPersistence.QueryAsync(Arg.Any<CaseQuery>(), Arg.Any<CancellationToken>())
+            .Returns(new CasePage(Array.Empty<Case>(), 0, 1, 20));
 
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add(ClientIdDefaults.DefaultHeaderName, ClientId);
 
-        var response = await client.GetAsync("/work-items", cancellationToken);
+        var response = await client.GetAsync("/cases", cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -488,7 +488,7 @@ public class ClientIdAuthenticationTests
             )
         );
 
-        var response = await client.GetAsync("/work-items", cancellationToken);
+        var response = await client.GetAsync("/cases", cancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         var challenge = response.Headers.WwwAuthenticate.ToString();
@@ -508,7 +508,7 @@ public class ClientIdAuthenticationTests
         AddTimestampAndNonce(client, factory.FakeTime.GetUtcNow().ToString("O"), "nonce-no-sig");
         // No x-cdp-auth-signature header at all.
 
-        var response = await client.GetAsync("/work-items", cancellationToken);
+        var response = await client.GetAsync("/cases", cancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         var challenge = response.Headers.WwwAuthenticate.ToString();
@@ -536,7 +536,7 @@ public class ClientIdAuthenticationTests
             )
         );
 
-        var response = await client.GetAsync("/work-items", cancellationToken);
+        var response = await client.GetAsync("/cases", cancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         var challenge = response.Headers.WwwAuthenticate.ToString();
@@ -563,7 +563,7 @@ public class ClientIdAuthenticationTests
             )
         );
 
-        var response = await client.GetAsync("/work-items", cancellationToken);
+        var response = await client.GetAsync("/cases", cancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         var challenge = response.Headers.WwwAuthenticate.ToString();
@@ -600,7 +600,7 @@ public class ClientIdAuthenticationTests
             client.DefaultRequestHeaders.Add(header, oversize);
         }
 
-        var response = await client.GetAsync("/work-items", cancellationToken);
+        var response = await client.GetAsync("/cases", cancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         var challenge = response.Headers.WwwAuthenticate.ToString();
@@ -645,7 +645,7 @@ public class ClientIdAuthenticationTests
             header == "x-cdp-auth-signature" ? oversize : goodSignature
         );
 
-        var response = await client.GetAsync("/work-items", cancellationToken);
+        var response = await client.GetAsync("/cases", cancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         var challenge = response.Headers.WwwAuthenticate.ToString();
@@ -669,7 +669,7 @@ public class ClientIdAuthenticationTests
         AddTimestampAndNonce(client, factory.FakeTime.GetUtcNow().ToString("O"), "nonce-big-sig");
         client.DefaultRequestHeaders.Add("x-cdp-auth-signature", new string('a', 257));
 
-        var response = await client.GetAsync("/work-items", cancellationToken);
+        var response = await client.GetAsync("/cases", cancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         var challenge = response.Headers.WwwAuthenticate.ToString();
@@ -686,8 +686,8 @@ public class ClientIdAuthenticationTests
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var factory = new BareFactory();
         factory
-            .MockPersistence.QueryAsync(Arg.Any<WorkItemQuery>(), Arg.Any<CancellationToken>())
-            .Returns(new WorkItemPage(Array.Empty<WorkItem>(), 0, 1, 20));
+            .MockPersistence.QueryAsync(Arg.Any<CaseQuery>(), Arg.Any<CancellationToken>())
+            .Returns(new CasePage(Array.Empty<Case>(), 0, 1, 20));
 
         using var client = factory.CreateClient();
         var atCap = new string('a', cap);
@@ -701,7 +701,7 @@ public class ClientIdAuthenticationTests
             client.DefaultRequestHeaders.Add(header, atCap);
         }
 
-        var response = await client.GetAsync("/work-items", cancellationToken);
+        var response = await client.GetAsync("/cases", cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -714,8 +714,8 @@ public class ClientIdAuthenticationTests
             clientSecrets: new Dictionary<string, string> { [ClientId] = Secret }
         );
         factory
-            .MockPersistence.QueryAsync(Arg.Any<WorkItemQuery>(), Arg.Any<CancellationToken>())
-            .Returns(new WorkItemPage(Array.Empty<WorkItem>(), 0, 1, 20));
+            .MockPersistence.QueryAsync(Arg.Any<CaseQuery>(), Arg.Any<CancellationToken>())
+            .Returns(new CasePage(Array.Empty<Case>(), 0, 1, 20));
 
         var timestamp = factory.FakeTime.GetUtcNow().ToString("O");
         var nonce = new string('n', 128);
@@ -729,7 +729,7 @@ public class ClientIdAuthenticationTests
         AddTimestampAndNonce(client, timestamp, nonce);
         client.DefaultRequestHeaders.Add("x-cdp-auth-signature", signature);
 
-        var response = await client.GetAsync("/work-items", cancellationToken);
+        var response = await client.GetAsync("/cases", cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -750,7 +750,7 @@ public class ClientIdAuthenticationTests
         client.DefaultRequestHeaders.Add(ClientIdDefaults.DefaultHeaderName, ClientId);
         client.DefaultRequestHeaders.Add(header, oversize);
 
-        var response = await client.GetAsync("/work-items", cancellationToken);
+        var response = await client.GetAsync("/cases", cancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         var challenge = response.Headers.WwwAuthenticate.ToString();
@@ -765,15 +765,15 @@ public class ClientIdAuthenticationTests
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var factory = new BareFactory();
         factory
-            .MockPersistence.QueryAsync(Arg.Any<WorkItemQuery>(), Arg.Any<CancellationToken>())
-            .Returns(new WorkItemPage(Array.Empty<WorkItem>(), 0, 1, 20));
+            .MockPersistence.QueryAsync(Arg.Any<CaseQuery>(), Arg.Any<CancellationToken>())
+            .Returns(new CasePage(Array.Empty<Case>(), 0, 1, 20));
 
         using var client = factory.CreateClient();
         var atCap = new string('a', cap);
         client.DefaultRequestHeaders.Add(ClientIdDefaults.DefaultHeaderName, ClientId);
         client.DefaultRequestHeaders.Add(header, atCap);
 
-        var response = await client.GetAsync("/work-items", cancellationToken);
+        var response = await client.GetAsync("/cases", cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -792,15 +792,15 @@ public class ClientIdAuthenticationTests
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var factory = new BareFactory();
         factory
-            .MockPersistence.QueryAsync(Arg.Any<WorkItemQuery>(), Arg.Any<CancellationToken>())
-            .Returns(new WorkItemPage(Array.Empty<WorkItem>(), 0, 1, 20));
+            .MockPersistence.QueryAsync(Arg.Any<CaseQuery>(), Arg.Any<CancellationToken>())
+            .Returns(new CasePage(Array.Empty<Case>(), 0, 1, 20));
 
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add(ClientIdDefaults.DefaultHeaderName, ClientId);
         client.DefaultRequestHeaders.Add("x-cdp-user-role", "standard");
         client.DefaultRequestHeaders.Add("x-cdp-user-nation", "Wales");
 
-        var response = await client.GetAsync("/work-items", cancellationToken);
+        var response = await client.GetAsync("/cases", cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -811,13 +811,13 @@ public class ClientIdAuthenticationTests
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var factory = new BareFactory();
         factory
-            .MockPersistence.QueryAsync(Arg.Any<WorkItemQuery>(), Arg.Any<CancellationToken>())
-            .Returns(new WorkItemPage(Array.Empty<WorkItem>(), 0, 1, 20));
+            .MockPersistence.QueryAsync(Arg.Any<CaseQuery>(), Arg.Any<CancellationToken>())
+            .Returns(new CasePage(Array.Empty<Case>(), 0, 1, 20));
 
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add(ClientIdDefaults.DefaultHeaderName, ClientId);
 
-        var response = await client.GetAsync("/work-items", cancellationToken);
+        var response = await client.GetAsync("/cases", cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -834,8 +834,8 @@ public class ClientIdAuthenticationTests
             clientSecrets: new Dictionary<string, string> { [ClientId] = Secret }
         );
         factory
-            .MockPersistence.QueryAsync(Arg.Any<WorkItemQuery>(), Arg.Any<CancellationToken>())
-            .Returns(new WorkItemPage(Array.Empty<WorkItem>(), 0, 1, 20));
+            .MockPersistence.QueryAsync(Arg.Any<CaseQuery>(), Arg.Any<CancellationToken>())
+            .Returns(new CasePage(Array.Empty<Case>(), 0, 1, 20));
 
         var timestamp = factory.FakeTime.GetUtcNow().ToString("O");
         var nonce = "nonce-role-signed";
@@ -859,7 +859,7 @@ public class ClientIdAuthenticationTests
         client.DefaultRequestHeaders.Add("x-cdp-user-role", "standard");
         client.DefaultRequestHeaders.Add("x-cdp-user-nation", "Wales");
 
-        var response = await client.GetAsync("/work-items", cancellationToken);
+        var response = await client.GetAsync("/cases", cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -902,7 +902,7 @@ public class ClientIdAuthenticationTests
         // Tampered post-signing: signed for "support-readonly", sent as "standard".
         client.DefaultRequestHeaders.Add("x-cdp-user-role", "standard");
 
-        var response = await client.GetAsync("/work-items", cancellationToken);
+        var response = await client.GetAsync("/cases", cancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -939,7 +939,7 @@ public class ClientIdAuthenticationTests
         // Tampered post-signing: signed for "England", sent as "Wales".
         client.DefaultRequestHeaders.Add("x-cdp-user-nation", "Wales");
 
-        var response = await client.GetAsync("/work-items", cancellationToken);
+        var response = await client.GetAsync("/cases", cancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -962,8 +962,8 @@ public class ClientIdAuthenticationTests
             clientSecrets: new Dictionary<string, string> { [ClientId] = Secret }
         );
         factory
-            .MockPersistence.QueryAsync(Arg.Any<WorkItemQuery>(), Arg.Any<CancellationToken>())
-            .Returns(new WorkItemPage(Array.Empty<WorkItem>(), 0, 1, 20));
+            .MockPersistence.QueryAsync(Arg.Any<CaseQuery>(), Arg.Any<CancellationToken>())
+            .Returns(new CasePage(Array.Empty<Case>(), 0, 1, 20));
 
         var timestamp = factory.FakeTime.GetUtcNow().ToString("O");
         var nonce = "nonce-legacy-form";
@@ -985,7 +985,7 @@ public class ClientIdAuthenticationTests
         AddTimestampAndNonce(client, timestamp, nonce);
         client.DefaultRequestHeaders.Add("x-cdp-auth-signature", signature);
 
-        var response = await client.GetAsync("/work-items", cancellationToken);
+        var response = await client.GetAsync("/cases", cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -1003,8 +1003,8 @@ public class ClientIdAuthenticationTests
             clientSecrets: new Dictionary<string, string> { [ClientId] = Secret }
         );
         factory
-            .MockPersistence.QueryAsync(Arg.Any<WorkItemQuery>(), Arg.Any<CancellationToken>())
-            .Returns(new WorkItemPage(Array.Empty<WorkItem>(), 0, 1, 20));
+            .MockPersistence.QueryAsync(Arg.Any<CaseQuery>(), Arg.Any<CancellationToken>())
+            .Returns(new CasePage(Array.Empty<Case>(), 0, 1, 20));
 
         var timestamp = factory.FakeTime.GetUtcNow().ToString("O");
         var nonce = "nonce-extended-empty";
@@ -1018,7 +1018,7 @@ public class ClientIdAuthenticationTests
         AddTimestampAndNonce(client, timestamp, nonce);
         client.DefaultRequestHeaders.Add("x-cdp-auth-signature", signature);
 
-        var response = await client.GetAsync("/work-items", cancellationToken);
+        var response = await client.GetAsync("/cases", cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -1050,7 +1050,7 @@ public class ClientIdAuthenticationTests
         // Added post-signing.
         client.DefaultRequestHeaders.Add("x-cdp-user-role", "standard");
 
-        var response = await client.GetAsync("/work-items", cancellationToken);
+        var response = await client.GetAsync("/cases", cancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -1089,7 +1089,7 @@ public class ClientIdAuthenticationTests
         client.DefaultRequestHeaders.Add("x-cdp-auth-signature", signature);
         // x-cdp-user-role / x-cdp-user-nation deliberately NOT sent.
 
-        var response = await client.GetAsync("/work-items", cancellationToken);
+        var response = await client.GetAsync("/cases", cancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -1142,8 +1142,8 @@ public class ClientIdAuthenticationEnvVarTests
             // so 200 here is only possible if the secret genuinely bound.
             await using var factory = new BareFactory(environment: "Production");
             factory
-                .MockPersistence.QueryAsync(Arg.Any<WorkItemQuery>(), Arg.Any<CancellationToken>())
-                .Returns(new WorkItemPage(Array.Empty<WorkItem>(), 0, 1, 20));
+                .MockPersistence.QueryAsync(Arg.Any<CaseQuery>(), Arg.Any<CancellationToken>())
+                .Returns(new CasePage(Array.Empty<Case>(), 0, 1, 20));
 
             var timestamp = factory.FakeTime.GetUtcNow().ToString("O");
             var nonce = "nonce-real-env-var";
@@ -1161,7 +1161,7 @@ public class ClientIdAuthenticationEnvVarTests
             client.DefaultRequestHeaders.Add("x-cdp-auth-signature", signature);
 
             var response = await client.GetAsync(
-                "/work-items",
+                "/cases",
                 TestContext.Current.CancellationToken
             );
 
@@ -1181,7 +1181,7 @@ internal sealed class BareFactory(
     IReadOnlyDictionary<string, string?>? configOverrides = null
 ) : WebApplicationFactory<Program>
 {
-    public readonly IWorkItemPersistence MockPersistence = Substitute.For<IWorkItemPersistence>();
+    public readonly ICasePersistence MockPersistence = Substitute.For<ICasePersistence>();
     public readonly FakeTimeProvider FakeTime = new(DateTimeOffset.Parse("2026-04-30T12:00:00Z"));
     public readonly FakeClientIdAuthNonceStore NonceStore = new();
 
@@ -1204,7 +1204,7 @@ internal sealed class BareFactory(
         }
         builder.ConfigureServices(services =>
         {
-            services.RemoveAll<IWorkItemPersistence>();
+            services.RemoveAll<ICasePersistence>();
             services.AddSingleton(MockPersistence);
             services.RemoveAll<TimeProvider>();
             services.AddSingleton<TimeProvider>(FakeTime);

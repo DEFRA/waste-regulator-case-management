@@ -141,14 +141,14 @@ public class PiiRedactionEnricherTests
     {
         var logEvent = CreateLogEvent(
             new LogEventProperty("CorrelationId", new ScalarValue("abc-123")),
-            new LogEventProperty("WorkItemId", new ScalarValue("wi-456")),
+            new LogEventProperty("CaseId", new ScalarValue("wi-456")),
             new LogEventProperty("event.category", new ScalarValue("notify"))
         );
 
         new PiiRedactionEnricher().Enrich(logEvent, new TestPropertyFactory());
 
         Assert.Equal(new ScalarValue("abc-123"), logEvent.Properties["CorrelationId"]);
-        Assert.Equal(new ScalarValue("wi-456"), logEvent.Properties["WorkItemId"]);
+        Assert.Equal(new ScalarValue("wi-456"), logEvent.Properties["CaseId"]);
         Assert.Equal(new ScalarValue("notify"), logEvent.Properties["event.category"]);
     }
 

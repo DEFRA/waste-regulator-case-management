@@ -17,7 +17,7 @@ namespace WasteRegulatorCaseManagement.Notifications;
 /// <para>
 /// Suppression swaps the real client for <see cref="NoOpNotifyClient"/>, which
 /// returns success and logs the intended send with the same ECS shape. The
-/// work item's audit log therefore still records a <c>notification-sent</c>
+/// case's audit log therefore still records a <c>notification-sent</c>
 /// entry and the UI behaves exactly as it does in an environment that really
 /// sends — the only difference is that no HTTP traffic reaches Notify.
 /// </para>

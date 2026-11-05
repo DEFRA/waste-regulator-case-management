@@ -87,7 +87,7 @@ public class ClientIdAuthenticationOptions : AuthenticationSchemeOptions
 
     /// <summary>
     /// Maximum permitted length of the user id header. Persisted into
-    /// <c>WorkItem.AuditLog.CreatedBy</c> and <c>WorkItemNote.CreatedBy</c>
+    /// <c>Case.AuditLog.CreatedBy</c> and <c>CaseNote.CreatedBy</c>
     /// — capping defends Mongo document size against a misbehaving BFF or
     /// a caller that holds the shared secret.
     /// </summary>
@@ -95,8 +95,8 @@ public class ClientIdAuthenticationOptions : AuthenticationSchemeOptions
 
     /// <summary>
     /// Maximum permitted length of the user display name header. Persisted
-    /// into <c>WorkItem.AuditLog.CreatedByName</c> and
-    /// <c>WorkItemNote.CreatedByName</c>.
+    /// into <c>Case.AuditLog.CreatedByName</c> and
+    /// <c>CaseNote.CreatedByName</c>.
     /// </summary>
     public int MaxUserNameLength { get; set; } = 256;
 

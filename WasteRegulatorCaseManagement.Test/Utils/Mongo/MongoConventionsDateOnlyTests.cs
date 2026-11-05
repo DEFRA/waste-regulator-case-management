@@ -1,5 +1,5 @@
 using WasteRegulatorCaseManagement.Utils.Mongo;
-using WasteRegulatorCaseManagement.WorkItems.Core;
+using WasteRegulatorCaseManagement.Cases;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 
@@ -21,7 +21,7 @@ public class MongoConventionsDateOnlyTests
     {
         var payload = new DatedPayload { StartDate = new DateOnly(2027, 1, 1) };
 
-        var json = WorkItemPayloadConverter.ToJson(payload.ToBsonDocument());
+        var json = CasePayloadConverter.ToJson(payload.ToBsonDocument());
 
         Assert.Equal(
             "2027-01-01",

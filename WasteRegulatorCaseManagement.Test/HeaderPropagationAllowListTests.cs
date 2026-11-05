@@ -9,7 +9,7 @@ namespace WasteRegulatorCaseManagement.Test;
 /// Uses <see cref="EphemeralMongoTestFactory"/> so the host boots against
 /// the shared assembly-fixture ephemeral mongod instead of the default,
 /// unreachable-in-tests connection string — that otherwise left
-/// WorkItemPersistence's startup index reconciliation to eat a ~90s Mongo
+/// CasePersistence's startup index reconciliation to eat a ~90s Mongo
 /// server-selection timeout per test, even though this test never touches
 /// Mongo.
 /// </summary>

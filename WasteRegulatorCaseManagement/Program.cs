@@ -7,7 +7,7 @@ using WasteRegulatorCaseManagement.Utils;
 using WasteRegulatorCaseManagement.Utils.Http;
 using WasteRegulatorCaseManagement.Utils.Logging;
 using WasteRegulatorCaseManagement.Utils.Mongo;
-using WasteRegulatorCaseManagement.WorkItems.Core;
+using WasteRegulatorCaseManagement.Cases;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using MongoDB.Driver;
 using MongoDB.Driver.Authentication.AWS;
@@ -103,7 +103,7 @@ static void ConfigureServices(WebApplicationBuilder builder)
             // the transformer pipeline to survive schema population. RA-124.
             // AddDocumentTransformer<T> registers the transformer in DI, so
             // no separate AddSingleton call is required.
-            options.AddDocumentTransformer<WorkItemOpenApiExampleTransformer>();
+            options.AddDocumentTransformer<CaseOpenApiExampleTransformer>();
         }
     );
 
@@ -134,25 +134,25 @@ static void ConfigureServices(WebApplicationBuilder builder)
         .AddCheck<MongoHealthCheck>("mongodb", tags: ["ready"])
         .AddCheck<RequiredConfigHealthCheck>("required-config", tags: ["ready"]);
 
-    ConfigureWorkItems(builder);
+    ConfigureCases(builder);
 }
 
 [ExcludeFromCodeCoverage]
-static void ConfigureWorkItems(WebApplicationBuilder builder)
+static void ConfigureCases(WebApplicationBuilder builder)
 {
     var services = builder.Services;
 
-    // Register the framework, then add one line per work item module.
-    // See docs in WasteRegulatorCaseManagement/WorkItems/Core for the contract a module must implement.
-    services.AddWorkItemFramework();
-    services.AddSingleton<IWorkItemPersistence, WorkItemPersistence>();
+    // Register the framework, then add one line per case module.
+    // See docs in WasteRegulatorCaseManagement/Cases for the contract a module must implement.
+    services.AddCaseFramework();
+    services.AddSingleton<ICasePersistence, CasePersistence>();
 
     // The demo seeder writes records referencing stub user ids, so it is
-    // gated to Development hosts even when WorkItems:SeedOnStartup=true.
+    // gated to Development hosts even when Cases:SeedOnStartup=true.
     // A misconfiguration warning is emitted at startup if the flag is
     // observed in any other environment. See
-    // WorkItemModuleExtensions.AddWorkItemSeeders.
-    services.AddWorkItemSeeders(builder.Environment, builder.Configuration);
+    // CaseModuleExtensions.AddCaseSeeders.
+    services.AddCaseSeeders(builder.Environment, builder.Configuration);
 }
 
 [ExcludeFromCodeCoverage]
@@ -624,6 +624,6 @@ static void ConfigureEndpoints(WebApplication app)
         });
     }
 
-    app.MapWorkItemFrameworkEndpoints();
-    app.MapWorkItemModules();
+    app.MapCaseFrameworkEndpoints();
+    app.MapCaseModules();
 }

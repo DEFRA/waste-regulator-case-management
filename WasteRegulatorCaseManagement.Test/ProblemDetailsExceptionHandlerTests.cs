@@ -2,7 +2,7 @@ using System.Net;
 using MongoDB.Bson;
 using System.Net.Http.Json;
 using WasteRegulatorCaseManagement.Test.TestSupport;
-using WasteRegulatorCaseManagement.WorkItems.Core;
+using WasteRegulatorCaseManagement.Cases;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -18,11 +18,11 @@ namespace WasteRegulatorCaseManagement.Test;
 /// epr-efp: this suite exists to prove the global exception handler
 /// turns unhandled exceptions into RFC 7807 <see cref="ProblemDetails"/>
 /// — a middleware contract, not a persistence contract. To force the
-/// exception we wrap a real <see cref="WorkItemPersistence"/>
+/// exception we wrap a real <see cref="CasePersistence"/>
 /// (ephemeral Mongo) in a thin fault-injection decorator so the test
 /// still exercises the production HTTP pipeline end-to-end without
 /// substituting the persistence layer wholesale (the previous
-/// implementation mocked <see cref="IWorkItemPersistence"/>).
+/// implementation mocked <see cref="ICasePersistence"/>).
 /// </summary>
 public class ProblemDetailsExceptionHandlerTests
 {
@@ -41,7 +41,7 @@ public class ProblemDetailsExceptionHandlerTests
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add(ClientIdDefaults.DefaultHeaderName, "test-client");
 
-        var response = await client.GetAsync("/work-items", ct);
+        var response = await client.GetAsync("/cases", ct);
 
         Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
         Assert.Equal("application/problem+json",
@@ -64,36 +64,36 @@ public class ProblemDetailsExceptionHandlerTests
                 // Wrap the real persistence so QueryAsync throws — the
                 // rest of the service surface is the production code
                 // path.
-                services.RemoveAll<IWorkItemPersistence>();
+                services.RemoveAll<ICasePersistence>();
                 var clientFactory = new TestMongoDbClientFactory(
                     fixture.ConnectionString, _databaseName);
-                var real = new WorkItemPersistence(clientFactory, NullLoggerFactory.Instance, new WorkItemRegistry([]));
-                services.AddSingleton<IWorkItemPersistence>(new ThrowingOnQueryPersistence(real));
+                var real = new CasePersistence(clientFactory, NullLoggerFactory.Instance, new CaseRegistry([]));
+                services.AddSingleton<ICasePersistence>(new ThrowingOnQueryPersistence(real));
             });
         }
     }
 
     /// <summary>
-    /// Wraps a real <see cref="IWorkItemPersistence"/> and throws on
-    /// <see cref="IWorkItemPersistence.QueryAsync"/> only. Every other
+    /// Wraps a real <see cref="ICasePersistence"/> and throws on
+    /// <see cref="ICasePersistence.QueryAsync"/> only. Every other
     /// member delegates so the fault is surgical: the exception handler
     /// is the only thing under test.
     /// </summary>
-    private sealed class ThrowingOnQueryPersistence(IWorkItemPersistence inner) : IWorkItemPersistence
+    private sealed class ThrowingOnQueryPersistence(ICasePersistence inner) : ICasePersistence
     {
-        public Task CreateAsync(WorkItem workItem, CancellationToken cancellationToken = default) =>
-            inner.CreateAsync(workItem, cancellationToken);
+        public Task CreateAsync(Case caseRecord, CancellationToken cancellationToken = default) =>
+            inner.CreateAsync(caseRecord, cancellationToken);
 
-        public Task<bool> CreateIfAbsentAsync(WorkItem workItem, CancellationToken cancellationToken = default) =>
-            inner.CreateIfAbsentAsync(workItem, cancellationToken);
+        public Task<bool> CreateIfAbsentAsync(Case caseRecord, CancellationToken cancellationToken = default) =>
+            inner.CreateIfAbsentAsync(caseRecord, cancellationToken);
 
-        public Task<WorkItem?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+        public Task<Case?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
             inner.GetByIdAsync(id, cancellationToken);
 
-        public Task<WorkItemPage> QueryAsync(WorkItemQuery query, CancellationToken cancellationToken = default) =>
+        public Task<CasePage> QueryAsync(CaseQuery query, CancellationToken cancellationToken = default) =>
             throw new InvalidOperationException("boom");
 
-        public Task ReplaceAsync(WorkItem workItem, CancellationToken cancellationToken = default) =>
-            inner.ReplaceAsync(workItem, cancellationToken);
+        public Task ReplaceAsync(Case caseRecord, CancellationToken cancellationToken = default) =>
+            inner.ReplaceAsync(caseRecord, cancellationToken);
     }
 }

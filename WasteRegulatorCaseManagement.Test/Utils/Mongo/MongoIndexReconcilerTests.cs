@@ -1,6 +1,6 @@
 using WasteRegulatorCaseManagement.Test.TestSupport;
 using WasteRegulatorCaseManagement.Utils.Mongo;
-using WasteRegulatorCaseManagement.WorkItems.Core;
+using WasteRegulatorCaseManagement.Cases;
 using Microsoft.Extensions.Logging.Abstractions;
 using MongoDB.Bson;
 using MongoDB.Driver;
@@ -10,7 +10,7 @@ namespace WasteRegulatorCaseManagement.Test.Utils.Mongo;
 /// <summary>
 /// RA-219 PR review: focused coverage of <see cref="MongoIndexReconciler"/>
 /// against a real (ephemeral) Mongo, exercising the branches the
-/// <see cref="WorkItems.Core.WorkItemPersistence"/> integration tests do not:
+/// <see cref="Cases.Core.CasePersistence"/> integration tests do not:
 /// the empty-model short-circuit, leaving an unrelated index untouched while
 /// reconciling a conflict, and detecting the conflict by its code name.
 /// </summary>
@@ -19,13 +19,13 @@ public sealed class MongoIndexReconcilerTests
 {
     private readonly TestMongoDbClientFactory _factory;
     private readonly string _databaseName;
-    private readonly IMongoCollection<WorkItem> _collection;
+    private readonly IMongoCollection<Case> _collection;
 
     public MongoIndexReconcilerTests(MongoIntegrationFixture fixture)
     {
         _databaseName = MongoIntegrationFixture.NewDatabaseName("reconciler");
         _factory = new TestMongoDbClientFactory(fixture.ConnectionString, _databaseName);
-        _collection = _factory.GetCollection<WorkItem>("workItems");
+        _collection = _factory.GetCollection<Case>("cases");
     }
 
     public void Dispose() => _factory.GetClient().DropDatabase(_databaseName);
@@ -34,7 +34,7 @@ public sealed class MongoIndexReconcilerTests
     public void EnsureIndexes_with_no_models_is_a_no_op()
     {
         var dropped = MongoIndexReconciler.EnsureIndexes(
-            _collection, Array.Empty<CreateIndexModel<WorkItem>>(), NullLogger.Instance);
+            _collection, Array.Empty<CreateIndexModel<Case>>(), NullLogger.Instance);
 
         Assert.Empty(dropped);
     }
@@ -42,9 +42,9 @@ public sealed class MongoIndexReconcilerTests
     [Fact]
     public void RenderKeys_renders_each_models_key_specification()
     {
-        var models = new List<CreateIndexModel<WorkItem>>
+        var models = new List<CreateIndexModel<Case>>
         {
-            new(Builders<WorkItem>.IndexKeys.Ascending("payload.applicationReference")),
+            new(Builders<Case>.IndexKeys.Ascending("payload.applicationReference")),
         };
 
         var keys = MongoIndexReconciler.RenderKeys(_collection, models);
@@ -60,22 +60,22 @@ public sealed class MongoIndexReconcilerTests
         // preserved across the reconcile (exercises the "key not in desired
         // set" branch of DropConflictingIndexes).
         _collection.Indexes.CreateOne(
-            new CreateIndexModel<WorkItem>(
-                Builders<WorkItem>.IndexKeys.Ascending(w => w.SubmittedBy)),
+            new CreateIndexModel<Case>(
+                Builders<Case>.IndexKeys.Ascending(w => w.SubmittedBy)),
             cancellationToken: TestContext.Current.CancellationToken);
 
         // The OLD, non-unique applicationReference index that will conflict.
         _collection.Indexes.CreateOne(
-            new CreateIndexModel<WorkItem>(
-                Builders<WorkItem>.IndexKeys.Ascending("payload.applicationReference"),
+            new CreateIndexModel<Case>(
+                Builders<Case>.IndexKeys.Ascending("payload.applicationReference"),
                 new CreateIndexOptions { Unique = false }),
             cancellationToken: TestContext.Current.CancellationToken);
 
         // Desired: only the tightened unique applicationReference index.
-        var desired = new List<CreateIndexModel<WorkItem>>
+        var desired = new List<CreateIndexModel<Case>>
         {
             new(
-                Builders<WorkItem>.IndexKeys.Ascending("payload.applicationReference"),
+                Builders<Case>.IndexKeys.Ascending("payload.applicationReference"),
                 new CreateIndexOptions { Unique = true, Sparse = true }),
         };
 
@@ -113,13 +113,13 @@ public sealed class MongoIndexReconcilerTests
     {
         var duplicateDocs = new[]
         {
-            new WorkItem
+            new Case
             {
                 TypeId = "test-type",
                 StateId = "state-1",
                 Payload = new BsonDocument { ["operatorApplicationId"] = "dup-1" },
             },
-            new WorkItem
+            new Case
             {
                 TypeId = "test-type",
                 StateId = "state-1",
@@ -128,11 +128,11 @@ public sealed class MongoIndexReconcilerTests
         };
         await _collection.InsertManyAsync(duplicateDocs, cancellationToken: TestContext.Current.CancellationToken);
 
-        var desired = new List<CreateIndexModel<WorkItem>>
+        var desired = new List<CreateIndexModel<Case>>
         {
-            new(Builders<WorkItem>.IndexKeys.Ascending(w => w.SubmittedBy)),
+            new(Builders<Case>.IndexKeys.Ascending(w => w.SubmittedBy)),
             new(
-                Builders<WorkItem>.IndexKeys.Ascending("payload.operatorApplicationId"),
+                Builders<Case>.IndexKeys.Ascending("payload.operatorApplicationId"),
                 new CreateIndexOptions { Unique = true, Sparse = true }),
         };
 

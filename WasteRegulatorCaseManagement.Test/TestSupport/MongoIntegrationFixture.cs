@@ -1,6 +1,6 @@
 using EphemeralMongo;
 using WasteRegulatorCaseManagement.Utils.Mongo;
-using WasteRegulatorCaseManagement.WorkItems.Core;
+using WasteRegulatorCaseManagement.Cases;
 using MongoDB.Driver;
 
 namespace WasteRegulatorCaseManagement.Test.TestSupport;
@@ -14,7 +14,7 @@ namespace WasteRegulatorCaseManagement.Test.TestSupport;
 /// amortised across the class.
 ///
 /// epr-efp: shared so endpoint suites and service suites can drop
-/// their <c>Substitute.For&lt;IWorkItemPersistence&gt;</c> wholesale
+/// their <c>Substitute.For&lt;ICasePersistence&gt;</c> wholesale
 /// and run against the real driver — the same code path production
 /// uses. The previous mocked implementations let regressions in BSON
 /// conventions, indexes, projections (epr-4pf), case-insensitive
@@ -67,7 +67,7 @@ public sealed class MongoIntegrationFixture : IAsyncLifetime
 /// <summary>
 /// Minimal <see cref="IMongoDbClientFactory"/> that points at the
 /// fixture's ephemeral <c>mongod</c>. Exists so tests can drive the
-/// production <see cref="WorkItemPersistence"/> constructor without
+/// production <see cref="CasePersistence"/> constructor without
 /// standing up the full DI container / Options pipeline.
 /// </summary>
 public sealed class TestMongoDbClientFactory : IMongoDbClientFactory

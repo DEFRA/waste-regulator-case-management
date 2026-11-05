@@ -26,23 +26,23 @@ public class OpenApiEndpointTests
         using var document = JsonDocument.Parse(body);
 
         // Document must be a valid OpenAPI doc and include at least one
-        // of the existing endpoints (a work-item framework route under
-        // /work-items is registered by MapWorkItemFrameworkEndpoints).
+        // of the existing endpoints (a case framework route under
+        // /cases is registered by MapCaseFrameworkEndpoints).
         Assert.True(document.RootElement.TryGetProperty("openapi", out _));
         Assert.True(document.RootElement.TryGetProperty("paths", out var paths));
         Assert.Equal(JsonValueKind.Object, paths.ValueKind);
         var pathNames = paths.EnumerateObject().Select(p => p.Name).ToArray();
         Assert.NotEmpty(pathNames);
-        Assert.Contains(pathNames, p => p.StartsWith("/work-items", StringComparison.Ordinal));
+        Assert.Contains(pathNames, p => p.StartsWith("/cases", StringComparison.Ordinal));
     }
 
     [Theory]
-    [InlineData("SubmitWorkItem")]
-    [InlineData("AssignWorkItem")]
-    [InlineData("AddWorkItemNote")]
+    [InlineData("SubmitCase")]
+    [InlineData("AssignCase")]
+    [InlineData("AddCaseNote")]
     public async Task Request_body_example_is_present_for_known_operation(string operationId)
     {
-        // Drift guard for WorkItemOpenApiExampleTransformer: if an
+        // Drift guard for CaseOpenApiExampleTransformer: if an
         // endpoint's .WithName(...) is renamed without updating the
         // transformer's lookup table, the example silently disappears
         // from the rendered Swagger UI. Asserting at the document level
@@ -73,13 +73,13 @@ public class OpenApiEndpointTests
                 Assert.True(
                     json.TryGetProperty("example", out _),
                     $"Operation '{operationId}' must have a request-body example wired " +
-                    "in WorkItemOpenApiExampleTransformer.");
+                    "in CaseOpenApiExampleTransformer.");
                 found = true;
             }
         }
 
         Assert.True(found, $"Operation id '{operationId}' was not found in the OpenAPI document. " +
-            "Either the endpoint was renamed or removed — update WorkItemOpenApiExampleTransformer " +
+            "Either the endpoint was renamed or removed — update CaseOpenApiExampleTransformer " +
             "to match.");
     }
 

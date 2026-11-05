@@ -1,5 +1,5 @@
 using WasteRegulatorCaseManagement.Utils.Mongo;
-using WasteRegulatorCaseManagement.WorkItems.Core;
+using WasteRegulatorCaseManagement.Cases;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
@@ -17,10 +17,10 @@ public static class TestServiceCollectionExtensions
 {
     /// <summary>
     /// Replace <see cref="IMongoDbClientFactory"/> and
-    /// <see cref="IWorkItemPersistence"/> with implementations that
+    /// <see cref="ICasePersistence"/> with implementations that
     /// talk to <paramref name="fixture"/>'s ephemeral mongod against
     /// a fresh per-test <paramref name="databaseName"/>. The
-    /// production <see cref="WorkItemPersistence"/> class is used
+    /// production <see cref="CasePersistence"/> class is used
     /// verbatim — only its connection target is swapped.
     /// </summary>
     public static IServiceCollection UseEphemeralMongoPersistence(
@@ -28,13 +28,13 @@ public static class TestServiceCollectionExtensions
         MongoIntegrationFixture fixture,
         string databaseName)
     {
-        services.RemoveAll<IWorkItemPersistence>();
+        services.RemoveAll<ICasePersistence>();
         services.RemoveAll<IMongoDbClientFactory>();
 
         var clientFactory = new TestMongoDbClientFactory(fixture.ConnectionString, databaseName);
         services.AddSingleton<IMongoDbClientFactory>(clientFactory);
-        services.AddSingleton<IWorkItemPersistence>(sp =>
-            new WorkItemPersistence(clientFactory, sp.GetRequiredService<ILoggerFactory>(), sp.GetRequiredService<IWorkItemRegistry>()));
+        services.AddSingleton<ICasePersistence>(sp =>
+            new CasePersistence(clientFactory, sp.GetRequiredService<ILoggerFactory>(), sp.GetRequiredService<ICaseRegistry>()));
 
         return services;
     }

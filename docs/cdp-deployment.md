@@ -71,7 +71,7 @@ dispatched:
 | unset or unrecognised, non-Development host | Yes (fail-open) |
 
 When sending is suppressed, `NoOpNotifyClient` is registered **even though
-`NOTIFY_API_KEY` is set**. It returns success, so the work item's audit log
+`NOTIFY_API_KEY` is set**. It returns success, so the case's audit log
 still records a `notification-sent` entry and the UI behaves exactly as it does
 in a sending environment. The only difference is that no HTTP traffic reaches
 Notify. Suppressed sends are logged with

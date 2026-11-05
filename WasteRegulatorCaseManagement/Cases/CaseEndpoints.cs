@@ -1,0 +1,649 @@
+using System.Diagnostics.CodeAnalysis;
+using System.Security.Claims;
+using System.Text.Json;
+using WasteRegulatorCaseManagement.Utils.Logging;
+using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
+
+namespace WasteRegulatorCaseManagement.Cases;
+
+// Marker type for IStructuredLogger category — CaseEndpoints is a
+// static class and therefore cannot itself be used as a type argument.
+internal sealed class CaseEndpointsLogger;
+
+/// <summary>
+/// Framework-level HTTP endpoints for ingesting and listing cases. The
+/// envelope (id, type, state, submitted-by, payload) is owned by the
+/// framework; type-specific behaviour and routes are added by modules under
+/// <c>/cases/&lt;type-id&gt;/...</c>.
+/// </summary>
+public static class CaseEndpoints
+{
+    private const string AbsentValue = "(absent)";
+    private const string CallerClientIdField = "caller.client_id";
+    private const string ErrorMessageField = "error.message";
+    private const string InvalidRequestTitle = "Invalid request";
+    private const string CaseTypeIdField = "case.type_id";
+
+    // Request body size caps (epr-rvz). The case endpoints all parse
+    // their JSON body manually after .DisableValidation(), so without an
+    // explicit cap an attacker can POST arbitrarily large payloads and
+    // force in-memory JSON / BSON parsing before any size guard fires.
+    // The caps are deliberately generous for the legitimate use cases
+    // (a real submission payload is well under 1 MB; a note is well under
+    // 100 KB; status / assign carry just a couple of small string fields).
+    public const long MaxSubmitBodyBytes = 1 * 1024 * 1024; // 1 MB
+    public const long MaxNoteBodyBytes = 100 * 1024; // 100 KB
+    public const long MaxAssignBodyBytes = 10 * 1024; // 10 KB
+
+    [ExcludeFromCodeCoverage]
+    public static IEndpointRouteBuilder MapCaseFrameworkEndpoints(
+        this IEndpointRouteBuilder app
+    )
+    {
+        var group = app.MapGroup("/cases").WithTags("Cases");
+
+        group
+            .MapPost(string.Empty, Submit)
+            .WithName("SubmitCase")
+            .DisableValidation()
+            .WithMetadata(new RequestSizeLimitAttribute(MaxSubmitBodyBytes))
+            .RequireAuthorization();
+
+        group.MapGet("/{id:guid}", GetById).WithName("GetCaseById").RequireAuthorization();
+
+        group.MapGet(string.Empty, GetAll).WithName("ListCases").RequireAuthorization();
+
+        group
+            .MapPost("/{id:guid}/actions/{actionId}", ApplyAction)
+            .WithName("ApplyCaseAction")
+            .RequireAuthorization();
+
+        group
+            .MapPost("/{id:guid}/assign", Assign)
+            .WithName("AssignCase")
+            .DisableValidation()
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAssignBodyBytes))
+            .RequireAuthorization();
+
+        group
+            .MapPost("/{id:guid}/unassign", Unassign)
+            .WithName("UnassignCase")
+            .RequireAuthorization();
+
+        group
+            .MapPost("/{id:guid}/notes", AddNote)
+            .WithName("AddCaseNote")
+            .DisableValidation()
+            .WithMetadata(new RequestSizeLimitAttribute(MaxNoteBodyBytes))
+            .RequireAuthorization();
+
+        return app;
+    }
+
+    internal static async Task<Results<CreatedAtRoute<CaseResponse>, ProblemHttpResult>> Submit(
+        JsonElement body,
+        HttpContext httpContext,
+        [FromServices] ICaseRegistry registry,
+        [FromServices] ICaseService engine,
+        [FromServices] IStructuredLogger<CaseEndpointsLogger> log,
+        CancellationToken cancellationToken
+    )
+    {
+        var req = httpContext.Request;
+        var bodyText = body.ValueKind != JsonValueKind.Undefined ? body.GetRawText() : "(empty)";
+        // Truncate very large bodies in the log — the 1 MB cap still applies
+        // at the framework level; this is just for readability.
+        const int MaxLoggedBodyChars = 4096;
+        var loggedBody =
+            bodyText.Length > MaxLoggedBodyChars
+                ? bodyText[..MaxLoggedBodyChars] + $"…(truncated, total {bodyText.Length} chars)"
+                : bodyText;
+
+        log.Log(
+            LogLevel.Information,
+            "Case submission received",
+            new Dictionary<string, object?>
+            {
+                ["http.request.method"] = req.Method,
+                ["url.path"] = req.Path.Value,
+                ["http.request.body"] = loggedBody,
+                [CallerClientIdField] = req.Headers.TryGetValue(
+                    "x-cdp-client-id",
+                    out var cid
+                )
+                    ? cid.ToString()
+                    : AbsentValue,
+                ["caller.user_id"] = req.Headers.TryGetValue("x-cdp-user-id", out var uid)
+                    ? uid.ToString()
+                    : AbsentValue,
+                ["caller.user_name"] = req.Headers.TryGetValue("x-cdp-user-name", out var uname)
+                    ? uname.ToString()
+                    : AbsentValue,
+                ["http.request.mime_type"] = req.ContentType ?? AbsentValue,
+                ["http.request.body.bytes"] = req.ContentLength?.ToString() ?? AbsentValue,
+            }
+        );
+
+        if (body.ValueKind != JsonValueKind.Object)
+        {
+            log.Log(
+                LogLevel.Warning,
+                "Case submission rejected: body is not a JSON object",
+                new Dictionary<string, object?>
+                {
+                    [ErrorMessageField] = $"ValueKind was {body.ValueKind}",
+                }
+            );
+            return BadRequest(InvalidRequestTitle, "Request body must be a JSON object.");
+        }
+
+        if (
+            !body.TryGetProperty("typeId", out var typeIdElement)
+            || typeIdElement.ValueKind != JsonValueKind.String
+            || string.IsNullOrWhiteSpace(typeIdElement.GetString())
+        )
+        {
+            log.Log(
+                LogLevel.Warning,
+                "Case submission rejected: missing or empty typeId",
+                new Dictionary<string, object?> { ["http.request.body"] = loggedBody }
+            );
+            return BadRequest(
+                InvalidRequestTitle,
+                "'typeId' is required and must be a non-empty string."
+            );
+        }
+
+        var typeId = typeIdElement.GetString()!;
+        var type = registry.Find(typeId);
+        if (type is null)
+        {
+            log.Log(
+                LogLevel.Warning,
+                "Case submission rejected: unknown typeId",
+                new Dictionary<string, object?> { [CaseTypeIdField] = typeId }
+            );
+            return BadRequest(
+                "Unknown case type",
+                $"No case type is registered with id '{typeId}'."
+            );
+        }
+
+        JsonElement? payload = body.TryGetProperty("payload", out var payloadElement)
+            ? payloadElement
+            : null;
+
+        MongoDB.Bson.BsonDocument payloadDocument;
+        try
+        {
+            payloadDocument = CasePayloadConverter.ToBson(payload);
+        }
+        catch (InvalidCasePayloadException ex)
+        {
+            log.Log(
+                LogLevel.Warning,
+                "Case submission rejected: invalid payload",
+                new Dictionary<string, object?>
+                {
+                    [CaseTypeIdField] = typeId,
+                    [ErrorMessageField] = ex.Message,
+                },
+                ex
+            );
+            return BadRequest("Invalid case payload", ex.Message);
+        }
+
+        var submittedBy =
+            httpContext.User.FindFirstValue("client_id")
+            ?? httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        // RA-126: optional caller-supplied audit context. 'source' is a
+        // string when present; reject other JSON types up front so a
+        // malformed body cannot silently degrade the audit record.
+        Dictionary<string, string?>? submissionMetadata = null;
+        if (body.TryGetProperty("source", out var sourceElement))
+        {
+            if (sourceElement.ValueKind != JsonValueKind.String)
+            {
+                log.Log(
+                    LogLevel.Warning,
+                    "Case submission rejected: 'source' is not a string",
+                    new Dictionary<string, object?>
+                    {
+                        [CaseTypeIdField] = typeId,
+                        [ErrorMessageField] = $"'source' ValueKind was {sourceElement.ValueKind}",
+                    }
+                );
+                return BadRequest("Invalid request body", "'source' must be a string.");
+            }
+            (submissionMetadata ??= new Dictionary<string, string?>(StringComparer.Ordinal))[
+                "source"
+            ] = sourceElement.GetString();
+        }
+
+        // Routed through the engine so the framework owns audit-log
+        // composition for the birth event in the same place it owns every
+        // other state-changing entry. The engine writes the document and
+        // its first 'work-item-submitted' audit entry in a single
+        // CreateAsync call.
+        CaseActionResult result;
+        try
+        {
+            result = await engine.SubmitAsync(
+                type,
+                payloadDocument,
+                submittedBy,
+                httpContext.User,
+                submissionMetadata,
+                cancellationToken
+            );
+        }
+        catch (Exception ex)
+        {
+            log.Log(
+                LogLevel.Error,
+                "Case submission threw an unhandled exception",
+                new Dictionary<string, object?>
+                {
+                    [CaseTypeIdField] = typeId,
+                    [CallerClientIdField] = submittedBy ?? "(unknown)",
+                    ["error.type"] = ex.GetType().FullName,
+                    [ErrorMessageField] = ex.Message,
+                },
+                ex
+            );
+            throw;
+        }
+
+        if (!result.IsSuccess)
+        {
+            log.Log(
+                LogLevel.Warning,
+                "Case submission failed",
+                new Dictionary<string, object?>
+                {
+                    [CaseTypeIdField] = typeId,
+                    [CallerClientIdField] = submittedBy ?? "(unknown)",
+                    ["error.code"] = result.FailureCode.ToString(),
+                    [ErrorMessageField] = result.Message,
+                }
+            );
+            return result.FailureCode switch
+            {
+                CaseActionFailureCode.MissingActorIdentity => TypedResults.Problem(
+                    title: "Authentication required",
+                    detail: result.Message,
+                    statusCode: StatusCodes.Status401Unauthorized
+                ),
+                _ => TypedResults.Problem(
+                    title: InvalidRequestTitle,
+                    detail: result.Message,
+                    statusCode: StatusCodes.Status400BadRequest
+                ),
+            };
+        }
+
+        var caseRecord = result.Case!;
+        log.Log(
+            LogLevel.Information,
+            "Case submission succeeded",
+            new Dictionary<string, object?>
+            {
+                ["case.id"] = caseRecord.Id.ToString(),
+                [CaseTypeIdField] = typeId,
+                [CallerClientIdField] = submittedBy ?? "(unknown)",
+            }
+        );
+        var response = ToResponse(engine.Project(caseRecord));
+        return TypedResults.CreatedAtRoute(response, "GetCaseById", new { id = caseRecord.Id });
+    }
+
+    private static ProblemHttpResult BadRequest(string title, string detail) =>
+        TypedResults.Problem(
+            title: title,
+            detail: detail,
+            statusCode: StatusCodes.Status400BadRequest
+        );
+
+    internal static async Task<Results<Ok<CaseResponse>, NotFound>> GetById(
+        [FromRoute] Guid id,
+        HttpContext httpContext,
+        [FromServices] ICasePersistence persistence,
+        [FromServices] ICaseService engine,
+        CancellationToken cancellationToken
+    )
+    {
+        var caseRecord = await persistence.GetByIdAsync(id, cancellationToken);
+        if (caseRecord is null)
+        {
+            return TypedResults.NotFound();
+        }
+        return TypedResults.Ok(ToResponse(engine.Project(caseRecord)));
+    }
+
+    internal static async Task<Results<Ok<CaseListResponse>, ProblemHttpResult>> GetAll(
+        HttpContext httpContext,
+        [FromServices] ICasePersistence persistence,
+        [FromServices] ICaseService engine,
+        CancellationToken cancellationToken
+    )
+    {
+        var query = CaseQueryBinding.FromQueryString(httpContext.Request.Query);
+
+        if (query.ExceedsPageCap)
+        {
+            return TypedResults.Problem(
+                title: "Page out of range",
+                detail: $"'page' must be <= {CaseQuery.MaxPage}.",
+                statusCode: StatusCodes.Status400BadRequest
+            );
+        }
+
+        var page = await persistence.QueryAsync(query, cancellationToken);
+
+        var items = page
+            .Items.Select(w => ToListItemResponse(engine.Project(w)))
+            .ToList();
+
+        return TypedResults.Ok(
+            new CaseListResponse(items, page.TotalCount, page.Page, page.PageSize)
+        );
+    }
+
+    /// <summary>
+    /// Header name set on a response whose operation was a no-op because the
+    /// case was already in the requested condition. Lets clients
+    /// distinguish "first hit" from "replay" without needing to introspect the
+    /// audit log.
+    /// </summary>
+    public const string IdempotentReplayHeader = "X-Idempotent-Replay";
+
+    internal static async Task<
+        Results<Ok<CaseResponse>, NotFound, ProblemHttpResult>
+    > ApplyAction(
+        [FromRoute] Guid id,
+        [FromRoute] string actionId,
+        HttpContext httpContext,
+        [FromServices] ICasePersistence persistence,
+        [FromServices] ICaseService engine,
+        CancellationToken cancellationToken
+    )
+    {
+        // Security boundary (RA-311/MBE-1 review): a transition is declared
+        // CallerInvocable: false when several transitions share the same
+        // FromStateId — the engine's normal "is the item in the right
+        // state" guard cannot tell them apart, so a caller who could invoke
+        // one directly here would pick the target state themselves instead
+        // of the module's bespoke service resolving it server-side from
+        // audit history. Checked against the case's own frozen
+        // TemplateSnapshot (the same source ApplyActionAsync itself
+        // resolves the transition from) so this rejects using the exact
+        // rules the item was submitted under.
+        var caseRecord = await persistence.GetByIdAsync(id, cancellationToken);
+        // RA-351: an action id can be declared on more than one state (e.g.
+        // a self-loop available from two states). Resolve the CallerInvocable check against the transition
+        // for the item's CURRENT state — matching on action id alone would
+        // test the first-declared transition, which can differ in
+        // CallerInvocable from the one that actually applies here.
+        var actionTransitions = caseRecord
+            ?.TemplateSnapshot?.Transitions.Where(t =>
+                string.Equals(t.ActionId, actionId, StringComparison.OrdinalIgnoreCase)
+            )
+            .ToList();
+        var transition =
+            actionTransitions?.FirstOrDefault(t =>
+                string.Equals(
+                    t.FromStateId,
+                    caseRecord!.StateId,
+                    StringComparison.OrdinalIgnoreCase
+                )
+            ) ?? actionTransitions?.FirstOrDefault();
+        if (transition is { CallerInvocable: false })
+        {
+            return ToHttpResult(
+                CaseActionResult.Failure(
+                    CaseActionFailureCode.UnknownAction,
+                    $"Action '{actionId}' is not declared by case type '{caseRecord!.TypeId}'."),
+                engine);
+        }
+
+        var result = await engine.ApplyActionAsync(
+            id,
+            actionId,
+            httpContext.User,
+            cancellationToken
+        );
+        return ToHttpResult(result, engine);
+    }
+
+    internal static async Task<Results<Ok<CaseResponse>, NotFound, ProblemHttpResult>> Assign(
+        [FromRoute] Guid id,
+        JsonElement body,
+        HttpContext httpContext,
+        [FromServices] ICaseService engine,
+        CancellationToken cancellationToken
+    )
+    {
+        if (body.ValueKind != JsonValueKind.Object)
+        {
+            return BadRequest(
+                InvalidRequestTitle,
+                "Request body must be a JSON object containing 'assigneeId'."
+            );
+        }
+
+        if (
+            !body.TryGetProperty("assigneeId", out var assigneeIdElement)
+            || assigneeIdElement.ValueKind != JsonValueKind.String
+            || string.IsNullOrWhiteSpace(assigneeIdElement.GetString())
+        )
+        {
+            return BadRequest(
+                InvalidRequestTitle,
+                "'assigneeId' is required and must be a non-empty string."
+            );
+        }
+
+        string? assigneeName = null;
+        if (
+            body.TryGetProperty("assigneeName", out var assigneeNameElement)
+            && assigneeNameElement.ValueKind == JsonValueKind.String
+        )
+        {
+            assigneeName = assigneeNameElement.GetString();
+        }
+
+        var result = await engine.AssignAsync(
+            id,
+            assigneeIdElement.GetString()!,
+            assigneeName,
+            httpContext.User,
+            cancellationToken
+        );
+        if (result.IsIdempotentReplay)
+        {
+            httpContext.Response.Headers[IdempotentReplayHeader] = "true";
+        }
+        return ToHttpResult(result, engine);
+    }
+
+    internal static async Task<Results<Ok<CaseResponse>, NotFound, ProblemHttpResult>> Unassign(
+        [FromRoute] Guid id,
+        HttpContext httpContext,
+        [FromServices] ICaseService engine,
+        CancellationToken cancellationToken
+    )
+    {
+        var result = await engine.UnassignAsync(id, httpContext.User, cancellationToken);
+        if (result.IsIdempotentReplay)
+        {
+            httpContext.Response.Headers[IdempotentReplayHeader] = "true";
+        }
+        return ToHttpResult(result, engine);
+    }
+
+    internal static async Task<Results<Ok<CaseResponse>, NotFound, ProblemHttpResult>> AddNote(
+        [FromRoute] Guid id,
+        JsonElement body,
+        HttpContext httpContext,
+        [FromServices] ICaseService engine,
+        CancellationToken cancellationToken
+    )
+    {
+        if (body.ValueKind != JsonValueKind.Object)
+        {
+            return BadRequest(
+                InvalidRequestTitle,
+                "Request body must be a JSON object containing 'text'."
+            );
+        }
+
+        if (
+            !body.TryGetProperty("text", out var textElement)
+            || textElement.ValueKind != JsonValueKind.String
+            || string.IsNullOrWhiteSpace(textElement.GetString())
+        )
+        {
+            return BadRequest(
+                InvalidRequestTitle,
+                "'text' is required and must be a non-empty string."
+            );
+        }
+
+        var result = await engine.AddNoteAsync(
+            id,
+            textElement.GetString()!,
+            httpContext.User,
+            cancellationToken
+        );
+        return ToHttpResult(result, engine);
+    }
+
+    private static Results<Ok<CaseResponse>, NotFound, ProblemHttpResult> ToHttpResult(
+        CaseActionResult result,
+        ICaseService engine
+    )
+    {
+        if (result.IsSuccess)
+        {
+            return TypedResults.Ok(ToResponse(engine.Project(result.Case!)));
+        }
+
+        return result.FailureCode switch
+        {
+            CaseActionFailureCode.CaseNotFound => TypedResults.NotFound(),
+            CaseActionFailureCode.UnknownAction
+            or CaseActionFailureCode.InvalidTransition
+            or CaseActionFailureCode.InvalidAssignment
+            or CaseActionFailureCode.InvalidNote => TypedResults.Problem(
+                title: "Invalid action",
+                detail: result.Message,
+                statusCode: StatusCodes.Status400BadRequest
+            ),
+            CaseActionFailureCode.NotAuthorized => TypedResults.Problem(
+                title: "Not authorised",
+                detail: result.Message,
+                statusCode: StatusCodes.Status403Forbidden
+            ),
+            CaseActionFailureCode.MissingActorIdentity => TypedResults.Problem(
+                title: "Authentication required",
+                detail: result.Message,
+                statusCode: StatusCodes.Status401Unauthorized
+            ),
+            CaseActionFailureCode.TerminalState
+            or CaseActionFailureCode.ConcurrencyConflict => TypedResults.Problem(
+                title: "Action not allowed",
+                detail: result.Message,
+                statusCode: StatusCodes.Status409Conflict
+            ),
+            _ => TypedResults.Problem(
+                detail: result.Message,
+                statusCode: StatusCodes.Status400BadRequest
+            ),
+        };
+    }
+
+    internal static CaseResponse ToResponse(CaseEngineProjection projection)
+    {
+        var w = projection.Case;
+        return new CaseResponse(
+            w.Id,
+            w.TypeId,
+            w.StateId,
+            w.SubmittedAt,
+            w.LastModifiedAt,
+            w.SubmittedBy,
+            projection.TemplateVersion,
+            CasePayloadConverter.ToJson(w.Payload),
+            projection.AvailableActions,
+            w.AssignedToId,
+            w.AssignedToName,
+            w.AssignedAt,
+            w.AssignedBy,
+            // Notes are stored append-only but rendered newest-first so the
+            // most relevant context is at the top of an assessor's screen.
+            w.Notes.OrderByDescending(n => n.CreatedAt)
+                .Select(n => new CaseNoteResponse(
+                    n.Id,
+                    n.Text,
+                    n.CreatedAt,
+                    n.CreatedBy,
+                    n.CreatedByName
+                ))
+                .ToList(),
+            // Audit log (RA-97) is projected in reverse-chronological
+            // (newest-first) order so a UI renders the most recent activity
+            // at the top of the timeline (RA-568). Insertion index is the
+            // secondary key so entries written within the same tick (common
+            // under FakeTimeProvider, and possible in production when a
+            // single engine call appends two entries back-to-back) keep
+            // their append order reversed on the wire instead of relying on
+            // undefined behaviour from a tied OrderBy (epr-s4y).
+            w.AuditLog.Select((e, i) => (Entry: e, Index: i))
+                .OrderByDescending(x => x.Entry.CreatedAt)
+                .ThenByDescending(x => x.Index)
+                .Select(x => new CaseAuditEntryResponse(
+                    x.Entry.Id,
+                    x.Entry.Action,
+                    x.Entry.ActionDisplayName,
+                    x.Entry.Details,
+                    x.Entry.CreatedAt,
+                    x.Entry.CreatedBy,
+                    x.Entry.CreatedByName,
+                    // epr-rr9s: per-event state snapshot (null for pre-change entries).
+                    x.Entry.StateId
+                ))
+                .ToList()
+        );
+    }
+
+    /// <summary>
+    /// Slim per-item projection used by the list endpoint (epr-4pf).
+    /// Identical to <see cref="ToResponse"/>
+    /// except the per-item <c>Notes</c> and <c>AuditLog</c> collections
+    /// are omitted entirely from the wire shape — they would otherwise
+    /// dominate the payload of a 100-row page even though no list view
+    /// renders them.
+    /// </summary>
+    internal static CaseListItemResponse ToListItemResponse(CaseEngineProjection projection)
+    {
+        var w = projection.Case;
+        return new CaseListItemResponse(
+            w.Id,
+            w.TypeId,
+            w.StateId,
+            w.SubmittedAt,
+            w.LastModifiedAt,
+            w.SubmittedBy,
+            projection.TemplateVersion,
+            CasePayloadConverter.ToJson(w.Payload),
+            projection.AvailableActions,
+            w.AssignedToId,
+            w.AssignedToName,
+            w.AssignedAt,
+            w.AssignedBy
+        );
+    }
+}

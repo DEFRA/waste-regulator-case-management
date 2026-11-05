@@ -24,9 +24,9 @@ public sealed class LivenessHealthCheckOptions
 
 /// <summary>
 /// Liveness probe that exercises a real signal of process health beyond
-/// "the request was parsed": it schedules a trivial work item on the
+/// "the request was parsed": it schedules a trivial case on the
 /// thread pool and waits for it to complete within
-/// <see cref="LivenessHealthCheckOptions.Timeout"/>. If the work item
+/// <see cref="LivenessHealthCheckOptions.Timeout"/>. If the case
 /// cannot be observed to complete in time the thread pool is wedged
 /// (deadlock, exhaustion, GC death-spiral) and we report
 /// <see cref="HealthStatus.Unhealthy"/> so Kubernetes / CDP recycles the

@@ -14,7 +14,7 @@ public interface INotifyClient
     ///
     /// Returns a result rather than throwing on transport / API
     /// failures so callers can record an audit entry without unwinding
-    /// the work item state change that triggered the send. A missing
+    /// the case state change that triggered the send. A missing
     /// template key returns <see cref="NotifySendResult.Failure"/> with
     /// an error message — it is a misconfiguration, not an exception.
     /// </summary>

@@ -1,5 +1,5 @@
 using System.Net.Http;
-using WasteRegulatorCaseManagement.WorkItems.Core;
+using WasteRegulatorCaseManagement.Cases;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
@@ -162,8 +162,8 @@ public class CorsPolicyTests
             }
             builder.ConfigureServices(services =>
             {
-                services.RemoveAll<IWorkItemPersistence>();
-                services.AddSingleton(Substitute.For<IWorkItemPersistence>());
+                services.RemoveAll<ICasePersistence>();
+                services.AddSingleton(Substitute.For<ICasePersistence>());
             });
         }
     }

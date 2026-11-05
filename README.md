@@ -74,7 +74,7 @@ HTTP traffic to Notify).
 Even with the flag on and a key set, notification calls are logged but **never**
 sent to GOV.UK Notify when running locally: the no-op client is registered on a
 Development host and whenever `ENVIRONMENT` is `local` or `dev`. It returns
-success, so the work item's audit log still records a `notification-sent` entry
+success, so the case's audit log still records a `notification-sent` entry
 and the UI behaves as it does in a sending environment. The non-production
 Notify team key can only reach team-registered addresses plus five guests, and
 those slots are used up — see
@@ -118,12 +118,12 @@ docker compose down -v
 ```
 
 > **Pulling a branch that changes seed data? Tear the volume down first.**
-> Work item seeding is insert-only (`CreateIfAbsentAsync` against a
+> Case seeding is insert-only (`CreateIfAbsentAsync` against a
 > deterministic id), so an existing MongoDB volume keeps whatever it seeded
 > the first time and edits to a seed item's contents never reach it. The
 > resulting e2e failures look like a broken frontend rather than stale
 > fixtures. `docker compose down -v` and start clean. See
-> [`docs/work-items.md`](docs/work-items.md#seeding) for the full rules.
+> [`docs/cases.md`](docs/cases.md#seeding) for the full rules.
 
 ## Endpoints
 
@@ -132,14 +132,14 @@ docker compose down -v
 | GET    | `/health`                                    | Health probe used by CDP               |
 | GET    | `/openapi/v1.json`                           | OpenAPI document (anonymous)           |
 | GET    | `/swagger`                                   | Swagger UI explorer (non-Production)   |
-| POST   | `/work-items`                                | Submit a new work item                 |
-| GET    | `/work-items`                                | List/search work items                 |
-| GET    | `/work-items/{id}`                           | Get a single work item by id           |
-| POST   | `/work-items/{id}/tasks/{taskId}/complete`   | Complete a task on a work item         |
-| POST   | `/work-items/{id}/actions/{actionId}`        | Apply an action / state transition     |
-| POST   | `/work-items/{id}/assign`                    | Assign a work item to a user           |
-| POST   | `/work-items/{id}/unassign`                  | Unassign a work item                   |
-| POST   | `/work-items/{id}/notes`                     | Add a note to a work item              |
+| POST   | `/cases`                                | Submit a new case                 |
+| GET    | `/cases`                                | List/search cases                 |
+| GET    | `/cases/{id}`                           | Get a single case by id           |
+| POST   | `/cases/{id}/tasks/{taskId}/complete`   | Complete a task on a case         |
+| POST   | `/cases/{id}/actions/{actionId}`        | Apply an action / state transition     |
+| POST   | `/cases/{id}/assign`                    | Assign a case to a user           |
+| POST   | `/cases/{id}/unassign`                  | Unassign a case                   |
+| POST   | `/cases/{id}/notes`                     | Add a note to a case              |
 
 ## Authentication
 
@@ -153,7 +153,7 @@ configured, the handler falls back to trusting the header's presence alone:
 
 ```bash
 curl -H 'x-cdp-client-id: my-upstream-service' \
-  http://localhost:8085/work-items
+  http://localhost:8085/cases
 ```
 
 Requests without the header (or, outside Development, without a valid
@@ -204,7 +204,7 @@ Notify-testing walkthrough.
 | `Mongo__DatabaseUri` | No | MongoDB connection string (default `mongodb://127.0.0.1:27017`; IAM auth in deployed environments) |
 | `Mongo__DatabaseName` | No | MongoDB database name (default `waste-regulator-case-management`) |
 | `Cors__AllowedOrigins` | No | CORS allow-list (array). Empty = deny-all |
-| `WorkItems__SeedOnStartup` | No | Runs registered work item seeders on boot. Honoured in Development only |
+| `Cases__SeedOnStartup` | No | Runs registered case seeders on boot. Honoured in Development only |
 | `ENVIRONMENT` | No | Platform environment name (`local`/`dev`/`test`/`perf-test`/`ext-test`/`prod`) |
 
 ### Example local/testing values
