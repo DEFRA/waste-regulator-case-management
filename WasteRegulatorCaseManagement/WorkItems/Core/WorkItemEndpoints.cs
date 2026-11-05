@@ -335,7 +335,6 @@ public static class WorkItemEndpoints
         HttpContext httpContext,
         [FromServices] IWorkItemPersistence persistence,
         [FromServices] IWorkItemService engine,
-        [FromServices] TimeProvider timeProvider,
         CancellationToken cancellationToken
     )
     {
@@ -344,14 +343,13 @@ public static class WorkItemEndpoints
         {
             return TypedResults.NotFound();
         }
-        return TypedResults.Ok(ToResponse(engine.Project(workItem), timeProvider));
+        return TypedResults.Ok(ToResponse(engine.Project(workItem)));
     }
 
     internal static async Task<Results<Ok<WorkItemListResponse>, ProblemHttpResult>> GetAll(
         HttpContext httpContext,
         [FromServices] IWorkItemPersistence persistence,
         [FromServices] IWorkItemService engine,
-        [FromServices] TimeProvider timeProvider,
         CancellationToken cancellationToken
     )
     {
@@ -369,7 +367,7 @@ public static class WorkItemEndpoints
         var page = await persistence.QueryAsync(query, cancellationToken);
 
         var items = page
-            .Items.Select(w => ToListItemResponse(engine.Project(w), timeProvider))
+            .Items.Select(w => ToListItemResponse(engine.Project(w)))
             .ToList();
 
         return TypedResults.Ok(
@@ -551,13 +549,12 @@ public static class WorkItemEndpoints
 
     private static Results<Ok<WorkItemResponse>, NotFound, ProblemHttpResult> ToHttpResult(
         WorkItemActionResult result,
-        IWorkItemService engine,
-        TimeProvider? timeProvider = null
+        IWorkItemService engine
     )
     {
         if (result.IsSuccess)
         {
-            return TypedResults.Ok(ToResponse(engine.Project(result.WorkItem!), timeProvider));
+            return TypedResults.Ok(ToResponse(engine.Project(result.WorkItem!)));
         }
 
         return result.FailureCode switch
@@ -594,14 +591,9 @@ public static class WorkItemEndpoints
         };
     }
 
-    internal static WorkItemResponse ToResponse(
-        WorkItemEngineProjection projection,
-        TimeProvider? timeProvider = null
-    )
+    internal static WorkItemResponse ToResponse(WorkItemEngineProjection projection)
     {
         var w = projection.WorkItem;
-        var now = timeProvider?.GetUtcNow().UtcDateTime;
-        var (slaRemaining, slaState) = ComputeSla(w.SlaClock, now, projection.IsTerminal);
         return new WorkItemResponse(
             w.Id,
             w.TypeId,
@@ -650,13 +642,6 @@ public static class WorkItemEndpoints
                     x.Entry.StateId
                 ))
                 .ToList(),
-            slaRemaining,
-            slaState,
-            ComputeSlaDueDate(w.SlaClock),
-            // RA-611: the duly-made anchor the deadline floor is measured from.
-            // Read straight off the live clock, like the due date, so an
-            // ISlaService override that moves the start is reflected at once.
-            w.SlaClock?.StartedAt,
             w.Payload.TryGetValue("applicationReference", out var reference) && reference.IsString
                 ? reference.AsString
                 : null,
@@ -666,68 +651,17 @@ public static class WorkItemEndpoints
         );
     }
 
-    internal static (TimeSpan? Remaining, WorkItemSlaState? State) ComputeSla(
-        WorkItemSlaClock? clock,
-        DateTime? now,
-        bool isTerminal = false
-    )
-    {
-        // No clock means no SLA at all — nothing to cancel, run or breach.
-        // This is checked before terminality on purpose: a terminal item that
-        // never started an SLA reports no state, exactly as a non-terminal one
-        // does. Only items with an actual clock are eligible for Cancelled.
-        if (clock is null)
-        {
-            return (null, null);
-        }
-        // RA-359: a terminal work item (withdrawn / approved / rejected) has no
-        // live SLA. Its clock is cancelled regardless of elapsed time, so we
-        // stop the countdown (Remaining => null) and report Cancelled instead
-        // of an OnTrack/AtRisk/Breached derived purely from the clock. The
-        // historical deadline is untouched and still surfaced via
-        // ComputeSlaDueDate. Terminality is time-independent, so this holds even
-        // when no "now" was supplied.
-        if (isTerminal)
-        {
-            return (null, WorkItemSlaState.Cancelled);
-        }
-        if (now is null)
-        {
-            return (null, null);
-        }
-        var remaining = clock.Remaining(now.Value);
-        var state = clock.ComputeState(now.Value);
-        return (remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero, state);
-    }
-
-    /// <summary>
-    /// RA-324 / RA-295: the absolute SLA deadline (<c>slaClock.StartedAt +
-    /// TargetDuration</c>) for the Applications card's and the case header's
-    /// "Due on:" line, or <c>null</c> when no SLA clock has started. Unlike
-    /// <see cref="ComputeSla"/> this needs no "now" — the deadline is a fixed
-    /// instant, not a relative countdown. Read straight off the live clock, so
-    /// an <see cref="ISlaService"/> extend or override is reflected
-    /// immediately.
-    /// </summary>
-    internal static DateTime? ComputeSlaDueDate(WorkItemSlaClock? clock) =>
-        clock?.DueAt;
-
     /// <summary>
     /// Slim per-item projection used by the list endpoint (epr-4pf).
-    /// Identical to <see cref="ToResponse(WorkItemEngineProjection)"/>
+    /// Identical to <see cref="ToResponse"/>
     /// except the per-item <c>Notes</c> and <c>AuditLog</c> collections
     /// are omitted entirely from the wire shape — they would otherwise
     /// dominate the payload of a 100-row page even though no list view
     /// renders them.
     /// </summary>
-    internal static WorkItemListItemResponse ToListItemResponse(
-        WorkItemEngineProjection projection,
-        TimeProvider? timeProvider = null
-    )
+    internal static WorkItemListItemResponse ToListItemResponse(WorkItemEngineProjection projection)
     {
         var w = projection.WorkItem;
-        var now = timeProvider?.GetUtcNow().UtcDateTime;
-        var (slaRemaining, slaState) = ComputeSla(w.SlaClock, now, projection.IsTerminal);
         return new WorkItemListItemResponse(
             w.Id,
             w.TypeId,
@@ -742,9 +676,6 @@ public static class WorkItemEndpoints
             w.AssignedToName,
             w.AssignedAt,
             w.AssignedBy,
-            slaRemaining,
-            slaState,
-            ComputeSlaDueDate(w.SlaClock),
             // RA-410: falls back to the item's own state so the field is
             // always populated, even for a projection built without one.
             projection.OriginStateId ?? w.StateId

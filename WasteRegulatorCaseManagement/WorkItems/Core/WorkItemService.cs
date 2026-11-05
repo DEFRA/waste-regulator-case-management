@@ -107,14 +107,7 @@ public sealed record WorkItemEngineProjection(
     // discharges (see IWorkItemOriginStateResolver). Almost always
     // WorkItem.StateId. Defaults to null so callers constructing a projection
     // directly are unaffected; Project always populates it.
-    string? OriginStateId = null,
-    // RA-359: whether the item's current state is terminal (withdrawn /
-    // approved / rejected) under its resolved template. Drives the read-side
-    // SLA projection: a terminal item's SLA is reported as Cancelled rather
-    // than a running OnTrack/AtRisk/Breached. Defaults to false so callers
-    // constructing a projection directly are unaffected; Project always
-    // populates it from TerminalStates.Find.
-    bool IsTerminal = false
+    string? OriginStateId = null
 );
 
 public sealed class WorkItemService : IWorkItemService
@@ -947,8 +940,7 @@ public sealed class WorkItemService : IWorkItemService
             workItem,
             template.TemplateVersion,
             available,
-            ResolveOriginStateId(workItem, template),
-            isTerminal
+            ResolveOriginStateId(workItem, template)
         );
     }
 

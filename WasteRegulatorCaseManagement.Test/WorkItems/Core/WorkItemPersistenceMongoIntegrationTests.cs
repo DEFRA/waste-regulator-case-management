@@ -24,8 +24,6 @@ namespace WasteRegulatorCaseManagement.Test.WorkItems.Core;
 /// </summary>
 public sealed class WorkItemPersistenceMongoIntegrationTests : IAsyncDisposable, IDisposable
 {
-    private static readonly string[] s_expectedDueDateAscending = ["A", "B", "C", "NoClock"];
-    private static readonly string[] s_expectedDueDateDescending = ["B", "A", "NoClock"];
     private static readonly string[] s_expectedFirstPage = ["a", "b"];
     private static readonly string[] s_expectedMultiMaterialMatches = ["g", "p"];
     private static readonly string[] s_expectedNewestSubmittedFirst = ["newer", "older"];
@@ -426,8 +424,7 @@ public sealed class WorkItemPersistenceMongoIntegrationTests : IAsyncDisposable,
         string? material = null,
         string? wasteProcessingType = null,
         string stateId = "submitted",
-        int submittedMinutesAgo = 0,
-        WorkItemSlaClock? slaClock = null
+        int submittedMinutesAgo = 0
     )
     {
         var now = _time.GetUtcNow().UtcDateTime;
@@ -451,7 +448,6 @@ public sealed class WorkItemPersistenceMongoIntegrationTests : IAsyncDisposable,
             SubmittedAt = now.AddMinutes(-submittedMinutesAgo),
             LastModifiedAt = now,
             Payload = payload,
-            SlaClock = slaClock,
         };
         await _persistence.CreateAsync(item, TestContext.Current.CancellationToken);
     }
@@ -590,82 +586,6 @@ public sealed class WorkItemPersistenceMongoIntegrationTests : IAsyncDisposable,
         Assert.Equal(5, page2.TotalCount);
         Assert.Equal(2, page1.PageSize);
         Assert.Equal(2, page2.Page);
-    }
-
-    [Fact]
-    public async Task QueryAsync_sort_due_date_soonest_first_and_no_clock_last()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        var now = _time.GetUtcNow().UtcDateTime;
-        // Same start, longer target => later deadline: proves the sort reflects
-        // targetDuration (SLA extensions), not just startedAt.
-        await SeedAsync(
-            "B",
-            stateId: "assessment-in-progress",
-            slaClock: new WorkItemSlaClock
-            {
-                StartedAt = now,
-                TargetDuration = TimeSpan.FromDays(30),
-            }
-        );
-        await SeedAsync(
-            "A",
-            stateId: "assessment-in-progress",
-            slaClock: new WorkItemSlaClock
-            {
-                StartedAt = now,
-                TargetDuration = TimeSpan.FromDays(10),
-            }
-        );
-        await SeedAsync("NoClock", stateId: "submitted", slaClock: null);
-        await SeedAsync(
-            "C",
-            stateId: "assessment-in-progress",
-            slaClock: new WorkItemSlaClock
-            {
-                StartedAt = now.AddDays(-5),
-                TargetDuration = TimeSpan.FromDays(84),
-            }
-        );
-
-        var page = await _persistence.QueryAsync(new WorkItemQuery(Sort: "due-date"), ct);
-
-        // A (now+10), B (now+30), C (now+79), then the clock-less item last.
-        Assert.Equal(s_expectedDueDateAscending, OrgOrder(page));
-    }
-
-    [Fact]
-    public async Task QueryAsync_sort_due_date_descending_keeps_no_clock_item_last()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        var now = _time.GetUtcNow().UtcDateTime;
-        await SeedAsync(
-            "B",
-            stateId: "assessment-in-progress",
-            slaClock: new WorkItemSlaClock
-            {
-                StartedAt = now,
-                TargetDuration = TimeSpan.FromDays(30),
-            }
-        );
-        await SeedAsync(
-            "A",
-            stateId: "assessment-in-progress",
-            slaClock: new WorkItemSlaClock
-            {
-                StartedAt = now,
-                TargetDuration = TimeSpan.FromDays(10),
-            }
-        );
-        await SeedAsync("NoClock", stateId: "submitted", slaClock: null);
-
-        var page = await _persistence.QueryAsync(
-            new WorkItemQuery(Sort: "due-date", SortDescending: true),
-            ct
-        );
-
-        // Latest deadline first, but the clock-less item still sorts last.
-        Assert.Equal(s_expectedDueDateDescending, OrgOrder(page));
     }
 
     [Fact]

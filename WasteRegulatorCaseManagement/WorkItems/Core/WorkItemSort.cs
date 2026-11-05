@@ -5,41 +5,29 @@ namespace WasteRegulatorCaseManagement.WorkItems.Core;
 /// <summary>
 /// Translates the <c>?sort=</c> / <c>?dir=</c> query params into the MongoDB
 /// aggregation stages that reorder the Applications list (RA-324). Kept as a
-/// pure, side-effect-free helper so the tricky bits — the SLA due-date
-/// expression and the status workflow ranking — can be unit-tested without a
-/// database.
+/// pure, side-effect-free helper so the tricky bit — the status workflow
+/// ranking — can be unit-tested without a database.
 ///
 /// <para>
-/// Two of the three sorts cannot be expressed as a plain field sort:
-/// <list type="bullet">
-/// <item><description><b>Due date</b> is not stored; it is
-/// <c>slaClock.startedAt + slaClock.targetDuration</c>. Both operands are
-/// persisted (targetDuration as .NET ticks), so the deadline is computed in an
-/// <c>$addFields</c> stage — no persisted field or migration needed. Items
-/// whose SLA clock has not started (pre-payment) have no deadline and are
-/// pushed to the end regardless of direction.</description></item>
-/// <item><description><b>Status</b> sorts by workflow progression, not
-/// alphabetically, so state ids are mapped to a rank via <c>$switch</c>.</description></item>
-/// </list>
+/// <b>Status</b> cannot be expressed as a plain field sort: it sorts by
+/// workflow progression, not alphabetically, so state ids are mapped to a rank
+/// via <c>$switch</c>.
 /// </para>
 /// </summary>
 internal static class WorkItemSort
 {
     internal const string OrganisationToken = "organisation";
     internal const string StatusToken = "status";
-    internal const string DueDateToken = "due-date";
 
     // Computed fields injected by an $addFields stage. They must be removed
     // ($unset) before the aggregation result is deserialised because WorkItem
     // does not ignore extra BSON elements.
-    internal const string DeadlineField = "_sortDeadline";
-    internal const string HasDeadlineField = "_sortHasDeadline";
     internal const string RankField = "_sortRank";
     internal const string OrgField = "_sortOrg";
 
     /// <summary>Every computed field name this helper can inject; always $unset before deserialising.</summary>
     internal static readonly IReadOnlyList<string> ComputedFields =
-        [DeadlineField, HasDeadlineField, RankField, OrgField];
+        [RankField, OrgField];
 
     // Rank assigned to any state id the registry does not know about, so
     // unexpected states sort last under a Status sort rather than colliding
@@ -92,7 +80,6 @@ internal static class WorkItemSort
         {
             OrganisationToken => BuildOrganisationStages(descendingOverride),
             StatusToken => BuildStatusStages(descendingOverride, statusRank),
-            DueDateToken => BuildDueDateStages(descendingOverride),
             _ => null
         };
     }
@@ -132,50 +119,6 @@ internal static class WorkItemSort
             });
         var addFields = new BsonDocument(RankField, rank);
         var sort = StableSort(RankField, dir);
-        return (addFields, sort);
-    }
-
-    private static (BsonDocument?, BsonDocument) BuildDueDateStages(bool? descendingOverride)
-    {
-        // Default = soonest deadline first (ascending). deadline =
-        // slaClock.startedAt + targetDuration(ticks); ticks→ms via /TicksPerMillisecond
-        // because Mongo date arithmetic is in milliseconds. Items with no clock
-        // started have no deadline and are forced last in BOTH directions by
-        // sorting the has-deadline flag descending first.
-        var dir = descendingOverride == true ? -1 : 1;
-        // 1 only when the SLA clock has actually started (a real date). $type
-        // distinguishes a genuine date from BOTH a missing field and an
-        // explicit null — unlike $ne against null, which reports a missing
-        // field as "not null" and would wrongly flag a clock-less item as
-        // having a deadline.
-        var hasDeadline = new BsonDocument("$cond", new BsonArray
-        {
-            new BsonDocument("$eq", new BsonArray
-            {
-                new BsonDocument("$type", "$slaClock.startedAt"),
-                "date"
-            }),
-            1,
-            0
-        });
-        var deadline = new BsonDocument("$add", new BsonArray
-        {
-            "$slaClock.startedAt",
-            new BsonDocument("$divide",
-                new BsonArray { "$slaClock.targetDuration", TimeSpan.TicksPerMillisecond })
-        });
-        var addFields = new BsonDocument
-        {
-            { HasDeadlineField, hasDeadline },
-            { DeadlineField, deadline }
-        };
-        var sort = new BsonDocument
-        {
-            { HasDeadlineField, -1 },
-            { DeadlineField, dir },
-            { "submittedAt", -1 },
-            { "_id", 1 }
-        };
         return (addFields, sort);
     }
 

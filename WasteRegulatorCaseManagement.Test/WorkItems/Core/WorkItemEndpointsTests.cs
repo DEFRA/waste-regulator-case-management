@@ -1935,14 +1935,7 @@ public class WorkItemEndpointsTests
 
                 // Background services call QueryAsync at startup which sets
                 // Recording.LastQuery and contaminates tests that assert the
-                // query was never issued. Remove all three offenders.
-                var slaBreachDescriptor = services.FirstOrDefault(d =>
-                    d.ImplementationType == typeof(SlaBreachBackgroundService)
-                );
-                if (slaBreachDescriptor is not null)
-                {
-                    services.Remove(slaBreachDescriptor);
-                }
+                // query was never issued. Remove both offenders.
                 var archiveDescriptor = services.FirstOrDefault(d =>
                     d.ImplementationType == typeof(ArchiveBackgroundService)
                 );

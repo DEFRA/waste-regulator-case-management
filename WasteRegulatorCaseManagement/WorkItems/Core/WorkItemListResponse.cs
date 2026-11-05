@@ -46,13 +46,6 @@ public sealed record WorkItemListItemResponse(
     string? AssignedToName = null,
     DateTime? AssignedAt = null,
     string? AssignedBy = null,
-    TimeSpan? SlaRemaining = null,
-    WorkItemSlaState? SlaState = null,
-    // RA-324: absolute SLA deadline (slaClock.StartedAt + TargetDuration) so the
-    // Applications card can render "Due on: {date}". Null under the same
-    // condition as SlaState/SlaRemaining — no SLA clock started yet. Additive +
-    // nullable, so the list DTO stays backward-compatible.
-    DateTime? SlaDueDate = null,
     // RA-410: the state this work item returns to when its current waypoint
     // discharges. Equal to StateId for any item not in a waypoint state.
     // Mirrors WorkItemResponse.OriginStateId so the single-item and list

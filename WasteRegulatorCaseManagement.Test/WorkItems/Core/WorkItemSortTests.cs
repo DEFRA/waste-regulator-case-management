@@ -6,8 +6,8 @@ namespace WasteRegulatorCaseManagement.Test.WorkItems.Core;
 /// <summary>
 /// RA-324: unit coverage for <see cref="WorkItemSort"/>, the pure helper that
 /// turns the <c>?sort=</c> / <c>?dir=</c> params into aggregation stages. The
-/// tricky expressions (SLA due-date arithmetic, status workflow ranking) are
-/// asserted here without a database.
+/// tricky expression (status workflow ranking) is asserted here without a
+/// database.
 /// </summary>
 public class WorkItemSortTests
 {
@@ -97,7 +97,6 @@ public class WorkItemSortTests
     }
 
     [Theory]
-    [InlineData("  Due-Date  ", WorkItemSort.DeadlineField)]
     [InlineData("ORGANISATION", WorkItemSort.OrgField)]
     [InlineData("Status", WorkItemSort.RankField)]
     public void BuildStages_normalises_token_casing_and_whitespace(string token, string expectedComputedField)
@@ -176,45 +175,4 @@ public class WorkItemSortTests
         Assert.Equal(-1, sort[WorkItemSort.RankField].AsInt32);
     }
 
-    [Fact]
-    public void BuildStages_due_date_computes_deadline_from_start_plus_target()
-    {
-        var stages = WorkItemSort.BuildStages("due-date", descendingOverride: null, s_rank);
-
-        var (addFields, sort) = stages!.Value;
-
-        // hasDeadline = ($type(slaClock.startedAt) == "date") ? 1 : 0 — so a
-        // missing OR null clock both yield 0.
-        var cond = addFields![WorkItemSort.HasDeadlineField]["$cond"].AsBsonArray;
-        var eq = cond[0]["$eq"].AsBsonArray;
-        Assert.Equal("$slaClock.startedAt", eq[0]["$type"].AsString);
-        Assert.Equal("date", eq[1].AsString);
-        Assert.Equal(1, cond[1].AsInt32);
-        Assert.Equal(0, cond[2].AsInt32);
-
-        // deadline = startedAt + (targetDuration ticks / 10000 ms)
-        var add = addFields[WorkItemSort.DeadlineField]["$add"].AsBsonArray;
-        Assert.Equal("$slaClock.startedAt", add[0].AsString);
-        var divide = add[1]["$divide"].AsBsonArray;
-        Assert.Equal("$slaClock.targetDuration", divide[0].AsString);
-        Assert.Equal(TimeSpan.TicksPerMillisecond, divide[1].AsInt64);
-
-        // No-clock items forced last (hasDeadline desc), then soonest first (asc).
-        Assert.Equal(-1, sort[WorkItemSort.HasDeadlineField].AsInt32);
-        Assert.Equal(1, sort[WorkItemSort.DeadlineField].AsInt32);
-        Assert.Equal(-1, sort["submittedAt"].AsInt32);
-        Assert.Equal(1, sort["_id"].AsInt32);
-    }
-
-    [Fact]
-    public void BuildStages_due_date_descending_keeps_no_clock_items_last()
-    {
-        var stages = WorkItemSort.BuildStages("due-date", descendingOverride: true, s_rank);
-
-        var (_, sort) = stages!.Value;
-        // Direction flips on the deadline, but has-deadline stays -1 so
-        // clock-less items never jump to the top under a descending sort.
-        Assert.Equal(-1, sort[WorkItemSort.HasDeadlineField].AsInt32);
-        Assert.Equal(-1, sort[WorkItemSort.DeadlineField].AsInt32);
-    }
 }
