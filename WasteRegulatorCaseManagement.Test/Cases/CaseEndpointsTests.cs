@@ -523,27 +523,38 @@ public class CaseEndpointsTests
 		problem!.Detail.Should().Contain("callbackUrl");
 	}
 
-	[Fact]
-	public async Task Post_returns_problem_when_a_display_data_type_is_not_recognised()
+	[Theory]
+	[InlineData("""{ "value": "Acme", "type": "text" }""")]
+	[InlineData("""{ "type": "string" }""")]
+	[InlineData("""{ "value": "Acme" }""")]
+	[InlineData("null")]
+	public async Task Post_returns_problem_when_a_display_data_field_is_not_a_typed_value(string field)
 	{
+		// Arrange
 		var cancellationToken = TestContext.Current.CancellationToken;
 		await using var factory = NewFactory();
 		using var client = factory.CreateClient();
-
-		var response = await client.PostAsJsonAsync(
-			"/cases",
-			new
+		var body = new System.Text.Json.Nodes.JsonObject
+		{
+			["caseType"] = CaseType,
+			["sourceSystemId"] = Ulid.NewUlid().ToString(),
+			["callbackUrl"] = "https://source-system.test/callback",
+			["nation"] = "ENGLAND",
+			["orgId"] = "test-org",
+			["displayData"] = new System.Text.Json.Nodes.JsonObject
 			{
-				caseType = CaseType,
-				sourceSystemId = Ulid.NewUlid().ToString(),
-				callbackUrl = "https://source-system.test/callback",
-				nation = "ENGLAND",
-				orgId = "test-org",
-				displayData = new { organisationName = new { value = "Acme", type = "text" } },
+				["organisationName"] = System.Text.Json.Nodes.JsonNode.Parse(field),
 			},
+		};
+
+		// Act
+		var response = await client.PostAsync(
+			"/cases",
+			new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json"),
 			cancellationToken
 		);
 
+		// Assert
 		response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
 		var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken);
 		problem!.Detail.Should().Contain("displayData.organisationName");
@@ -552,6 +563,7 @@ public class CaseEndpointsTests
 	[Theory]
 	[InlineData("callbackUrl", "null", "'callbackUrl' is required and must be a non-empty string.")]
 	[InlineData("callbackUrl", "\"ftp://source-system.test/callback\"", "'callbackUrl' must be an absolute http or https URL.")]
+	[InlineData("callbackUrl", "\"source-system.test/callback\"", "'callbackUrl' must be an absolute http or https URL.")]
 	[InlineData("nation", "null", "'nation' is required and must be a non-empty string.")]
 	[InlineData("orgId", "\"   \"", "'orgId' is required and must be a non-empty string.")]
 	[InlineData("initialState", "\"  \"", "'initialState' is required and must be a non-empty string.")]
@@ -669,8 +681,11 @@ public class CaseEndpointsTests
 		problem!.Detail.Should().Contain("initialState");
 	}
 
-	[Fact]
-	public async Task Post_keeps_the_original_submission_time_of_a_loaded_case()
+	[Theory]
+	[InlineData("2024-11-01T10:32:00Z")]
+	[InlineData("2024-11-01T10:32:00")]
+	[InlineData("2024-11-01T11:32:00+01:00")]
+	public async Task Post_keeps_the_original_submission_time_of_a_loaded_case(string createdAt)
 	{
 		var cancellationToken = TestContext.Current.CancellationToken;
 		await using var factory = NewFactory();
@@ -685,7 +700,7 @@ public class CaseEndpointsTests
 				callbackUrl = "https://source-system.test/callback",
 				nation = "ENGLAND",
 				orgId = "test-org",
-				createdAt = "2024-11-01T10:32:00Z",
+				createdAt,
 			},
 			cancellationToken
 		);
