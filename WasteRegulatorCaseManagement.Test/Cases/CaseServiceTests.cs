@@ -1898,8 +1898,8 @@ public class CaseServiceTests : IAsyncDisposable
         var entry = Assert.Single(fetched.Timeline);
         Assert.Equal("case-created", entry.Action);
         Assert.Equal("Case submitted", entry.ActionDisplayName);
-        Assert.Equal("alice-1", entry.PerformedById);
-        Assert.Equal("Alice Example", entry.PerformedByName);
+        Assert.Equal("service:test-client", entry.PerformedById);
+        Assert.Equal("test-client", entry.PerformedByName);
         Assert.Equal(fetched.SubmittedAt, entry.PerformedAt);
         Assert.Equal(TickedNow, entry.PerformedAt);
         Assert.Equal(CaseType, entry.Details["caseType"]);
@@ -1910,7 +1910,7 @@ public class CaseServiceTests : IAsyncDisposable
     }
 
     [Fact]
-    public async Task Submit_returns_missing_actor_identity_and_persists_nothing_when_user_id_claim_absent()
+    public async Task Submit_without_a_user_id_claim_attributes_the_case_to_the_calling_service()
     {
         var type = BuildType();
 
@@ -1923,16 +1923,12 @@ public class CaseServiceTests : IAsyncDisposable
                 cancellationToken: TestContext.Current.CancellationToken
             );
 
-        Assert.False(result.IsSuccess);
-        Assert.Equal(CaseActionFailureCode.MissingActorIdentity, result.FailureCode);
-
-        // No document was created: the database is empty for this type.
-        var page = await _persistence.QueryAsync(
-            new CaseQuery(CaseTypes: [CaseType], Page: 1, PageSize: 10),
-            TestContext.Current.CancellationToken
-        );
-        Assert.Empty(page.Items);
+        Assert.True(result.IsSuccess, result.Message);
+        var fetched = await GetAsync(result.Case!.Id);
+        var entry = Assert.Single(fetched.Timeline);
+        Assert.Equal("service:test-client", entry.PerformedById);
     }
+
 
     [Fact]
     public async Task Submit_records_submission_metadata_on_birth_audit_entry()
@@ -1967,7 +1963,6 @@ public class CaseServiceTests : IAsyncDisposable
         Assert.Equal("v1", entry.Details["templateVersion"]);
         Assert.Equal("operator-fe", entry.Details["source"]);
         Assert.Equal("test-client", entry.Details["clientId"]);
-        Assert.Equal("alice-1", entry.Details["userId"]);
     }
 
     [Fact]
@@ -1993,7 +1988,6 @@ public class CaseServiceTests : IAsyncDisposable
         Assert.True(entry.Details.ContainsKey("source"));
         Assert.Null(entry.Details["source"]);
         Assert.Equal("test-client", entry.Details["clientId"]);
-        Assert.Equal("alice-1", entry.Details["userId"]);
     }
 
     /// <summary>

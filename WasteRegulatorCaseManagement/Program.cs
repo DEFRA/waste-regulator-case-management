@@ -190,7 +190,19 @@ static void ConfigureAuth(IServiceCollection services, IConfiguration configurat
             }
         );
 
-    services.AddAuthorization();
+    services.AddAuthorization(options =>
+        options.AddPolicy(
+            CaseIntakePolicy.Name,
+            policy =>
+                policy.RequireClaim(
+                    "client_id",
+                    configuration.GetValue(
+                        CaseIntakePolicy.ClientIdKey,
+                        CaseIntakePolicy.DefaultClientId
+                    )!
+                )
+        )
+    );
 
     // RA-525: Mongo-backed replay store, shared across every running
     // instance — replaces the old per-process IMemoryCache. Registered
@@ -229,8 +241,8 @@ static IReadOnlyDictionary<string, string> BuildClientSecrets(IConfiguration con
         map,
         config,
         callerName: "CaseIntake",
-        clientIdKey: "Auth:CaseIntakeClientId",
-        clientIdDefault: "case-intake-processor",
+        clientIdKey: CaseIntakePolicy.ClientIdKey,
+        clientIdDefault: CaseIntakePolicy.DefaultClientId,
         secretKey: "AUTH_SHARED_SECRET:CASE_INTAKE"
     );
     return map;

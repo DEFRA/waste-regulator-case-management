@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Claims;
 using System.Text.Json;
+using WasteRegulatorCaseManagement.Auth;
 using WasteRegulatorCaseManagement.Utils.Logging;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
@@ -49,7 +50,7 @@ public static class CaseEndpoints
             .WithName("SubmitCase")
             .DisableValidation()
             .WithMetadata(new RequestSizeLimitAttribute(MaxSubmitBodyBytes))
-            .RequireAuthorization();
+            .RequireAuthorization(CaseIntakePolicy.Name);
 
         group.MapGet("/{id}", GetById).WithName("GetCaseById").RequireAuthorization();
 

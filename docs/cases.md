@@ -54,6 +54,11 @@ header (`x-cdp-client-id`) per RA-89/RA-85b.
 
 ### Intake fields
 
+Only the Case Intake Processor may create cases: `POST /cases` requires the
+`CaseIntake` policy, which matches the HMAC-verified client id against
+`Auth__CaseIntakeClientId` (default `case-intake-processor`). The new case's
+`case-created` timeline entry is attributed to `service:<client id>`.
+
 | Field | Required | Notes |
 | --- | --- | --- |
 | `sourceSystemId` | Yes | Immutable reference to the submission in the source system. Unique: one case per submission. |

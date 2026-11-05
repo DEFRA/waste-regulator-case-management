@@ -192,7 +192,7 @@ public class CaseEndpointsTests
         // RA-97: the timeline must start at submission. The framework
         // appends one 'case-created' entry inside the same
         // CreateAsync call that persists the new document, attributed to
-        // the forwarded user:id and stamped with Case.SubmittedAt.
+        // the calling service and stamped with Case.SubmittedAt.
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var factory = NewFactory(userId: "alice-1", userName: "Alice Example");
         using var client = factory.CreateClient();
@@ -217,8 +217,8 @@ public class CaseEndpointsTests
         var entry = Assert.Single(persisted!.Timeline);
         Assert.Equal("case-created", entry.Action);
         Assert.Equal("Case submitted", entry.ActionDisplayName);
-        Assert.Equal("alice-1", entry.PerformedById);
-        Assert.Equal("Alice Example", entry.PerformedByName);
+        Assert.Equal("service:test-client", entry.PerformedById);
+        Assert.Equal("test-client", entry.PerformedByName);
         Assert.Equal(persisted.SubmittedAt, entry.PerformedAt);
         Assert.Equal(CaseType, entry.Details["caseType"]);
         Assert.Equal("submitted", entry.Details["stateId"]);
@@ -236,11 +236,8 @@ public class CaseEndpointsTests
     }
 
     [Fact]
-    public async Task Post_returns_401_and_persists_nothing_when_user_id_claim_missing()
+    public async Task Post_attributes_the_new_case_to_the_intake_service_rather_than_a_user()
     {
-        // RA-97 / engine rule: every mutating call requires the BFF to
-        // forward a 'user:id' claim so the audit entry can be tied back
-        // to a real human. Without it the engine refuses to write.
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var factory = NewFactory(userId: null);
         using var client = factory.CreateClient();
@@ -258,7 +255,35 @@ public class CaseEndpointsTests
             cancellationToken
         );
 
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
+        var created = Assert.Single(body!.Timeline!);
+        Assert.Equal("service:test-client", created.PerformedById);
+        Assert.Equal("test-client", created.PerformedByName);
+    }
+
+    [Fact]
+    public async Task Post_is_forbidden_to_a_caller_other_than_the_intake_service()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var factory = NewFactory();
+        factory.IntakeClientId = "case-intake-processor";
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync(
+            "/cases",
+            new
+            {
+                caseType = CaseType,
+                sourceSystemId = Ulid.NewUlid().ToString(),
+                callbackUrl = "https://source-system.test/callback",
+                nation = "ENGLAND",
+                orgId = "test-org",
+            },
+            cancellationToken
+        );
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Empty(await factory.AllItemsAsync(cancellationToken));
     }
 
@@ -297,7 +322,6 @@ public class CaseEndpointsTests
         Assert.Equal("v1", entry.Details["templateVersion"]);
         Assert.Equal("operator-fe", entry.Details["source"]);
         Assert.Equal("test-client", entry.Details["clientId"]);
-        Assert.Equal("alice-1", entry.Details["userId"]);
     }
 
     [Fact]
@@ -329,7 +353,6 @@ public class CaseEndpointsTests
         Assert.True(entry.Details.ContainsKey("source"));
         Assert.Null(entry.Details["source"]);
         Assert.Equal("test-client", entry.Details["clientId"]);
-        Assert.Equal("alice-1", entry.Details["userId"]);
     }
 
     [Theory]
@@ -2070,6 +2093,12 @@ public class CaseEndpointsTests
         private readonly string? _userName;
         private readonly IReadOnlyCollection<CaseState>? _states;
 
+        /// <summary>
+        /// The client id allowed to create cases. Defaults to the client
+        /// these tests call every endpoint as; set before the first request.
+        /// </summary>
+        public string IntakeClientId { get; set; } = "test-client";
+
         public TestApplicationFactory(
             MongoIntegrationFixture fixture,
             bool includeAuthHeader,
@@ -2104,6 +2133,8 @@ public class CaseEndpointsTests
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
+            builder.UseSetting(CaseIntakePolicy.ClientIdKey, IntakeClientId);
+
             builder.ConfigureServices(services =>
             {
                 services.RemoveAll<ICasePersistence>();

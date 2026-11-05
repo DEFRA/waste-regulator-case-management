@@ -21,10 +21,8 @@ public interface ICaseService
     /// case's timeline so the timeline starts at the
     /// document's birth event rather than the first state change. The
     /// audit entry and the document body are written in the same
-    /// <see cref="ICasePersistence.CreateAsync"/> call. Mutations
-    /// require a <c>user:id</c> claim — calls without one return
-    /// <see cref="CaseActionFailureCode.MissingActorIdentity"/> and
-    /// nothing is persisted. A <see cref="CaseIntake.SourceSystemId"/> that
+    /// <see cref="ICasePersistence.CreateAsync"/> call, attributed to the
+    /// calling service as <c>service:&lt;client id&gt;</c>. A <see cref="CaseIntake.SourceSystemId"/> that
     /// already has a case returns that case as an idempotent replay rather
     /// than creating a second one, so a source system can safely resend.
     /// </summary>
@@ -143,11 +141,6 @@ public sealed class CaseService : ICaseService
         ArgumentNullException.ThrowIfNull(type);
         ArgumentNullException.ThrowIfNull(intake);
 
-        if (RequireActorIdentity(user) is { } identityFailure)
-        {
-            return identityFailure;
-        }
-
         var existing = await _persistence.FindBySourceSystemIdAsync(
             intake.SourceSystemId,
             cancellationToken
@@ -198,7 +191,7 @@ public sealed class CaseService : ICaseService
             caseRecord,
             "case-created",
             "Case submitted",
-            user,
+            ServiceActor(user),
             now,
             new()
             {
@@ -211,7 +204,6 @@ public sealed class CaseService : ICaseService
                         ? src
                         : null,
                 ["clientId"] = user.FindFirstValue("client_id"),
-                ["userId"] = ResolveActorUserId(user),
             }
         );
 
@@ -872,6 +864,35 @@ public sealed class CaseService : ICaseService
         ClaimsPrincipal? user,
         DateTime performedAt,
         Dictionary<string, string?> details
+    ) =>
+        AppendTimelineEntry(
+            caseRecord,
+            action,
+            actionDisplayName,
+            new Actor(ResolveActorUserId(user)!, user?.FindFirstValue("user:name")),
+            performedAt,
+            details
+        );
+
+    /// <summary>
+    /// Cases are created by a source system rather than a person, so the
+    /// birth entry names the calling service by its verified client id.
+    /// </summary>
+    private static Actor ServiceActor(ClaimsPrincipal user)
+    {
+        var clientId = user.FindFirstValue("client_id");
+        return new Actor($"service:{clientId}", clientId);
+    }
+
+    private sealed record Actor(string Id, string? Name);
+
+    private static void AppendTimelineEntry(
+        Case caseRecord,
+        string action,
+        string actionDisplayName,
+        Actor actor,
+        DateTime performedAt,
+        Dictionary<string, string?> details
     )
     {
         caseRecord.Timeline.Add(
@@ -881,8 +902,8 @@ public sealed class CaseService : ICaseService
                 ActionDisplayName = actionDisplayName,
                 Details = details,
                 PerformedAt = performedAt,
-                PerformedById = ResolveActorUserId(user)!,
-                PerformedByName = user?.FindFirstValue("user:name"),
+                PerformedById = actor.Id,
+                PerformedByName = actor.Name,
                 // epr-rr9s: snapshot the state as of this event. Every
                 // AppendAudit caller invokes this AFTER any state mutation
                 // (submit sets the initial state, state-changed assigns
