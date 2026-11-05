@@ -108,6 +108,7 @@ public sealed record CaseEngineProjection(
 public sealed class CaseService : ICaseService
 {
 	private const string SourceKey = "source";
+	private const int MaxWriteAttemptsAfterCallback = 3;
 
 	private readonly CaseRegistry _registry;
 	private readonly ICasePersistence _persistence;
@@ -356,6 +357,7 @@ public sealed class CaseService : ICaseService
 		// has accepted the decision, so a caseworker sees a failed callback
 		// straight away and the case never claims an outcome its source
 		// system does not hold.
+		var callbackAccepted = false;
 		if (
 			_registry
 				.Find(caseRecord.CaseType)
@@ -383,36 +385,38 @@ public sealed class CaseService : ICaseService
 					cancellationToken
 				);
 			}
+			callbackAccepted = true;
 		}
 
+		// Once the source system holds the decision, the case must follow
+		// it: the write ignores the caller giving up, and a note or
+		// assignment that landed during the callback is reloaded and kept.
+		var writeCancellationToken = callbackAccepted ? CancellationToken.None : cancellationToken;
 		var previousState = caseRecord.StateId;
-		var now = _timeProvider.GetUtcNow().UtcDateTime;
-		caseRecord.StateId = transition.ToStateId;
-		caseRecord.IsTerminal = TerminalStates.Find(template, transition.ToStateId) is not null;
-		caseRecord.LastModifiedAt = now;
-		var details = new Dictionary<string, string?>
+		for (var attempt = 1; ; attempt++)
 		{
-			["actionId"] = transition.ActionId,
-			["actionDisplayName"] = transition.DisplayName,
-			["fromStateId"] = previousState,
-			["toStateId"] = caseRecord.StateId,
-		};
-		if (decision is { Count: > 0 })
-		{
-			caseRecord.Decision = new Dictionary<string, string>(decision);
-			foreach (var (field, value) in decision)
+			ApplyTransition(caseRecord, template!, transition, decision, user);
+			try
 			{
-				details[$"decision.{field}"] = value;
+				await _persistence.ReplaceAsync(caseRecord, writeCancellationToken);
+				break;
 			}
-		}
-		AppendTimelineEntry(caseRecord, "state-changed", "Action applied", user, now, details);
-		try
-		{
-			await _persistence.ReplaceAsync(caseRecord, cancellationToken);
-		}
-		catch (CaseConcurrencyException)
-		{
-			return ConcurrencyConflict(caseRecord.Id);
+			catch (CaseConcurrencyException) when (callbackAccepted && attempt < MaxWriteAttemptsAfterCallback)
+			{
+				var reloaded = await _persistence.GetByIdAsync(caseId, writeCancellationToken);
+				if (
+					reloaded is null
+					|| !string.Equals(reloaded.StateId, transition.FromStateId, StringComparison.OrdinalIgnoreCase)
+				)
+				{
+					return ConcurrencyConflict(caseId);
+				}
+				caseRecord = reloaded;
+			}
+			catch (CaseConcurrencyException)
+			{
+				return ConcurrencyConflict(caseRecord.Id);
+			}
 		}
 		_logger.LogInformation(
 			"Case {CaseId} ({CaseType}) transitioned from {FromState} to {ToState} via action {ActionId} by {User}",
@@ -432,6 +436,36 @@ public sealed class CaseService : ICaseService
 		);
 
 		return CaseActionResult.Success(caseRecord);
+	}
+
+	private void ApplyTransition(
+		Case caseRecord,
+		ICaseTemplate template,
+		CaseTransition transition,
+		IReadOnlyDictionary<string, string>? decision,
+		ClaimsPrincipal user
+	)
+	{
+		var now = _timeProvider.GetUtcNow().UtcDateTime;
+		var details = new Dictionary<string, string?>
+		{
+			["actionId"] = transition.ActionId,
+			["actionDisplayName"] = transition.DisplayName,
+			["fromStateId"] = caseRecord.StateId,
+			["toStateId"] = transition.ToStateId,
+		};
+		caseRecord.StateId = transition.ToStateId;
+		caseRecord.IsTerminal = TerminalStates.Find(template, transition.ToStateId) is not null;
+		caseRecord.LastModifiedAt = now;
+		if (decision is { Count: > 0 })
+		{
+			caseRecord.Decision = new Dictionary<string, string>(decision);
+			foreach (var (field, value) in decision)
+			{
+				details[$"decision.{field}"] = value;
+			}
+		}
+		AppendTimelineEntry(caseRecord, "state-changed", "Action applied", user, now, details);
 	}
 
 	private async Task<string?> SendCallbackAsync(

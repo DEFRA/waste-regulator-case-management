@@ -405,6 +405,63 @@ public class CaseServiceTests : IAsyncDisposable
 	}
 
 	[Fact]
+	public async Task ApplyAction_keeps_a_change_that_landed_during_an_accepted_callback_and_still_applies_the_action()
+	{
+		// Arrange
+		var type = new CaseModuleConfig
+		{
+			CaseType = CaseType,
+			DisplayName = "Test type",
+			TemplateVersion = "v1",
+			InitialStateId = "submitted",
+			States = [new CaseState("submitted", "Submitted"), new CaseState("approved", "Approved", IsTerminal: true)],
+			Transitions = [new CaseTransition("approve", "Approve", "submitted", "approved")],
+			CallbackMappings = new() { ["approved"] = new BsonDocument("status", "Approved") },
+		};
+		var caseRecord = await SeedAsync();
+		var callbackClient = Substitute.For<ICaseCallbackClient>();
+		callbackClient
+			.SendAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<BsonDocument>(), Arg.Any<CancellationToken>())
+			.Returns((string?)null);
+		var raced = false;
+		var racingOnce = new RacingPersistence(
+			_persistence,
+			() =>
+			{
+				if (raced)
+				{
+					return;
+				}
+				raced = true;
+				AddCompetingNote(caseRecord.Id);
+			}
+		);
+		var service = new CaseService(
+			new CaseRegistry([type]),
+			racingOnce,
+			callbackClient,
+			NullLogger<CaseService>.Instance,
+			_time
+		);
+
+		// Act
+		var result = await service.ApplyActionAsync(
+			caseRecord.Id,
+			"approve",
+			decision: null,
+			User(),
+			TestContext.Current.CancellationToken
+		);
+
+		// Assert
+		Assert.True(result.IsSuccess);
+		var persisted = await _persistence.GetByIdAsync(caseRecord.Id, TestContext.Current.CancellationToken);
+		Assert.Equal("approved", persisted!.StateId);
+		Assert.Contains(persisted.Timeline, entry => entry.PerformedById == "competing-user");
+		Assert.Single(persisted.Timeline, entry => entry.Action == "state-changed");
+	}
+
+	[Fact]
 	public async Task AddNote_records_user_id_verbatim_without_falling_back_to_client_id()
 	{
 		var type = BuildType();
@@ -1931,22 +1988,7 @@ public class CaseServiceTests : IAsyncDisposable
 	/// </summary>
 	private CaseService BuildRacingService(CaseModuleConfig type, string id)
 	{
-		var racing = new RacingPersistence(
-			_persistence,
-			() =>
-			{
-				var raceLoaded = _persistence.GetByIdAsync(id).GetAwaiter().GetResult();
-				raceLoaded!.LastModifiedAt = raceLoaded.LastModifiedAt.AddMinutes(1);
-				raceLoaded.Timeline.Add(new CaseTimelineEntry
-				{
-					Action = "note-added",
-					ActionDisplayName = "Note added",
-					PerformedAt = raceLoaded.LastModifiedAt,
-					PerformedById = "competing-user",
-				});
-				_persistence.ReplaceAsync(raceLoaded).GetAwaiter().GetResult();
-			}
-		);
+		var racing = new RacingPersistence(_persistence, () => AddCompetingNote(id));
 		return new CaseService(
 			new CaseRegistry([type]),
 			racing,
@@ -1954,6 +1996,20 @@ public class CaseServiceTests : IAsyncDisposable
 			NullLogger<CaseService>.Instance,
 			_time
 		);
+	}
+
+	private void AddCompetingNote(string id)
+	{
+		var raceLoaded = _persistence.GetByIdAsync(id).GetAwaiter().GetResult();
+		raceLoaded!.LastModifiedAt = raceLoaded.LastModifiedAt.AddMinutes(1);
+		raceLoaded.Timeline.Add(new CaseTimelineEntry
+		{
+			Action = "note-added",
+			ActionDisplayName = "Note added",
+			PerformedAt = raceLoaded.LastModifiedAt,
+			PerformedById = "competing-user",
+		});
+		_persistence.ReplaceAsync(raceLoaded).GetAwaiter().GetResult();
 	}
 
 	private sealed class RacingPersistence(ICasePersistence inner, Action onBeforeReplace)

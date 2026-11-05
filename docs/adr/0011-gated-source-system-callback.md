@@ -40,8 +40,10 @@ Option A. When an action moves a case into a state its case type maps in
   source system and can retry, and a case never shows an outcome its source
   system does not hold.
 - A caseworker cannot conclude a case while the source system is down.
-- A case whose callback succeeded but whose own write then failed stays in
-  its earlier state until the caseworker retries; the `422` read-back then
+- Once the callback has succeeded, the case's write ignores the caller
+  disconnecting, and a note or assignment saved during the callback is
+  reloaded and kept. A write that still fails leaves the case in its
+  earlier state until the caseworker retries; the `422` read-back then
   completes it.
 - The action's request waits for the source system, up to a 30-second
   timeout.
