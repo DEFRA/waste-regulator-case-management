@@ -91,7 +91,7 @@ emulator with the analytics SNS topic created and publishing enabled:
 docker compose up --build -d
 ```
 
-Once the stack is healthy the API is reachable on `http://localhost:8085`.
+Once the stack is healthy the API is reachable on <http://localhost:8085/swagger>.
 Tear it down with:
 
 ```bash
