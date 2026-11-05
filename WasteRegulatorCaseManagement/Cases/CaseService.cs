@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using MongoDB.Bson;
 using MongoDB.Driver;
 
 namespace WasteRegulatorCaseManagement.Cases;
@@ -110,6 +111,7 @@ public sealed class CaseService : ICaseService
 
     private readonly CaseRegistry _registry;
     private readonly ICasePersistence _persistence;
+    private readonly ICaseCallbackClient _callbackClient;
     private readonly ILogger<CaseService> _logger;
     private readonly IReadOnlyCollection<ICasePostActionHook> _postActionHooks;
     private readonly TimeProvider _timeProvider;
@@ -117,6 +119,7 @@ public sealed class CaseService : ICaseService
     public CaseService(
         CaseRegistry registry,
         ICasePersistence persistence,
+        ICaseCallbackClient callbackClient,
         ILogger<CaseService> logger,
         TimeProvider? timeProvider = null,
         IEnumerable<ICasePostActionHook>? postActionHooks = null
@@ -124,6 +127,7 @@ public sealed class CaseService : ICaseService
     {
         this._registry = registry;
         this._persistence = persistence;
+        _callbackClient = callbackClient;
         this._logger = logger;
         _postActionHooks = postActionHooks?.ToArray() ?? Array.Empty<ICasePostActionHook>();
         _timeProvider = timeProvider ?? TimeProvider.System;
@@ -348,6 +352,39 @@ public sealed class CaseService : ICaseService
             );
         }
 
+        // The source system is told first and the case only moves once it
+        // has accepted the decision, so a caseworker sees a failed callback
+        // straight away and the case never claims an outcome its source
+        // system does not hold.
+        if (
+            _registry
+                .Find(caseRecord.CaseType)
+                ?.CallbackMappings.FirstOrDefault(mapping =>
+                    string.Equals(mapping.Key, transition.ToStateId, StringComparison.OrdinalIgnoreCase)
+                )
+                .Value
+            is { } callbackMapping
+        )
+        {
+            var callbackFailure = await SendCallbackAsync(
+                caseRecord,
+                callbackMapping,
+                decision,
+                user,
+                cancellationToken
+            );
+            if (callbackFailure is not null)
+            {
+                return await RecordCallbackFailureAsync(
+                    caseRecord,
+                    transition,
+                    callbackFailure,
+                    user,
+                    cancellationToken
+                );
+            }
+        }
+
         var previousState = caseRecord.StateId;
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         caseRecord.StateId = transition.ToStateId;
@@ -395,6 +432,89 @@ public sealed class CaseService : ICaseService
         );
 
         return CaseActionResult.Success(caseRecord);
+    }
+
+    private async Task<string?> SendCallbackAsync(
+        Case caseRecord,
+        BsonDocument callbackMapping,
+        IReadOnlyDictionary<string, string>? decision,
+        ClaimsPrincipal user,
+        CancellationToken cancellationToken
+    )
+    {
+        var values = new Dictionary<string, string?>
+        {
+            ["actor.id"] = user.FindFirstValue("user:id"),
+            ["actor.email"] = user.FindFirstValue("user:email"),
+            ["actor.name"] = user.FindFirstValue("user:name"),
+        };
+        foreach (var (field, value) in decision ?? new Dictionary<string, string>())
+        {
+            values[$"decision.{field}"] = value;
+        }
+
+        BsonDocument payload;
+        try
+        {
+            payload = CaseCallbackPayload.Render(callbackMapping, values);
+        }
+        catch (CaseCallbackPayloadException exception)
+        {
+            return exception.Message;
+        }
+
+        return await _callbackClient.SendAsync(
+            caseRecord.CaseType,
+            caseRecord.CallbackUrl,
+            payload,
+            cancellationToken
+        );
+    }
+
+    private async Task<CaseActionResult> RecordCallbackFailureAsync(
+        Case caseRecord,
+        CaseTransition transition,
+        string failure,
+        ClaimsPrincipal user,
+        CancellationToken cancellationToken
+    )
+    {
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+        caseRecord.LastModifiedAt = now;
+        AppendTimelineEntry(
+            caseRecord,
+            "callback-failed",
+            "Callback failed",
+            user,
+            now,
+            new()
+            {
+                ["actionId"] = transition.ActionId,
+                ["toStateId"] = transition.ToStateId,
+                ["reason"] = failure,
+            }
+        );
+        try
+        {
+            await _persistence.ReplaceAsync(caseRecord, cancellationToken);
+        }
+        catch (CaseConcurrencyException)
+        {
+            return ConcurrencyConflict(caseRecord.Id);
+        }
+        _logger.LogWarning(
+            "Case {CaseId} ({CaseType}) stayed in {StateId}: callback for action {ActionId} failed: {Failure}",
+            caseRecord.Id,
+            caseRecord.CaseType,
+            caseRecord.StateId,
+            transition.ActionId,
+            failure
+        );
+
+        return CaseActionResult.Failure(
+            CaseActionFailureCode.CallbackFailed,
+            $"The source system did not accept '{transition.ActionId}': {failure}"
+        );
     }
 
     public async Task<CaseActionResult> AssignAsync(

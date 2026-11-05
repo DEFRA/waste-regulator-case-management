@@ -135,6 +135,15 @@ public class ClientIdAuthenticationHandler(
             { } nationFailure
         )
             return nationFailure;
+        if (
+            TryValidateOptionalHeader(
+                Options.EmailHeaderName,
+                Options.MaxUserEmailLength,
+                out var email
+            ) is
+            { } emailFailure
+        )
+            return emailFailure;
 
         // Integrity check: when per-caller secrets are configured the BFF
         // must sign the trust headers with HMAC-SHA256, supply a fresh
@@ -148,7 +157,8 @@ public class ClientIdAuthenticationHandler(
                 userId,
                 userName,
                 role,
-                nation
+                nation,
+                email
             );
             if (signedRequestFailure is not null)
             {
@@ -178,7 +188,7 @@ public class ClientIdAuthenticationHandler(
             );
         }
 
-        var claims = BuildClaims(clientId, userId, userName, role, nation);
+        var claims = BuildClaims(clientId, userId, userName, role, nation, email);
         var identity = new ClaimsIdentity(claims, Scheme.Name);
         var principal = new ClaimsPrincipal(identity);
         var ticket = new AuthenticationTicket(principal, Scheme.Name);
@@ -231,7 +241,8 @@ public class ClientIdAuthenticationHandler(
         string? userId,
         string? userName,
         string? role,
-        string? nation
+        string? nation,
+        string? email
     )
     {
         // --- Timestamp: present, parseable, within +/- MaxClockSkew. ---
@@ -340,7 +351,8 @@ public class ClientIdAuthenticationHandler(
             timestampHeader,
             nonce,
             role,
-            nation
+            nation,
+            email
         );
 
         if (!VerifySignature(secret, signaturePayload, providedSignature))
@@ -380,7 +392,8 @@ public class ClientIdAuthenticationHandler(
         string? userId,
         string? userName,
         string? role,
-        string? nation
+        string? nation,
+        string? email
     )
     {
         var claims = new List<Claim>
@@ -397,6 +410,8 @@ public class ClientIdAuthenticationHandler(
             claims.Add(new Claim("user:role", role));
         if (nation is not null)
             claims.Add(new Claim("user:nation", nation));
+        if (email is not null)
+            claims.Add(new Claim("user:email", email));
 
         return claims;
     }
@@ -476,29 +491,31 @@ public class ClientIdAuthenticationHandler(
     /// <c>v3\nclientId\nuserId\nuserName\ntimestamp\nnonce</c>. This is
     /// what a service caller with no user role or nation (the Case Intake
     /// Processor) signs — so this method produces it whenever
-    /// <see cref="ClientIdSignaturePayload.Role"/> and
-    /// <see cref="ClientIdSignaturePayload.Nation"/> are both null.</item>
+    /// <see cref="ClientIdSignaturePayload.Role"/>,
+    /// <see cref="ClientIdSignaturePayload.Nation"/> and
+    /// <see cref="ClientIdSignaturePayload.Email"/> are all null.</item>
     /// <item><b>Extended</b> (RA-469):
-    /// <c>v3\nclientId\nuserId\nuserName\nrole\nnation\ntimestamp\nnonce</c>.
+    /// <c>v3\nclientId\nuserId\nuserName\nrole\nnation\nemail\ntimestamp\nnonce</c>.
     /// Role/nation were dropped from the payload at v3 (ADR-0005) but
     /// RA-469 puts them back: an endpoint that authorises backend-side on
     /// the resulting user:role/user:nation claims needs those two values to
     /// have the same signed-integrity guarantee as userId/userName —
     /// otherwise a party able to alter headers on an already-signed request
     /// (e.g. a misbehaving intermediary) could bypass that authorization
-    /// while the signature still validates. Produced whenever either role
-    /// or nation is supplied.</item>
+    /// while the signature still validates. The email is signed for the same
+    /// reason: it is sent to the source system as the deciding user's
+    /// address. Produced whenever role, nation or email is supplied.</item>
     /// </list>
     /// The two forms cannot collide: header values cannot contain a newline,
     /// so a legacy string always has exactly six lines and an extended one
-    /// exactly eight. Inbound verification accepts either form, but only
-    /// when no role/nation header is present — see <see cref="VerifySignature"/>.
+    /// exactly nine. Inbound verification accepts either form, but only
+    /// when no role/nation/email header is present — see <see cref="VerifySignature"/>.
     /// </summary>
     internal static string ComputeSignature(
         string sharedSecret,
         ClientIdSignaturePayload payload
     ) =>
-        payload.Role is null && payload.Nation is null
+        payload.Role is null && payload.Nation is null && payload.Email is null
             ? ComputeLegacySignature(sharedSecret, payload)
             : ComputeExtendedSignature(sharedSecret, payload);
 
@@ -523,10 +540,10 @@ public class ClientIdAuthenticationHandler(
         );
 
     /// <summary>
-    /// The RA-469 eight-line v3 form — see <see cref="ComputeSignature"/>.
-    /// Role/nation are signed as empty strings when null; that is exactly
-    /// what management-fe emits on every call, including the ones that
-    /// never forward a role/nation header.
+    /// The RA-469 nine-line v3 form — see <see cref="ComputeSignature"/>.
+    /// Role/nation/email are signed as empty strings when null; that is
+    /// exactly what management-fe emits on every call, including the ones
+    /// that never forward those headers.
     /// </summary>
     internal static string ComputeExtendedSignature(
         string sharedSecret,
@@ -542,6 +559,7 @@ public class ClientIdAuthenticationHandler(
                 payload.UserName ?? string.Empty,
                 payload.Role ?? string.Empty,
                 payload.Nation ?? string.Empty,
+                payload.Email ?? string.Empty,
                 payload.Timestamp,
                 payload.Nonce
             )
@@ -550,17 +568,17 @@ public class ClientIdAuthenticationHandler(
     /// <summary>
     /// Checks <paramref name="providedSignature"/> against every canonical
     /// form this request could legitimately have been signed with. When a
-    /// role or nation header is present there is exactly one: the extended
-    /// form over the values actually sent. When neither is present BOTH
+    /// role, nation or email header is present there is exactly one: the extended
+    /// form over the values actually sent. When none is present BOTH
     /// forms are acceptable — the legacy six-line form (what the Case Intake
     /// Processor signs) and the extended form with empty
-    /// role/nation (what management-fe signs on every call, including the
-    /// ones that never forward role/nation). Accepting both is safe because
+    /// role/nation/email (what management-fe signs on every call, including
+    /// the ones that never forward those headers). Accepting both is safe because
     /// in that case each form binds the same semantic content and the two
     /// cannot collide (see <see cref="ComputeSignature"/>); it is NOT a
-    /// downgrade path — a request signed over a real role/nation fails both
+    /// downgrade path — a request signed over a real role/nation/email fails both
     /// candidates once those headers are stripped, and a legacy-signed
-    /// request fails the only candidate once a role/nation header is added.
+    /// request fails the only candidate once a role/nation/email header is added.
     /// Both candidates are always computed before the result is combined so
     /// a mismatch costs the same whichever form the caller used.
     /// </summary>
@@ -570,7 +588,7 @@ public class ClientIdAuthenticationHandler(
         string providedSignature
     )
     {
-        if (payload.Role is not null || payload.Nation is not null)
+        if (payload.Role is not null || payload.Nation is not null || payload.Email is not null)
         {
             return FixedTimeEquals(
                 providedSignature,
@@ -636,5 +654,6 @@ internal sealed record ClientIdSignaturePayload(
     string Timestamp,
     string Nonce,
     string? Role = null,
-    string? Nation = null
+    string? Nation = null,
+    string? Email = null
 );

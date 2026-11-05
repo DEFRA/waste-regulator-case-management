@@ -172,6 +172,7 @@ per-environment list — the tables below summarise it.
 | --- | --- | --- |
 | `AUTH_SHARED_SECRET__CASE_INTAKE` | Yes | Verifies inbound signed requests from the Case Intake Processor — must match the secret it signs with exactly |
 | `AUTH_SHARED_SECRET__MANAGEMENT_FE` | Yes | Verifies inbound signed requests from `epr-register-enrol-management-fe` — must match management-fe's `BACKEND_API_SHARED_SECRET` exactly |
+| `CALLBACK_AUTH__CSOC` | Yes | `clientId:clientSecret` for the Waste Obligations API, sent as Basic auth on the CSoC decision callback |
 | `Auth__CaseIntakeClientId` | No | Expected `x-cdp-client-id` on inbound calls from the Case Intake Processor (default `case-intake-processor`) |
 | `Auth__ManagementFeClientId` | No | Expected `x-cdp-client-id` on inbound calls from management-fe (default `frontend`) — must differ from `Auth__CaseIntakeClientId` or the service throws at first request |
 

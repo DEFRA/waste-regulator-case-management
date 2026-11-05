@@ -48,6 +48,7 @@ public sealed class CaseModuleConfigLoaderTests : IAsyncDisposable
             ["accept", "cancel"],
             stored.Transitions.Select(t => t.ActionId).ToArray()
         );
+        Assert.Equal("{{decision.reason}}", stored.CallbackMappings["CANCELLED"]["reason"].AsString);
     }
 
     [Fact]

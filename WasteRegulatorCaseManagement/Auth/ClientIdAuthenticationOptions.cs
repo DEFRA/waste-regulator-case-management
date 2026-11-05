@@ -21,6 +21,9 @@ public class ClientIdAuthenticationOptions : AuthenticationSchemeOptions
     /// <summary>Optional header carrying the caller's nation scope. See <see cref="ClientIdDefaults.DefaultNationHeaderName"/>.</summary>
     public string NationHeaderName { get; set; } = ClientIdDefaults.DefaultNationHeaderName;
 
+    /// <summary>Optional header carrying the end user's email address. See <see cref="ClientIdDefaults.DefaultEmailHeaderName"/>.</summary>
+    public string EmailHeaderName { get; set; } = ClientIdDefaults.DefaultEmailHeaderName;
+
     /// <summary>
     /// Name of the request header carrying the BFF-computed HMAC signature
     /// over the trust headers. Used to prove the headers originated from a
@@ -110,6 +113,12 @@ public class ClientIdAuthenticationOptions : AuthenticationSchemeOptions
     /// <c>user:nation</c> claim.
     /// </summary>
     public int MaxUserNationLength { get; set; } = 32;
+
+    /// <summary>
+    /// Maximum permitted length of the email header, the longest address
+    /// RFC 5321 allows. Persisted into the <c>user:email</c> claim.
+    /// </summary>
+    public int MaxUserEmailLength { get; set; } = 320;
 
     /// <summary>
     /// Maximum permitted length of the HMAC signature header. Base64 of

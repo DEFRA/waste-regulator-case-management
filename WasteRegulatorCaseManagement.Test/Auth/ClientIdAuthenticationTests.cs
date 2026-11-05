@@ -959,6 +959,81 @@ public class ClientIdAuthenticationTests
     }
 
     [Fact]
+    public async Task Signature_valid_with_email_signed_is_200()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var factory = new BareFactory(
+            clientSecrets: new Dictionary<string, string> { [ClientId] = Secret }
+        );
+        factory
+            .MockPersistence.QueryAsync(Arg.Any<CaseQuery>(), Arg.Any<CancellationToken>())
+            .Returns(new CasePage(Array.Empty<Case>(), 0, 1, 20));
+        var timestamp = factory.FakeTime.GetUtcNow().ToString("O");
+        var nonce = "nonce-email-signed";
+        var signature = ClientIdAuthenticationHandler.ComputeSignature(
+            Secret,
+            new ClientIdSignaturePayload(
+                ClientId,
+                null,
+                null,
+                timestamp,
+                nonce,
+                Nation: "ENGLAND",
+                Email: "caseworker@regulator.example"
+            )
+        );
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add(ClientIdDefaults.DefaultHeaderName, ClientId);
+        AddTimestampAndNonce(client, timestamp, nonce);
+        client.DefaultRequestHeaders.Add("x-cdp-auth-signature", signature);
+        client.DefaultRequestHeaders.Add("x-cdp-user-nation", "ENGLAND");
+        client.DefaultRequestHeaders.Add("x-cdp-user-email", "caseworker@regulator.example");
+
+        // Act
+        var response = await client.GetAsync("/cases", cancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Signature_valid_but_email_tampered_after_signing_is_401()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var factory = new BareFactory(
+            clientSecrets: new Dictionary<string, string> { [ClientId] = Secret }
+        );
+        var timestamp = factory.FakeTime.GetUtcNow().ToString("O");
+        var nonce = "nonce-email-tampered";
+        var signature = ClientIdAuthenticationHandler.ComputeSignature(
+            Secret,
+            new ClientIdSignaturePayload(
+                ClientId,
+                null,
+                null,
+                timestamp,
+                nonce,
+                Nation: "ENGLAND",
+                Email: "caseworker@regulator.example"
+            )
+        );
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add(ClientIdDefaults.DefaultHeaderName, ClientId);
+        AddTimestampAndNonce(client, timestamp, nonce);
+        client.DefaultRequestHeaders.Add("x-cdp-auth-signature", signature);
+        client.DefaultRequestHeaders.Add("x-cdp-user-nation", "ENGLAND");
+        client.DefaultRequestHeaders.Add("x-cdp-user-email", "someone-else@regulator.example");
+
+        // Act
+        var response = await client.GetAsync("/cases", cancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Legacy_six_line_v3_signature_without_role_or_nation_authenticates()
     {
         // ADR-0007 — regression for the 2026-08-22 dev outage. A service
@@ -1011,7 +1086,7 @@ public class ClientIdAuthenticationTests
         // ADR-0007: management-fe signs the RA-469 extended form on EVERY
         // call, with role/nation as empty strings when it has none to
         // forward — so a request carrying no role/nation header must also
-        // verify against the eight-line form. Built by WireFormatReference
+        // verify against the nine-line form. Built by WireFormatReference
         // from the documented wire format, not via ComputeSignature.
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var factory = new BareFactory(

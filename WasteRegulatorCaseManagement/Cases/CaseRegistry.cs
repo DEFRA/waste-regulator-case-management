@@ -46,6 +46,12 @@ public sealed class CaseRegistry
                     $"Case type '{type.CaseType}' action '{transition.ActionId}' moves between undeclared states.");
             }
         }
+
+        foreach (var mappedStateId in type.CallbackMappings.Keys.Where(id => !stateIds.Contains(id)))
+        {
+            throw new InvalidCaseModuleConfigException(
+                $"Case type '{type.CaseType}' maps a callback for undeclared state '{mappedStateId}'.");
+        }
     }
 }
 

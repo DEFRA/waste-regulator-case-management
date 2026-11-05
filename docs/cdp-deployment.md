@@ -43,6 +43,7 @@ Create via the CDP self-service portal under the service's "secrets" tab:
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | `AUTH_SHARED_SECRET__MANAGEMENT_FE` | HMAC secret used to verify signed trust headers from `management-fe` (see [BFF signing contract](#bff-signing-contract) below). Must match the secret `management-fe` signs with (`AUTH_SHARED_SECRET` in that service). **Required in all non-Development environments.** The service will reject every authenticated request with `401` until at least one caller's secret is set (see RA-345 below). Generate with `openssl rand -base64 32`. |
 | `AUTH_SHARED_SECRET__CASE_INTAKE` | HMAC secret used to verify signed trust headers from the Case Intake Processor (see [BFF signing contract](#bff-signing-contract) below). Must match the secret the Case Intake Processor signs with. **Required in all non-Development environments.** Distinct from `AUTH_SHARED_SECRET__MANAGEMENT_FE` — each caller has its own secret so one can be rotated without touching the other (RA-345). Generate with `openssl rand -base64 32`. |
+| `CALLBACK_AUTH__CSOC` | Basic credentials, as `clientId:clientSecret`, that this service presents when it PATCHes a concluded CSoC case to the Waste Obligations API. The client must be on the Waste Obligations API's access list with `write` scope, to send the decision, and `read` scope, to check a decision it refuses as already held. Without it the callback is sent unauthenticated and rejected, so CSoC cases cannot be accepted or cancelled. |
 | `NOTIFY_API_KEY`     | GOV.UK Notify API key. Only takes effect when the `Notify__Enabled` master switch is `true` (RA-422; default `false`, set per environment in cdp-app-config). With the flag off — the default in every environment — the notification hook is never registered, so no email is sent and no `notification-*` audit entries are written regardless of this key. With the flag on but this key absent, the service boots with a no-op Notify client (notifications logged, not sent). Even with the flag on and this key set, dev and localhost suppress sending regardless — see [Notify sending by environment](#notify-sending-by-environment). |
 
 > **RA-345 (per-caller secrets):** prior to RA-345 there was a single
@@ -130,11 +131,11 @@ v3
 {x-cdp-auth-nonce}
 ```
 
-**Extended form (RA-469)** — adds the two role/nation trust headers so they carry
-the same signed-integrity guarantee as user-id/user-name. This is what
-`epr-register-enrol-management-fe` signs on every call (role/nation as `""` when
-it has none to forward), and the **only** form accepted when either
-`x-cdp-user-role` or `x-cdp-user-nation` is present on the request:
+**Extended form (RA-469)** — adds the role, nation and email trust headers so
+they carry the same signed-integrity guarantee as user-id/user-name. This is what
+`epr-register-enrol-management-fe` signs on every call (each as `""` when it has
+none to forward), and the **only** form accepted when any of `x-cdp-user-role`,
+`x-cdp-user-nation` or `x-cdp-user-email` is present on the request:
 
 ```
 v3
@@ -143,16 +144,19 @@ v3
 {x-cdp-user-name or ""}
 {x-cdp-user-role or ""}
 {x-cdp-user-nation or ""}
+{x-cdp-user-email or ""}
 {x-cdp-auth-timestamp}
 {x-cdp-auth-nonce}
 ```
 
 Empty-string placeholders must be included for absent optional fields — the
 field count and separator positions are fixed within each form. When a request
-carries no role/nation header, either form verifies; when it carries one, only
-the extended form over the sent values does. Nation scopes every caseworker
-route (`ENGLAND`, `WALES`, `SCOTLAND` or `N_IRELAND`; see `docs/cases.md`); role
-is an audit-only claim, and role-based authorization is the BFF's concern (see
+carries no role, nation or email header, either form verifies; when it carries
+one, only the extended form over the sent values does. The email is sent to the
+source system as the deciding user's address when a case is concluded (see
+`docs/cases.md`). Nation scopes every caseworker route (`ENGLAND`, `WALES`,
+`SCOTLAND` or `N_IRELAND`; see `docs/cases.md`); role is an audit-only claim,
+and role-based authorization is the BFF's concern (see
 `docs/adr/0005-rbac-in-frontend-drop-roles-from-payload.md`). See
 `ClientIdAuthenticationHandler.ComputeSignature` / `VerifySignature` for the
 authoritative implementation and

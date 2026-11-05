@@ -167,7 +167,7 @@ public class CaseTemplateVersioningTests
             StateId = "anything"
         };
 
-        var projection = new CaseService(registry, _persistence, NullLogger<CaseService>.Instance)
+        var projection = new CaseService(registry, _persistence, Substitute.For<ICaseCallbackClient>(), NullLogger<CaseService>.Instance)
             .Project(orphan);
 
         Assert.Equal("unknown", projection.TemplateVersion);
@@ -175,7 +175,7 @@ public class CaseTemplateVersioningTests
     }
 
     private CaseService BuildService(CaseModuleConfig type) =>
-        new(new CaseRegistry([type]), _persistence, NullLogger<CaseService>.Instance);
+        new(new CaseRegistry([type]), _persistence, Substitute.For<ICaseCallbackClient>(), NullLogger<CaseService>.Instance);
 
     /// <summary>
     /// Test fixture exposing TemplateVersion override so we can register

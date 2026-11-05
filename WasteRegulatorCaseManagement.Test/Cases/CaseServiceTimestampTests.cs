@@ -5,6 +5,7 @@ using WasteRegulatorCaseManagement.Cases;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using MongoDB.Bson;
+using NSubstitute;
 using NUlid;
 
 namespace WasteRegulatorCaseManagement.Test.Cases;
@@ -47,6 +48,7 @@ public class CaseServiceTimestampTests
         new(
             new CaseRegistry([type]),
             _persistence,
+            Substitute.For<ICaseCallbackClient>(),
             NullLogger<CaseService>.Instance,
             _time);
 

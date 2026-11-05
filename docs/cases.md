@@ -81,6 +81,33 @@ requires `reason`:
 The decision is stored on the case as `decision` and on the action's
 `state-changed` timeline entry as `decision.<field>` details.
 
+### Callback to the source system
+
+When an action moves a case into a state that its case type's
+`callbackMappings` names, the service PATCHes the mapping to the case's
+`callbackUrl` before it changes the case
+([ADR-0011](adr/0011-gated-source-system-callback.md)). Placeholders in string
+values are filled from the acting user (`{{actor.id}}`, `{{actor.email}}` and
+`{{actor.name}}`, from the signed identity headers) and the decision
+(`{{decision.<field>}}`). CSoC `cancel` sends:
+
+```json
+{
+  "status": "Cancelled",
+  "reason": "Submitted against the wrong obligation year.",
+  "user": { "id": "<user id>", "email": "<user email>", "name": "<user name>" }
+}
+```
+
+The request carries Basic credentials from `CALLBACK_AUTH__<caseType>`
+(`clientId:clientSecret`). When the source system accepts it, the action is
+applied. When it returns `422`, the service reads the resource back from the
+same URL and treats the decision as applied if every top-level string field
+the two share matches, because the source system refuses a decision it
+already holds. Otherwise, or when a placeholder has no value, the action
+returns `502`, the case keeps its state, and a `callback-failed` timeline
+entry records the reason.
+
 ### Nation scoping
 
 A caseworker sees and acts on only the cases of their own nation. Every route
@@ -108,7 +135,18 @@ for example `CSoC.json`:
   "transitions": [
     { "actionId": "accept", "displayName": "Accept", "fromStateId": "SUBMITTED", "toStateId": "ACCEPTED" },
     { "actionId": "cancel", "displayName": "Cancel", "fromStateId": "SUBMITTED", "toStateId": "CANCELLED", "requiredDecisionFields": ["reason"] }
-  ]
+  ],
+  "callbackMappings": {
+    "ACCEPTED": {
+      "status": "Accepted",
+      "user": { "id": "{{actor.id}}", "email": "{{actor.email}}", "name": "{{actor.name}}" }
+    },
+    "CANCELLED": {
+      "status": "Cancelled",
+      "reason": "{{decision.reason}}",
+      "user": { "id": "{{actor.id}}", "email": "{{actor.email}}", "name": "{{actor.name}}" }
+    }
+  }
 }
 ```
 
@@ -182,8 +220,9 @@ optionally reads two headers forwarded by the BFF and turns them into
 | --- | --- |
 | `x-cdp-user-id` | `user:id` (used by `ResolveActorUserId`) |
 | `x-cdp-user-name` | `user:name` |
+| `x-cdp-user-email` | `user:email` (sent in the source system callback) |
 
-These are used for audit attribution only (`Case.Timeline.PerformedById` /
+These are used for audit attribution (`Case.Timeline.PerformedById` /
 `PerformedByName` and similar). Role membership is not part of the trust
 contract — see ADR-0005.
 

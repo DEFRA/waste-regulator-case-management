@@ -590,6 +590,11 @@ public static class CaseEndpoints
                 detail: result.Message,
                 statusCode: StatusCodes.Status401Unauthorized
             ),
+            CaseActionFailureCode.CallbackFailed => TypedResults.Problem(
+                title: "Source system callback failed",
+                detail: result.Message,
+                statusCode: StatusCodes.Status502BadGateway
+            ),
             CaseActionFailureCode.TerminalState
             or CaseActionFailureCode.ConcurrencyConflict => TypedResults.Problem(
                 title: "Action not allowed",

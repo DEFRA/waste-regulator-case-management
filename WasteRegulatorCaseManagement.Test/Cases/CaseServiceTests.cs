@@ -41,6 +41,7 @@ public class CaseServiceTests : IAsyncDisposable
         new(
             new CaseRegistry([type]),
             _persistence,
+            Substitute.For<ICaseCallbackClient>(),
             NullLogger<CaseService>.Instance,
             _time
         );
@@ -52,6 +53,7 @@ public class CaseServiceTests : IAsyncDisposable
         new(
             new CaseRegistry([type]),
             _persistence,
+            Substitute.For<ICaseCallbackClient>(),
             NullLogger<CaseService>.Instance,
             _time,
             postActionHooks: [hook]
@@ -232,6 +234,7 @@ public class CaseServiceTests : IAsyncDisposable
         var service = new CaseService(
             new CaseRegistry([type]),
             _persistence,
+            Substitute.For<ICaseCallbackClient>(),
             NullLogger<CaseService>.Instance,
             _time,
             postActionHooks: [slowHook, pushHook]
@@ -1704,6 +1707,7 @@ public class CaseServiceTests : IAsyncDisposable
         var service = new CaseService(
             new CaseRegistry([type]),
             _persistence,
+            Substitute.For<ICaseCallbackClient>(),
             NullLogger<CaseService>.Instance,
             time
         );
@@ -1946,6 +1950,7 @@ public class CaseServiceTests : IAsyncDisposable
         return new CaseService(
             new CaseRegistry([type]),
             racing,
+            Substitute.For<ICaseCallbackClient>(),
             NullLogger<CaseService>.Instance,
             _time
         );

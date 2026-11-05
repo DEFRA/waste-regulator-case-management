@@ -35,15 +35,17 @@ public class ClientIdSignaturePayloadFormatTests
     }
 
     [Theory]
-    [InlineData("standard", null)]
-    [InlineData(null, "Wales")]
-    [InlineData("standard", "Wales")]
-    public void ComputeSignature_with_role_or_nation_emits_the_extended_eight_line_form(
+    [InlineData("standard", null, null)]
+    [InlineData(null, "Wales", null)]
+    [InlineData(null, null, "caseworker@regulator.example")]
+    [InlineData("standard", "Wales", "caseworker@regulator.example")]
+    public void ComputeSignature_with_role_nation_or_email_emits_the_extended_nine_line_form(
         string? role,
-        string? nation
+        string? nation,
+        string? email
     )
     {
-        var payload = WithoutRoleOrNation with { Role = role, Nation = nation };
+        var payload = WithoutRoleOrNation with { Role = role, Nation = nation, Email = email };
 
         var actual = ClientIdAuthenticationHandler.ComputeSignature(Secret, payload);
 
@@ -53,7 +55,7 @@ public class ClientIdSignaturePayloadFormatTests
     [Fact]
     public void Legacy_and_extended_forms_differ_for_the_same_identity()
     {
-        // A legacy string has six lines, an extended one eight — they can
+        // A legacy string has six lines, an extended one nine — they can
         // never collide, which is what makes dual acceptance safe.
         Assert.NotEqual(
             ClientIdAuthenticationHandler.ComputeLegacySignature(Secret, WithoutRoleOrNation),
@@ -163,7 +165,7 @@ internal static class WireFormatReference
     public static string ExtendedV3(string secret, ClientIdSignaturePayload p) =>
         Hmac(
             secret,
-            $"v3\n{p.ClientId}\n{p.UserId ?? ""}\n{p.UserName ?? ""}\n{p.Role ?? ""}\n{p.Nation ?? ""}\n{p.Timestamp}\n{p.Nonce}"
+            $"v3\n{p.ClientId}\n{p.UserId ?? ""}\n{p.UserName ?? ""}\n{p.Role ?? ""}\n{p.Nation ?? ""}\n{p.Email ?? ""}\n{p.Timestamp}\n{p.Nonce}"
         );
 
     private static string Hmac(string secret, string canonical) =>

@@ -17,6 +17,7 @@ public static class AnalyticsEventVocabulary
         "assigned",
         "unassigned",
         "note-added",
+        "callback-failed",
     ];
 
     private static readonly HashSet<string> s_actorPrefixes = ["service", "user", "system"];

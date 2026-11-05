@@ -35,6 +35,12 @@ public enum CaseActionFailureCode
     MissingDecisionField,
 
     /// <summary>
+    /// The case's source system did not accept the decision, so the case
+    /// was left in its current state.
+    /// </summary>
+    CallbackFailed,
+
+    /// <summary>
     /// The case was modified by another caller between load and save
     /// (optimistic concurrency conflict). Retry the request after re-reading
     /// the latest state.

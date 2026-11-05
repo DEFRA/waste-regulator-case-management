@@ -4,6 +4,7 @@ using WasteRegulatorCaseManagement.AuditEvents;
 using System.Net;
 using MongoDB.Bson;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using WasteRegulatorCaseManagement.Test.TestSupport;
 using WasteRegulatorCaseManagement.Utils.Logging;
@@ -45,8 +46,9 @@ public class CaseEndpointsTests
         string? userId = "test-user",
         string? userName = null,
         IReadOnlyCollection<CaseState>? states = null,
-        string? nation = "ENGLAND"
-    ) => new(_fixture, includeAuthHeader, userId, userName, states, nation);
+        string? nation = "ENGLAND",
+        string? userEmail = "caseworker@regulator.example"
+    ) => new(_fixture, includeAuthHeader, userId, userName, states, nation, userEmail);
 
     [Fact]
     public async Task Post_returns_unauthorized_without_client_id()
@@ -689,7 +691,7 @@ public class CaseEndpointsTests
     {
         // Arrange
         var cancellationToken = TestContext.Current.CancellationToken;
-        await using var factory = NewFactory();
+        await using var factory = NewFactory(userName: "Casey Worker");
         using var client = factory.CreateClient();
         var caseId = await SubmitCSoCCaseAsync(client, "csoc-2024-eng-00126", cancellationToken);
 
@@ -715,7 +717,7 @@ public class CaseEndpointsTests
     {
         // Arrange
         var cancellationToken = TestContext.Current.CancellationToken;
-        await using var factory = NewFactory(userId: "alice-1");
+        await using var factory = NewFactory(userId: "alice-1", userName: "Alice");
         using var client = factory.CreateClient();
         var caseId = await SubmitCSoCCaseAsync(client, "csoc-2024-eng-00129", cancellationToken);
 
@@ -762,7 +764,7 @@ public class CaseEndpointsTests
     {
         // Arrange
         var cancellationToken = TestContext.Current.CancellationToken;
-        await using var factory = NewFactory();
+        await using var factory = NewFactory(userName: "Casey Worker");
         using var client = factory.CreateClient();
         var caseId = await SubmitCSoCCaseAsync(client, "csoc-2024-eng-00127", cancellationToken);
 
@@ -795,6 +797,156 @@ public class CaseEndpointsTests
         // Assert
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Contains("Decision field 'reason' must be a string", await response.Content.ReadAsStringAsync(cancellationToken));
+    }
+
+    [Fact]
+    public async Task Accept_patches_the_callback_url_with_the_accepted_status_and_the_deciding_user()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var factory = NewFactory(userId: "ae5cf737-333a-4af0-8d91-18f7768ceb96", userName: "Casey Worker");
+        using var client = factory.CreateClient();
+        var caseId = await SubmitCSoCCaseAsync(client, "csoc-2024-eng-00130", cancellationToken);
+
+        // Act
+        var response = await client.PostAsync($"/cases/{caseId}/actions/accept", content: null, cancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var callback = Assert.Single(factory.Callbacks.Requests);
+        Assert.Equal(HttpMethod.Patch, callback.Method);
+        Assert.Equal("https://source-system.test/declarations/csoc-2024-eng-00130", callback.Uri.ToString());
+        Assert.Equal(
+            $"Basic {Convert.ToBase64String(Encoding.UTF8.GetBytes("case-management:callback-secret"))}",
+            callback.Authorization
+        );
+        using var body = JsonDocument.Parse(callback.Body!);
+        Assert.Equal("Accepted", body.RootElement.GetProperty("status").GetString());
+        var callbackUser = body.RootElement.GetProperty("user");
+        Assert.Equal("ae5cf737-333a-4af0-8d91-18f7768ceb96", callbackUser.GetProperty("id").GetString());
+        Assert.Equal("caseworker@regulator.example", callbackUser.GetProperty("email").GetString());
+        Assert.Equal("Casey Worker", callbackUser.GetProperty("name").GetString());
+    }
+
+    [Fact]
+    public async Task Cancel_patches_the_callback_url_with_the_cancelled_status_and_reason()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var factory = NewFactory(userName: "Casey Worker");
+        using var client = factory.CreateClient();
+        var caseId = await SubmitCSoCCaseAsync(client, "csoc-2024-eng-00131", cancellationToken);
+
+        // Act
+        await client.PostAsJsonAsync(
+            $"/cases/{caseId}/actions/cancel",
+            new { decision = new { reason = "Submitted against the wrong obligation year." } },
+            cancellationToken
+        );
+
+        // Assert
+        using var body = JsonDocument.Parse(Assert.Single(factory.Callbacks.Requests).Body!);
+        Assert.Equal("Cancelled", body.RootElement.GetProperty("status").GetString());
+        Assert.Equal(
+            "Submitted against the wrong obligation year.",
+            body.RootElement.GetProperty("reason").GetString()
+        );
+    }
+
+    [Fact]
+    public async Task Accept_rejected_by_the_source_system_returns_502_and_records_the_failure_on_a_submitted_case()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var factory = NewFactory(userName: "Casey Worker");
+        using var client = factory.CreateClient();
+        var caseId = await SubmitCSoCCaseAsync(client, "csoc-2024-eng-00132", cancellationToken);
+        factory.Callbacks.Respond = _ => new HttpResponseMessage(HttpStatusCode.InternalServerError);
+
+        // Act
+        var response = await client.PostAsync($"/cases/{caseId}/actions/accept", content: null, cancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
+        var persisted = await factory.Persistence.GetByIdAsync(caseId, cancellationToken);
+        Assert.Equal("SUBMITTED", persisted!.StateId);
+        var failure = Assert.Single(persisted.Timeline, e => e.Action == "callback-failed");
+        Assert.Equal("accept", failure.Details["actionId"]);
+        Assert.Equal(
+            "https://source-system.test/declarations/csoc-2024-eng-00132 returned 500 Internal Server Error.",
+            failure.Details["reason"]
+        );
+    }
+
+    [Fact]
+    public async Task Accept_is_applied_when_the_source_system_already_holds_the_accepted_status()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var factory = NewFactory(userName: "Casey Worker");
+        using var client = factory.CreateClient();
+        var caseId = await SubmitCSoCCaseAsync(client, "csoc-2024-eng-00133", cancellationToken);
+        factory.Callbacks.Respond = request =>
+            request.Method == HttpMethod.Patch
+                ? new HttpResponseMessage(HttpStatusCode.UnprocessableEntity)
+                : new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("""{ "id": "csoc-2024-eng-00133", "status": "Accepted" }"""),
+                };
+
+        // Act
+        var response = await client.PostAsync($"/cases/{caseId}/actions/accept", content: null, cancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal([HttpMethod.Patch, HttpMethod.Get], factory.Callbacks.Requests.Select(r => r.Method).ToArray());
+        var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
+        Assert.Equal("ACCEPTED", body!.StateId);
+    }
+
+    [Fact]
+    public async Task Accept_returns_502_when_the_source_system_refuses_it_and_holds_a_different_status()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var factory = NewFactory(userName: "Casey Worker");
+        using var client = factory.CreateClient();
+        var caseId = await SubmitCSoCCaseAsync(client, "csoc-2024-eng-00134", cancellationToken);
+        factory.Callbacks.Respond = request =>
+            request.Method == HttpMethod.Patch
+                ? new HttpResponseMessage(HttpStatusCode.UnprocessableEntity)
+                : new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("""{ "id": "csoc-2024-eng-00134", "status": "Cancelled" }"""),
+                };
+
+        // Act
+        var response = await client.PostAsync($"/cases/{caseId}/actions/accept", content: null, cancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
+        var persisted = await factory.Persistence.GetByIdAsync(caseId, cancellationToken);
+        Assert.Equal("SUBMITTED", persisted!.StateId);
+    }
+
+    [Fact]
+    public async Task Accept_by_a_caller_without_an_email_records_the_failure_without_calling_the_source_system()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var factory = NewFactory(userName: "Casey Worker", userEmail: null);
+        using var client = factory.CreateClient();
+        var caseId = await SubmitCSoCCaseAsync(client, "csoc-2024-eng-00135", cancellationToken);
+
+        // Act
+        var response = await client.PostAsync($"/cases/{caseId}/actions/accept", content: null, cancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
+        Assert.Empty(factory.Callbacks.Requests);
+        var persisted = await factory.Persistence.GetByIdAsync(caseId, cancellationToken);
+        var failure = Assert.Single(persisted!.Timeline, e => e.Action == "callback-failed");
+        Assert.Equal("Callback field 'actor.email' has no value.", failure.Details["reason"]);
     }
 
     private static async Task<string> SubmitCSoCCaseAsync(
@@ -2441,6 +2593,7 @@ public class CaseEndpointsTests
         private readonly string? _userName;
         private readonly IReadOnlyCollection<CaseState>? _states;
         private readonly string? _nation;
+        private readonly string? _userEmail;
 
         /// <summary>
         /// The client id allowed to create cases. Defaults to the client
@@ -2454,16 +2607,20 @@ public class CaseEndpointsTests
             string? userId,
             string? userName,
             IReadOnlyCollection<CaseState>? states,
-            string? nation
+            string? nation,
+            string? userEmail
         )
         {
             _nation = nation;
+            _userEmail = userEmail;
             _fixture = fixture;
             _includeAuthHeader = includeAuthHeader;
             _userId = userId;
             _userName = userName;
             _states = states;
         }
+
+        public StubCallbackHandler Callbacks { get; } = new();
 
         public ICasePersistence Persistence => Recording.Inner;
 
@@ -2488,6 +2645,7 @@ public class CaseEndpointsTests
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseSetting(CaseIntakePolicy.ClientIdKey, IntakeClientId);
+            builder.UseSetting("CALLBACK_AUTH:CSoC", "case-management:callback-secret");
 
             builder.ConfigureServices(services =>
             {
@@ -2510,6 +2668,9 @@ public class CaseEndpointsTests
                         sp.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>(),
                         sp.GetRequiredService<CaseRegistry>(), new AuditEventService(clientFactory, TimeProvider.System))
                 ));
+                services
+                    .AddHttpClient(CaseCallbackClient.HttpClientName)
+                    .ConfigurePrimaryHttpMessageHandler(() => Callbacks);
                 services.UseCaseModuleConfigs(
                     TestCaseType.Create(
                         CaseType,
@@ -2549,6 +2710,10 @@ public class CaseEndpointsTests
             if (_nation is not null)
             {
                 client.DefaultRequestHeaders.Add("x-cdp-user-nation", _nation);
+            }
+            if (_userEmail is not null)
+            {
+                client.DefaultRequestHeaders.Add("x-cdp-user-email", _userEmail);
             }
         }
 

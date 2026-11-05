@@ -45,6 +45,13 @@ public static class ClientIdDefaults
     public const string DefaultNationHeaderName = "x-cdp-user-nation";
 
     /// <summary>
+    /// Header carrying the end user's email address — becomes claim
+    /// <c>"user:email"</c>. Signed in the extended v3 payload — see
+    /// <see cref="ClientIdAuthenticationHandler.ComputeSignature"/>.
+    /// </summary>
+    public const string DefaultEmailHeaderName = "x-cdp-user-email";
+
+    /// <summary>
     /// Header carrying a base64 HMAC-SHA256 signature, computed by the BFF
     /// over the canonical concatenation of the trust headers, using a
     /// shared secret. Lets the backend verify the trust headers actually
