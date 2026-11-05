@@ -22,7 +22,7 @@ Defined in `WasteRegulatorCaseManagement/Cases/`:
 | --- | --- |
 | `CaseState` | Identifier + display name for a state. `IsTerminal` marks completion states (e.g. approved/rejected). |
 | `CaseTask` | Identifier + display name for a unit of work to be completed in a state. |
-| `CaseTransition` | A named action (`approve`, `reject`, `withdraw`) that moves a case from one state to another. `CallerInvocable` (default `true`) decides whether the generic action endpoint may select it by id, or whether it is reachable only through a module's own service resolving it server-side. |
+| `CaseTransition` | A named action (`approve`, `reject`, `withdraw`) that moves a case from one state to another. |
 | `ICaseType` | Declares a type's `CaseType`, `DisplayName`, `InitialState`, `States`, `GetTasksForState(stateId)` and `Transitions`. Pure & side-effect free. |
 | `ICaseModule` | A module's entry point. Exposes the `Type` and contributes `RegisterServices(services)` and `MapEndpoints(endpoints)`. |
 | `ICaseRegistry` | DI-resolvable lookup of every registered type. |
@@ -47,7 +47,7 @@ are mounted by `MapCaseFrameworkEndpoints()`:
 | `POST` | `/cases` | Submit a new case. Body: `{ "caseType", "sourceSystemId", "callbackUrl", "nation", "orgId", "producerType"?, "displayData"? }` — see below. The `caseType` must be registered with the framework; the server stamps the case with the type's `InitialState`, the caller's CDP client id and a server-side timestamp. Returns `201 Created` with `Location: /cases/{id}`; a `sourceSystemId` that already has a case returns that case with `200 OK` and `X-Idempotent-Replay: true`. |
 | `GET` | `/cases/{id}` | Fetch a single case by id, projected with the actions the engine will currently allow. |
 | `GET` | `/cases` | List persisted cases (with the same projection), newest first, with filter / search / pagination per RA-93. Query string parameters: `caseType` (repeatable), `stateId` (repeatable), `search` (free-text — matched on id and submitter), `page` (1-based, default 1), `pageSize` (default 20, capped at 100). Returns a paged envelope: `{ items, totalCount, page, pageSize }`. |
-| `POST` | `/cases/{id}/actions/{actionId}` | Invoke a named action declared by the type's transitions. `409` if the case is in a terminal state; `400` for unknown actions, transitions whose from-state does not match, and transitions declared `CallerInvocable: false`. |
+| `POST` | `/cases/{id}/actions/{actionId}` | Invoke a named action declared by the type's transitions. `409` if the case is in a terminal state; `400` for unknown actions and transitions whose from-state does not match. |
 
 All three endpoints require authentication via the CDP client id
 header (`x-cdp-client-id`) per RA-89/RA-85b.
@@ -141,13 +141,6 @@ That is the complete list of changes required outside the new module folder.
   the rules it was submitted under. Put every check before any side effect,
   and return the shared failure code rather than a bespoke one — the
   frontend maps a single message per failure reason.
-- **A multi-step change belongs behind one call.** Where reaching a
-  meaningful outcome takes more than one transition, the module service
-  applies them all server-side and the caller makes one request. Declare the
-  intermediate transitions `CallerInvocable: false` so that is the only
-  route, and accept every intermediate state as a valid entry state so a
-  failure part-way through is finished by replaying the same request rather
-  than needing a rescue path.
 
 ## Template versioning (RA-94)
 

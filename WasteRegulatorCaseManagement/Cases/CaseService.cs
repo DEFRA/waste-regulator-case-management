@@ -721,17 +721,6 @@ public sealed class CaseService : ICaseService
                         StringComparison.OrdinalIgnoreCase
                     )
                 )
-                // RA-364: never offer an action the generic action endpoint
-                // would reject. Transitions declared CallerInvocable: false
-                // are reachable only through a module's own bespoke service
-                // resolving them server-side, so listing them here would
-                // advertise buttons that always fail — and, where several
-                // share a DisplayName and a FromStateId, render as identical
-                // dead controls. This mirrors the guard in
-                // CaseEndpoints.Action; the bespoke services are
-                // unaffected because they call ApplyActionAsync directly and
-                // never consult AvailableActions.
-                .Where(t => t.CallerInvocable)
                 .ToList();
 
         return new CaseEngineProjection(

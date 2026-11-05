@@ -127,55 +127,6 @@ public class CaseEngineEndpointsTests
     }
 
     [Fact]
-    public async Task Action_rejects_a_non_caller_invocable_transition_without_reaching_the_engine()
-    {
-        // RA-311/MBE-1: a transition declared CallerInvocable: false on the
-        // item's own frozen snapshot must be refused by the endpoint itself
-        // — before ApplyActionAsync ever runs — so a caller cannot pick a
-        // module's server-resolved-only target state directly.
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using var factory = new EngineFactory(_fixture);
-        using var client = factory.CreateClient();
-
-        var snapshotType = new TestCaseType(
-            CaseType,
-            "Test type",
-            states:
-            [
-                new CaseState("submitted", "Submitted"),
-                new CaseState("approved", "Approved", IsTerminal: true)
-            ],
-            transitions:
-            [
-                new CaseTransition("resume-a", "Resume", "submitted", "approved", CallerInvocable: false)
-            ]);
-        var caseId = Ulid.NewUlid().ToString();
-        await factory.SeedAsync(new Case
-        {
-            SourceSystemId = Ulid.NewUlid().ToString(),
-            CallbackUrl = "https://source-system.test/callback",
-            Nation = "ENGLAND",
-            OrgId = "test-org",
-            Id = caseId,
-            CaseType = CaseType,
-            StateId = "submitted",
-            SubmittedBy = "test-client",
-            TemplateSnapshot = CaseTemplateSnapshot.Capture(snapshotType),
-        }, cancellationToken);
-
-        var response = await client.PostAsync(
-            $"/cases/{caseId}/actions/resume-a", content: null, cancellationToken);
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-
-        // The engine's real ApplyActionAsync never ran, so the item is
-        // unchanged and carries no audit entry for the blocked action.
-        var persisted = await factory.Persistence.GetByIdAsync(caseId, cancellationToken);
-        Assert.Equal("submitted", persisted!.StateId);
-        Assert.Empty(persisted.Timeline);
-    }
-
-    [Fact]
     public async Task Get_by_id_projects_engine_state_in_response()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

@@ -400,49 +400,10 @@ public static class CaseEndpoints
         [FromRoute] string id,
         [FromRoute] string actionId,
         HttpContext httpContext,
-        [FromServices] ICasePersistence persistence,
         [FromServices] ICaseService engine,
         CancellationToken cancellationToken
     )
     {
-        // Security boundary (RA-311/MBE-1 review): a transition is declared
-        // CallerInvocable: false when several transitions share the same
-        // FromStateId — the engine's normal "is the item in the right
-        // state" guard cannot tell them apart, so a caller who could invoke
-        // one directly here would pick the target state themselves instead
-        // of the module's bespoke service resolving it server-side from
-        // audit history. Checked against the case's own frozen
-        // TemplateSnapshot (the same source ApplyActionAsync itself
-        // resolves the transition from) so this rejects using the exact
-        // rules the item was submitted under.
-        var caseRecord = await persistence.GetByIdAsync(id, cancellationToken);
-        // RA-351: an action id can be declared on more than one state (e.g.
-        // a self-loop available from two states). Resolve the CallerInvocable check against the transition
-        // for the item's CURRENT state — matching on action id alone would
-        // test the first-declared transition, which can differ in
-        // CallerInvocable from the one that actually applies here.
-        var actionTransitions = caseRecord
-            ?.TemplateSnapshot?.Transitions.Where(t =>
-                string.Equals(t.ActionId, actionId, StringComparison.OrdinalIgnoreCase)
-            )
-            .ToList();
-        var transition =
-            actionTransitions?.FirstOrDefault(t =>
-                string.Equals(
-                    t.FromStateId,
-                    caseRecord!.StateId,
-                    StringComparison.OrdinalIgnoreCase
-                )
-            ) ?? actionTransitions?.FirstOrDefault();
-        if (transition is { CallerInvocable: false })
-        {
-            return ToHttpResult(
-                CaseActionResult.Failure(
-                    CaseActionFailureCode.UnknownAction,
-                    $"Action '{actionId}' is not declared by case type '{caseRecord!.CaseType}'."),
-                engine);
-        }
-
         var result = await engine.ApplyActionAsync(
             id,
             actionId,

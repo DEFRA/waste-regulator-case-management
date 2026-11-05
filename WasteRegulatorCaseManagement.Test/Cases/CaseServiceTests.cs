@@ -456,55 +456,6 @@ public class CaseServiceTests : IAsyncDisposable
     }
 
     [Fact]
-    public async Task Project_excludes_transitions_that_are_not_caller_invocable()
-    {
-        // RA-364: the reported bug. Four transitions sharing a FromStateId and
-        // a DisplayName, all CallerInvocable: false because a module service
-        // resolves the right one server-side, rendered as four identical dead
-        // buttons because the projection never filtered on the flag.
-        var type = BuildType(
-            transitions:
-            [
-                new CaseTransition(
-                    "resume-a",
-                    "Resume",
-                    "submitted",
-                    "approved",
-                    CallerInvocable: false
-                ),
-                new CaseTransition(
-                    "resume-b",
-                    "Resume",
-                    "submitted",
-                    "rejected",
-                    CallerInvocable: false
-                ),
-                new CaseTransition("withdraw", "Withdraw", "submitted", "rejected"),
-            ]
-        );
-        var caseRecord = new Case
-        {
-            SourceSystemId = Ulid.NewUlid().ToString(),
-            CallbackUrl = "https://source-system.test/callback",
-            Nation = "ENGLAND",
-            OrgId = "test-org",
-            Id = Ulid.NewUlid().ToString(),
-            CaseType = CaseType,
-            StateId = "submitted",
-            SubmittedAt = InitialNow,
-            LastModifiedAt = InitialNow,
-            SubmittedBy = "test-client",
-        };
-
-        var projection = BuildService(type).Project(caseRecord);
-
-        // Only the caller-invocable one survives — no duplicate "Resume"s.
-        Assert.Equal(["withdraw"], projection.AvailableActions.Select(a => a.ActionId).ToArray());
-        Assert.DoesNotContain(projection.AvailableActions, a => a.DisplayName == "Resume");
-        await Task.CompletedTask;
-    }
-
-    [Fact]
     public async Task Project_keeps_every_transition_when_all_are_caller_invocable()
     {
         // Regression guard for RA-364: the new filter must not cost a state
@@ -536,44 +487,6 @@ public class CaseServiceTests : IAsyncDisposable
             ["approve", "reject"],
             projection.AvailableActions.Select(a => a.ActionId).OrderBy(a => a).ToArray()
         );
-        await Task.CompletedTask;
-    }
-
-    [Fact]
-    public async Task Project_returns_no_actions_when_every_transition_is_non_invocable()
-    {
-        // The empty-actions case the frontend renders as "no actions
-        // available" — distinct from the terminal-state path below, which
-        // short-circuits before the filter runs.
-        var type = BuildType(
-            transitions:
-            [
-                new CaseTransition(
-                    "resume-a",
-                    "Resume",
-                    "submitted",
-                    "approved",
-                    CallerInvocable: false
-                ),
-            ]
-        );
-        var caseRecord = new Case
-        {
-            SourceSystemId = Ulid.NewUlid().ToString(),
-            CallbackUrl = "https://source-system.test/callback",
-            Nation = "ENGLAND",
-            OrgId = "test-org",
-            Id = Ulid.NewUlid().ToString(),
-            CaseType = CaseType,
-            StateId = "submitted",
-            SubmittedAt = InitialNow,
-            LastModifiedAt = InitialNow,
-            SubmittedBy = "test-client",
-        };
-
-        var projection = BuildService(type).Project(caseRecord);
-
-        Assert.Empty(projection.AvailableActions);
         await Task.CompletedTask;
     }
 
