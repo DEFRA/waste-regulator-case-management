@@ -58,91 +58,6 @@ public interface IWorkItemPersistence
     /// mutate any field on the supplied <see cref="WorkItem"/> before saving.
     /// </summary>
     Task ReplaceAsync(WorkItem workItem, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Set a single named field inside <see cref="WorkItem.Payload"/>, leaving
-    /// every other field of the document byte-for-byte untouched. Returns
-    /// <c>true</c> when a document was matched, <c>false</c> when no work item
-    /// with that id exists.
-    ///
-    /// <para>
-    /// Prefer this over load → mutate → <see cref="ReplaceAsync"/> whenever a
-    /// module needs to stamp one payload field. A full replace round-trips the
-    /// payload through the module's typed model, which MATERIALISES modelled-
-    /// but-absent fields as explicit nulls. That is not cosmetic: the
-    /// <c>payload.accreditationId</c> index is unique + <em>sparse</em>, and a
-    /// sparse index excludes only documents where the field is ABSENT — so
-    /// writing an explicit null pulls the document into the index and the
-    /// second such write anywhere in the collection fails with a duplicate-key
-    /// error (RA-291). A targeted <c>$set</c> cannot resurrect that class of
-    /// bug for any modelled-but-absent field, now or in future.
-    /// </para>
-    ///
-    /// <para>
-    /// Deliberately does NOT participate in the <see cref="WorkItem.Version"/>
-    /// optimistic-concurrency protocol and does not touch
-    /// <see cref="WorkItem.LastModifiedAt"/>: it is a single-field write that
-    /// cannot clobber a concurrent writer's changes to any other field, so
-    /// taking part in the version dance would only manufacture spurious
-    /// conflicts. Callers that need the version bumped should follow up with
-    /// a normal engine operation.
-    /// </para>
-    /// </summary>
-    Task<bool> SetPayloadFieldAsync(
-        Guid workItemId,
-        string fieldName,
-        BsonValue value,
-        CancellationToken cancellationToken = default
-    );
-
-    /// <summary>
-    /// Every work item of <paramref name="typeId"/> (archived included) whose
-    /// string <c>payload.{fieldName}</c> starts with <paramref name="prefix"/>,
-    /// returned in full (notes and audit log included). The prefix is matched
-    /// literally (regex-escaped and anchored), so an indexed payload field is
-    /// searched by index range rather than by collection scan.
-    ///
-    /// <para>
-    /// RA-691: lets a one-off correction locate its targets by a stable
-    /// identity instead of scanning the collection.
-    /// </para>
-    /// </summary>
-    Task<IReadOnlyList<WorkItem>> FindByPayloadFieldPrefixAsync(
-        string typeId,
-        string fieldName,
-        string prefix,
-        CancellationToken cancellationToken = default
-    );
-
-    /// <summary>
-    /// Atomically replace <c>payload.{fieldName}</c> with
-    /// <paramref name="newValue"/> AND append <paramref name="auditEntry"/>,
-    /// but only while the field still holds <paramref name="expectedValue"/>.
-    /// Returns <c>true</c> when the document was updated and <c>false</c>
-    /// when no work item with that id still holds the expected value (it
-    /// was never there, or something else changed it first) — in which
-    /// case nothing at all is written, so the audit entry can never
-    /// describe a change that did not happen.
-    ///
-    /// <para>
-    /// Unlike <see cref="SetPayloadFieldAsync"/> this DOES bump
-    /// <see cref="WorkItem.Version"/>: it appends to the audit log, and a
-    /// concurrent load → mutate → <see cref="ReplaceAsync"/> holding the old
-    /// version would otherwise silently overwrite both the corrected field
-    /// and the new entry. With the bump that writer gets a
-    /// <see cref="WorkItemConcurrencyException"/> and retries on fresh data.
-    /// <see cref="WorkItem.StateId"/> and <see cref="WorkItem.LastModifiedAt"/>
-    /// are left untouched: a correction is not a workflow event.
-    /// </para>
-    /// </summary>
-    Task<bool> CorrectPayloadFieldAsync(
-        Guid workItemId,
-        string fieldName,
-        BsonValue expectedValue,
-        BsonValue newValue,
-        WorkItemAuditEntry auditEntry,
-        CancellationToken cancellationToken = default
-    );
 }
 
 public sealed class WorkItemPersistence
@@ -322,108 +237,6 @@ public sealed class WorkItemPersistence
             );
         }
 
-        var orgId = query.NormalisedOrgId;
-        if (!string.IsNullOrEmpty(orgId))
-        {
-            var escaped = System.Text.RegularExpressions.Regex.Escape(orgId);
-            var pattern = new MongoDB.Bson.BsonRegularExpression(escaped, "i");
-            clauses.Add(builder.Regex("payload.applicationReference", pattern));
-        }
-
-        var registrationId = query.NormalisedRegistrationId;
-        if (!string.IsNullOrEmpty(registrationId))
-        {
-            var escaped = System.Text.RegularExpressions.Regex.Escape(registrationId);
-            var pattern = new MongoDB.Bson.BsonRegularExpression(escaped, "i");
-            clauses.Add(builder.Regex("_id", pattern));
-        }
-
-        var orgName = query.NormalisedOrgName;
-        if (!string.IsNullOrEmpty(orgName))
-        {
-            // Wrap in quotes for phrase matching: prevents OR word-matching where common
-            // words like "Org" in the query accidentally match unrelated items.
-            clauses.Add(
-                builder.Text($"\"{orgName}\"", new TextSearchOptions { CaseSensitive = false })
-            );
-        }
-
-        // RA-324: the Applications page merges the old separate orgName / orgId
-        // inputs into ONE "Organisation name or ID" box. It matches the needle
-        // case-insensitively as a substring of payload.organisationName OR
-        // payload.operatorOrganisationId (e.g. ORG-123-001). Registration-id is
-        // deliberately NOT matched here (dropped from the product per RA-324).
-        // Uses a regex on organisationName rather than the $text index because
-        // Mongo forbids OR-ing a $text clause with other conditions; fine at
-        // this volume since the list is always pre-filtered by typeId/state.
-        var organisation = query.NormalisedOrganisation;
-        if (!string.IsNullOrEmpty(organisation))
-        {
-            var escaped = System.Text.RegularExpressions.Regex.Escape(organisation);
-            var contains = new MongoDB.Bson.BsonRegularExpression(escaped, "i");
-            clauses.Add(
-                builder.Or(
-                    builder.Regex("payload.organisationName", contains),
-                    builder.Regex("payload.operatorOrganisationId", contains)
-                )
-            );
-        }
-
-        // RA-324: material filter (multi-select). payload.material stores a
-        // single lowercase token (plastic/glass/paper/steel/wood/aluminium/
-        // fibre); match each requested value case-insensitively as an exact
-        // token (anchored regex) so casing differences never hide a match, and
-        // OR multiple selections together.
-        if (query.Materials is { Count: > 0 } materials)
-        {
-            var materialClauses = materials
-                .Select(m => CaseInsensitiveExactMatch(builder, "payload.material", m))
-                .ToList();
-            clauses.Add(
-                materialClauses.Count == 1 ? materialClauses[0] : builder.Or(materialClauses)
-            );
-        }
-
-        // RA-412 (self-review): applicant-type filter. payload.wasteProcessingType
-        // has no backend enum, but it is NOT an open value set either — every
-        // producer writes exactly "exporter" or "reprocessor"
-        // (AccreditationIdGenerator.ResolveOperatorType / ApplicationReferenceGenerator
-        // both branch on nothing else), and critically every other reader of
-        // this field treats an ABSENT value as "reprocessor" — the documented
-        // pre-RA-314 fallback that preserves on-screen behaviour for old data.
-        // A naive per-value regex match on the literal stored string (the
-        // original version of this clause) does not: Mongo's $regex never
-        // matches a missing field, so filtering by Reprocessor would silently
-        // exclude every pre-RA-314 item and 9 of the 11 seeded fixtures —
-        // disagreeing with what the card label and every ID generator already
-        // decide for those same items.
-        //
-        // So "exporter" is a positive, case-insensitive match on the literal
-        // value; "reprocessor" is everything else — $not the exporter match,
-        // which Mongo defines to include a missing/differently-typed field,
-        // not just a literal "reprocessor" string. Selecting both collapses to
-        // no restriction, which is correct: between the two buckets every item
-        // matches exactly one.
-        if (query.WasteProcessingTypes is { Count: > 0 } wasteProcessingTypes)
-        {
-            var wantsExporter = wasteProcessingTypes.Any(t =>
-                t.Equals("exporter", StringComparison.OrdinalIgnoreCase)
-            );
-            var wantsReprocessor = wasteProcessingTypes.Any(t =>
-                !t.Equals("exporter", StringComparison.OrdinalIgnoreCase)
-            );
-
-            if (wantsExporter != wantsReprocessor)
-            {
-                var exporterFilter = CaseInsensitiveExactMatch(
-                    builder,
-                    "payload.wasteProcessingType",
-                    "exporter"
-                );
-                clauses.Add(wantsExporter ? exporterFilter : builder.Not(exporterFilter));
-            }
-        }
-
         var assigneeId = query.NormalisedAssigneeId;
         if (assigneeId is not null && query.UnassignedOnly)
         {
@@ -458,26 +271,6 @@ public sealed class WorkItemPersistence
         return clauses.Count == 0 ? builder.Empty : builder.And(clauses);
     }
 
-    /// <summary>
-    /// Case-insensitive exact-token match on a single BSON field: an anchored
-    /// regex so casing differences never hide a match without matching
-    /// substrings of a longer value. Shared by the <c>Materials</c> and
-    /// <c>WasteProcessingTypes</c> filter clauses above, which both need this
-    /// exact idiom.
-    /// </summary>
-    private static FilterDefinition<WorkItem> CaseInsensitiveExactMatch(
-        FilterDefinitionBuilder<WorkItem> builder,
-        string field,
-        string value
-    ) =>
-        builder.Regex(
-            field,
-            new MongoDB.Bson.BsonRegularExpression(
-                $"^{System.Text.RegularExpressions.Regex.Escape(value)}$",
-                "i"
-            )
-        );
-
     [ExcludeFromCodeCoverage]
     public async Task ReplaceAsync(WorkItem workItem, CancellationToken cancellationToken = default)
     {
@@ -507,98 +300,6 @@ public sealed class WorkItemPersistence
         );
     }
 
-    public async Task<bool> SetPayloadFieldAsync(
-        Guid workItemId,
-        string fieldName,
-        BsonValue value,
-        CancellationToken cancellationToken = default
-    )
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(fieldName);
-        // A C# null would be written as an explicit BSON null; callers must
-        // pass BsonNull.Value deliberately if that is what they mean.
-        ArgumentNullException.ThrowIfNull(value);
-        EnsureTopLevelPayloadField(fieldName);
-
-        var result = await Collection.UpdateOneAsync(
-            Builders<WorkItem>.Filter.Eq(w => w.Id, workItemId),
-            Builders<WorkItem>.Update.Set($"payload.{fieldName}", value),
-            cancellationToken: cancellationToken
-        );
-
-        return result.MatchedCount > 0;
-    }
-
-    public async Task<IReadOnlyList<WorkItem>> FindByPayloadFieldPrefixAsync(
-        string typeId,
-        string fieldName,
-        string prefix,
-        CancellationToken cancellationToken = default
-    )
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(typeId);
-        ArgumentException.ThrowIfNullOrWhiteSpace(prefix);
-        EnsureTopLevelPayloadField(fieldName);
-
-        // Anchored + escaped: a literal prefix, never a caller-supplied
-        // pattern, and an index-range scan on an indexed field.
-        var pattern = new BsonRegularExpression(
-            "^" + System.Text.RegularExpressions.Regex.Escape(prefix)
-        );
-        var filter = Builders<WorkItem>.Filter.And(
-            Builders<WorkItem>.Filter.Eq(w => w.TypeId, typeId),
-            Builders<WorkItem>.Filter.Regex($"payload.{fieldName}", pattern)
-        );
-
-        return await Collection.Find(filter).ToListAsync(cancellationToken);
-    }
-
-    public async Task<bool> CorrectPayloadFieldAsync(
-        Guid workItemId,
-        string fieldName,
-        BsonValue expectedValue,
-        BsonValue newValue,
-        WorkItemAuditEntry auditEntry,
-        CancellationToken cancellationToken = default
-    )
-    {
-        ArgumentNullException.ThrowIfNull(expectedValue);
-        ArgumentNullException.ThrowIfNull(newValue);
-        ArgumentNullException.ThrowIfNull(auditEntry);
-        EnsureTopLevelPayloadField(fieldName);
-
-        var result = await Collection.UpdateOneAsync(
-            Builders<WorkItem>.Filter.And(
-                Builders<WorkItem>.Filter.Eq(w => w.Id, workItemId),
-                Builders<WorkItem>.Filter.Eq($"payload.{fieldName}", expectedValue)
-            ),
-            Builders<WorkItem>.Update
-                .Set($"payload.{fieldName}", newValue)
-                .Push(w => w.AuditLog, auditEntry)
-                .Inc(w => w.Version, 1),
-            cancellationToken: cancellationToken
-        );
-
-        return result.ModifiedCount > 0;
-    }
-
-    // Guard the dotted-path injection: a caller passing "a.b" or a "$"
-    // operator would target a nested document or rewrite a different part
-    // of the envelope entirely. The payload-field methods' contract is one
-    // field directly under `payload`.
-    private static void EnsureTopLevelPayloadField(string fieldName)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(fieldName);
-        if (fieldName.Contains('.', StringComparison.Ordinal) || fieldName.StartsWith('$'))
-        {
-            throw new ArgumentException(
-                "Payload field name must be a single field directly under 'payload' "
-                    + "(no dotted paths, no update operators).",
-                nameof(fieldName)
-            );
-        }
-    }
-
     [ExcludeFromCodeCoverage]
     protected override List<CreateIndexModel<WorkItem>> DefineIndexes(
         IndexKeysDefinitionBuilder<WorkItem> builder
@@ -625,16 +326,12 @@ public sealed class WorkItemPersistence
                 builder.Descending(w => w.SubmittedAt)
             )
         );
-        // Search by org name: text index supports word-level case-insensitive $text queries.
-        // Only one text index is allowed per collection; scope it to organisationName.
-        var orgNameText = new CreateIndexModel<WorkItem>(builder.Text("payload.organisationName"));
         return
         [
             typeAndSubmitted,
             stateAndSubmitted,
             submittedDescending,
             assigneeAndSubmitted,
-            orgNameText,
         ];
     }
 }

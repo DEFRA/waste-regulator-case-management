@@ -10,19 +10,6 @@ namespace WasteRegulatorCaseManagement.Test.WorkItems.Core;
 /// </summary>
 public class WorkItemQueryBindingTests
 {
-    private static readonly string[] s_expectedSingleMaterial = ["plastic"];
-    private static readonly string[] s_expectedSingleWasteProcessingType = ["exporter"];
-    private static readonly string[] s_materialsPlasticGlassAndPaper =
-    [
-        "plastic",
-        "glass",
-        "paper",
-    ];
-    private static readonly string[] s_wasteProcessingTypesExporterAndReprocessor =
-    [
-        "exporter",
-        "reprocessor",
-    ];
 
     private static IQueryCollection Q(params (string Key, string Value)[] pairs)
     {
@@ -100,121 +87,10 @@ public class WorkItemQueryBindingTests
         Assert.Null(query.SubmittedBy);
     }
 
-    // ──────────────────────────── OrgId / RegistrationId / OrgName ──────────────────────────────
-
-    [Fact]
-    public void OrgIdIsBound()
-    {
-        var query = WorkItemQueryBinding.FromQueryString(Q(("orgId", "EPR-123")));
-
-        Assert.Equal("EPR-123", query.OrgId);
-    }
-
-    [Fact]
-    public void RegistrationIdIsBound()
-    {
-        var query = WorkItemQueryBinding.FromQueryString(Q(("registrationId", "abc-123")));
-
-        Assert.Equal("abc-123", query.RegistrationId);
-    }
-
-    [Fact]
-    public void OrgNameIsBound()
-    {
-        var query = WorkItemQueryBinding.FromQueryString(Q(("orgName", "Acme Ltd")));
-
-        Assert.Equal("Acme Ltd", query.OrgName);
-    }
-
-    [Fact]
-    public void MissingOrgFieldsDefaultToNull()
-    {
-        var query = WorkItemQueryBinding.FromQueryString(new QueryCollection());
-
-        Assert.Null(query.OrgId);
-        Assert.Null(query.RegistrationId);
-        Assert.Null(query.OrgName);
-    }
-
-    // ─────────────────────────── RA-324 filter + sort params ──────────────────────────
-
-    [Fact]
-    public void OrganisationIsBound()
-    {
-        var query = WorkItemQueryBinding.FromQueryString(Q(("organisation", "Acme or ORG-1")));
-
-        Assert.Equal("Acme or ORG-1", query.Organisation);
-    }
-
-    [Fact]
-    public void SingleMaterialIsBound()
-    {
-        var query = WorkItemQueryBinding.FromQueryString(Q(("material", "plastic")));
-
-        Assert.NotNull(query.Materials);
-        Assert.Equal(s_expectedSingleMaterial, query.Materials!);
-    }
-
-    [Fact]
-    public void RepeatedMaterialParamsAreAllBound()
-    {
-        var dict = new Dictionary<string, Microsoft.Extensions.Primitives.StringValues>(
-            StringComparer.OrdinalIgnoreCase)
-        {
-            ["material"] = new Microsoft.Extensions.Primitives.StringValues(
-                s_materialsPlasticGlassAndPaper)
-        };
-        var query = WorkItemQueryBinding.FromQueryString(new QueryCollection(dict));
-
-        Assert.Equal(s_materialsPlasticGlassAndPaper, query.Materials!);
-    }
-
-    [Fact]
-    public void MissingMaterialAndOrganisationDefaultToNull()
-    {
-        var query = WorkItemQueryBinding.FromQueryString(new QueryCollection());
-
-        Assert.Null(query.Materials);
-        Assert.Null(query.Organisation);
-    }
-
-    // ───────────────────────── WasteProcessingType (RA-412) ─────────────────────────
-
-    [Fact]
-    public void SingleWasteProcessingTypeIsBound()
-    {
-        var query = WorkItemQueryBinding.FromQueryString(Q(("wasteProcessingType", "exporter")));
-
-        Assert.NotNull(query.WasteProcessingTypes);
-        Assert.Equal(s_expectedSingleWasteProcessingType, query.WasteProcessingTypes!);
-    }
-
-    [Fact]
-    public void RepeatedWasteProcessingTypeParamsAreAllBound()
-    {
-        var dict = new Dictionary<string, Microsoft.Extensions.Primitives.StringValues>(
-            StringComparer.OrdinalIgnoreCase)
-        {
-            ["wasteProcessingType"] = new Microsoft.Extensions.Primitives.StringValues(
-                s_wasteProcessingTypesExporterAndReprocessor)
-        };
-        var query = WorkItemQueryBinding.FromQueryString(new QueryCollection(dict));
-
-        Assert.Equal(s_wasteProcessingTypesExporterAndReprocessor, query.WasteProcessingTypes!);
-    }
-
-    [Fact]
-    public void MissingWasteProcessingTypeDefaultsToNull()
-    {
-        var query = WorkItemQueryBinding.FromQueryString(new QueryCollection());
-
-        Assert.Null(query.WasteProcessingTypes);
-    }
+    // ───────────────────────── Sort (RA-324) ─────────────────────────
 
     [Theory]
-    [InlineData("organisation")]
     [InlineData("status")]
-    [InlineData("due-date")]
     public void SortTokenIsBound(string token)
     {
         var query = WorkItemQueryBinding.FromQueryString(Q(("sort", token)));

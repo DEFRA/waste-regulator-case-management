@@ -16,14 +16,8 @@ internal static class WorkItemQueryBinding
     internal const string UnassignedOnlyParam = "unassigned";
     internal const string PageParam = "page";
     internal const string PageSizeParam = "pageSize";
-    internal const string WasteProcessingTypeParam = "wasteProcessingType";
-    internal const string OrgIdParam = "orgId";
-    internal const string RegistrationIdParam = "registrationId";
-    internal const string OrgNameParam = "orgName";
 
-    // RA-324 (Applications page) filter + sort params.
-    internal const string MaterialParam = "material";
-    internal const string OrganisationParam = "organisation";
+    // RA-324 sort params.
     internal const string SortParam = "sort";
     internal const string SortDirectionParam = "dir";
 
@@ -42,12 +36,6 @@ internal static class WorkItemQueryBinding
             Page: ReadInt(query, PageParam, defaultValue: 1),
             PageSize: ReadInt(query, PageSizeParam, defaultValue: WorkItemQuery.DefaultPageSize),
             SubmittedBy: ReadString(query, SubmittedByParam),
-            WasteProcessingTypes: ReadStrings(query, WasteProcessingTypeParam),
-            OrgId: ReadString(query, OrgIdParam),
-            RegistrationId: ReadString(query, RegistrationIdParam),
-            OrgName: ReadString(query, OrgNameParam),
-            Materials: ReadStrings(query, MaterialParam),
-            Organisation: ReadString(query, OrganisationParam),
             Sort: ReadString(query, SortParam),
             SortDescending: ReadSortDirection(query, SortDirectionParam));
     }

@@ -36,17 +36,6 @@ namespace WasteRegulatorCaseManagement.WorkItems.Core;
 /// is enforced by the frontend, not this filter — the backend applies
 /// whatever scope the request asks for. Empty/null means "any submitter".
 /// </param>
-/// <param name="WasteProcessingTypes">
-/// Restrict to items by applicant type. Empty/null means "any type".
-/// A collection containing <c>exporter</c> (case-insensitive) restricts to
-/// items whose <c>payload.wasteProcessingType</c> literally equals
-/// <c>exporter</c>; any other supplied value is treated as
-/// <c>reprocessor</c>, which matches everything else — including an ABSENT
-/// field, the documented pre-RA-314 fallback (see
-/// <see cref="WorkItemPersistence.BuildFilter"/> for why that matters).
-/// Supplying both buckets is equivalent to supplying neither: every item
-/// matches exactly one, so the filter becomes "any type".
-/// </param>
 public sealed record WorkItemQuery(
     IReadOnlyCollection<string>? TypeIds = null,
     IReadOnlyCollection<string>? StateIds = null,
@@ -56,12 +45,6 @@ public sealed record WorkItemQuery(
     int Page = 1,
     int PageSize = 20,
     string? SubmittedBy = null,
-    IReadOnlyCollection<string>? WasteProcessingTypes = null,
-    string? OrgId = null,
-    string? RegistrationId = null,
-    string? OrgName = null,
-    IReadOnlyCollection<string>? Materials = null,
-    string? Organisation = null,
     string? Sort = null,
     bool? SortDescending = null)
 {
@@ -102,26 +85,6 @@ public sealed record WorkItemQuery(
     /// <summary>Trimmed submitted-by, or <c>null</c> if blank/whitespace.</summary>
     public string? NormalisedSubmittedBy =>
         string.IsNullOrWhiteSpace(SubmittedBy) ? null : SubmittedBy.Trim();
-
-    /// <summary>Trimmed org id (payload.applicationReference), or <c>null</c> if blank/whitespace.</summary>
-    public string? NormalisedOrgId =>
-        string.IsNullOrWhiteSpace(OrgId) ? null : OrgId.Trim();
-
-    /// <summary>Trimmed registration id (work item _id prefix), or <c>null</c> if blank/whitespace.</summary>
-    public string? NormalisedRegistrationId =>
-        string.IsNullOrWhiteSpace(RegistrationId) ? null : RegistrationId.Trim();
-
-    /// <summary>Trimmed org name (payload.organisationName), or <c>null</c> if blank/whitespace.</summary>
-    public string? NormalisedOrgName =>
-        string.IsNullOrWhiteSpace(OrgName) ? null : OrgName.Trim();
-
-    /// <summary>
-    /// Trimmed combined "organisation name or ID" needle (RA-324), or
-    /// <c>null</c> if blank/whitespace. Matched against
-    /// <c>payload.organisationName</c> and <c>payload.operatorOrganisationId</c>.
-    /// </summary>
-    public string? NormalisedOrganisation =>
-        string.IsNullOrWhiteSpace(Organisation) ? null : Organisation.Trim();
 }
 
 /// <summary>

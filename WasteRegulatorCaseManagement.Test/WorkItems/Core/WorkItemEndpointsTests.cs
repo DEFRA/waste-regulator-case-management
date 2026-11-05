@@ -1877,37 +1877,6 @@ public class WorkItemEndpointsTests
         public IWorkItemPersistence Inner { get; } = inner;
         public WorkItemQuery? LastQuery { get; private set; }
 
-        public Task<bool> SetPayloadFieldAsync(
-            Guid workItemId,
-            string fieldName,
-            BsonValue value,
-            CancellationToken cancellationToken = default) =>
-            Inner.SetPayloadFieldAsync(workItemId, fieldName, value, cancellationToken);
-
-        public Task<IReadOnlyList<WorkItem>> FindByPayloadFieldPrefixAsync(
-            string typeId,
-            string fieldName,
-            string prefix,
-            CancellationToken cancellationToken = default
-        ) => Inner.FindByPayloadFieldPrefixAsync(typeId, fieldName, prefix, cancellationToken);
-
-        public Task<bool> CorrectPayloadFieldAsync(
-            Guid workItemId,
-            string fieldName,
-            BsonValue expectedValue,
-            BsonValue newValue,
-            WorkItemAuditEntry auditEntry,
-            CancellationToken cancellationToken = default
-        ) =>
-            Inner.CorrectPayloadFieldAsync(
-                workItemId,
-                fieldName,
-                expectedValue,
-                newValue,
-                auditEntry,
-                cancellationToken
-            );
-
         public Task CreateAsync(WorkItem workItem, CancellationToken cancellationToken = default) =>
             Inner.CreateAsync(workItem, cancellationToken);
 

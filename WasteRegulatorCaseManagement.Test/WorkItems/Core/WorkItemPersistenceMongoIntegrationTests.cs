@@ -25,25 +25,7 @@ namespace WasteRegulatorCaseManagement.Test.WorkItems.Core;
 public sealed class WorkItemPersistenceMongoIntegrationTests : IAsyncDisposable, IDisposable
 {
     private static readonly string[] s_expectedFirstPage = ["a", "b"];
-    private static readonly string[] s_expectedMultiMaterialMatches = ["g", "p"];
     private static readonly string[] s_expectedNewestSubmittedFirst = ["newer", "older"];
-    private static readonly string[] s_expectedOrganisationAscending =
-    [
-        "Apple",
-        "banana",
-        "Cherry",
-    ];
-    private static readonly string[] s_expectedOrganisationDescending =
-    [
-        "Cherry",
-        "banana",
-        "Apple",
-    ];
-    private static readonly string[] s_expectedReprocessorMatches =
-    [
-        "No Field Co",
-        "Reprocessor Co",
-    ];
     private static readonly string[] s_expectedSecondPage = ["c", "d"];
     private static readonly string[] s_expectedStatusRankAscending =
     [
@@ -55,10 +37,6 @@ public sealed class WorkItemPersistenceMongoIntegrationTests : IAsyncDisposable,
     ];
     private static readonly string[] s_expectedStatusRankDescending = ["q", "a", "s-new", "s-old"];
     private static readonly string[] s_expectedThirdPage = ["e"];
-    private static readonly string[] s_materialsPlasticAndGlass = ["plastic", "glass"];
-    private static readonly string[] s_materialsPlasticUpperCase = ["PLASTIC"];
-    private static readonly string[] s_wasteProcessingTypesExporter = ["exporter"];
-    private static readonly string[] s_wasteProcessingTypesReprocessor = ["reprocessor"];
 
     /// <summary>
     /// Deterministic timestamp seed used for every <see cref="WorkItem"/>
@@ -153,7 +131,7 @@ public sealed class WorkItemPersistenceMongoIntegrationTests : IAsyncDisposable,
     }
 
     [Fact]
-    public async Task DefineIndexes_creates_the_five_documented_indexes_on_startup()
+    public async Task DefineIndexes_creates_the_four_documented_indexes_on_startup()
     {
         // Constructor of WorkItemPersistence calls EnsureIndexes; we
         // assert what the driver actually wrote (not what we asked for)
@@ -170,7 +148,7 @@ public sealed class WorkItemPersistenceMongoIntegrationTests : IAsyncDisposable,
             .OrderBy(s => s, StringComparer.Ordinal)
             .ToList();
 
-        Assert.Equal(5, keyDocs.Count);
+        Assert.Equal(4, keyDocs.Count);
         Assert.Contains(
             keyDocs,
             k => k.Contains("\"typeId\" : 1") && k.Contains("\"submittedAt\" : -1")
@@ -191,8 +169,6 @@ public sealed class WorkItemPersistenceMongoIntegrationTests : IAsyncDisposable,
                 && !k.Contains("stateId")
                 && !k.Contains("assignedToId")
         );
-        // Text index for org name search — the key doc always contains "_fts":"text".
-        Assert.Contains(keyDocs, k => k.Contains("\"_fts\" : \"text\""));
     }
 
     [Fact]
@@ -215,8 +191,8 @@ public sealed class WorkItemPersistenceMongoIntegrationTests : IAsyncDisposable,
             var indexes = await (
                 await collection.Indexes.ListAsync(TestContext.Current.CancellationToken)
             ).ToListAsync(TestContext.Current.CancellationToken);
-            // Mongo's default _id_ index plus our five.
-            Assert.Equal(6, indexes.Count);
+            // Mongo's default _id_ index plus our four.
+            Assert.Equal(5, indexes.Count);
         }
         finally
         {
@@ -280,30 +256,15 @@ public sealed class WorkItemPersistenceMongoIntegrationTests : IAsyncDisposable,
 
     private async Task SeedAsync(
         string organisationName,
-        string? operatorOrganisationId = null,
-        string? material = null,
-        string? wasteProcessingType = null,
         string stateId = "submitted",
         int submittedMinutesAgo = 0
     )
     {
         var now = _time.GetUtcNow().UtcDateTime;
         var payload = new BsonDocument { ["organisationName"] = organisationName };
-        if (operatorOrganisationId is not null)
-        {
-            payload["operatorOrganisationId"] = operatorOrganisationId;
-        }
-        if (material is not null)
-        {
-            payload["material"] = material;
-        }
-        if (wasteProcessingType is not null)
-        {
-            payload["wasteProcessingType"] = wasteProcessingType;
-        }
         var item = new WorkItem
         {
-            TypeId = "re-accreditation",
+            TypeId = "test",
             StateId = stateId,
             SubmittedAt = now.AddMinutes(-submittedMinutesAgo),
             LastModifiedAt = now,
@@ -325,35 +286,6 @@ public sealed class WorkItemPersistenceMongoIntegrationTests : IAsyncDisposable,
         var page = await _persistence.QueryAsync(new WorkItemQuery(), ct);
 
         Assert.Equal(s_expectedNewestSubmittedFirst, OrgOrder(page));
-    }
-
-    [Fact]
-    public async Task QueryAsync_sort_organisation_orders_case_insensitively_ascending()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        await SeedAsync("banana");
-        await SeedAsync("Apple");
-        await SeedAsync("Cherry");
-
-        var page = await _persistence.QueryAsync(new WorkItemQuery(Sort: "organisation"), ct);
-
-        Assert.Equal(s_expectedOrganisationAscending, OrgOrder(page));
-    }
-
-    [Fact]
-    public async Task QueryAsync_sort_organisation_descending_reverses()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        await SeedAsync("banana");
-        await SeedAsync("Apple");
-        await SeedAsync("Cherry");
-
-        var page = await _persistence.QueryAsync(
-            new WorkItemQuery(Sort: "organisation", SortDescending: true),
-            ct
-        );
-
-        Assert.Equal(s_expectedOrganisationDescending, OrgOrder(page));
     }
 
     [Fact]
@@ -398,44 +330,30 @@ public sealed class WorkItemPersistenceMongoIntegrationTests : IAsyncDisposable,
     }
 
     [Fact]
-    public async Task QueryAsync_sort_status_succeeds_when_no_work_item_types_are_registered()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        var persistence = new WorkItemPersistence(
-            _clientFactory,
-            NullLoggerFactory.Instance,
-            new WorkItemRegistry([])
-        );
-        await SeedAsync("only", stateId: "submitted");
-
-        var page = await persistence.QueryAsync(new WorkItemQuery(Sort: "status"), ct);
-
-        Assert.Equal("only", Assert.Single(page.Items).Payload["organisationName"].AsString);
-    }
-
-    [Fact]
     public async Task QueryAsync_sorted_path_paginates_and_reports_full_total()
     {
         var ct = TestContext.Current.CancellationToken;
-        // Five items, page size 2, sorted A→Z: exercises the aggregation
+        // Five items, page size 2, all sharing a status rank so the
+        // newest-submitted tiebreak fixes the order: exercises the aggregation
         // $sort → $unset → $skip → $limit across more than one page and checks
         // TotalCount reflects the full filtered count, not the page size — so a
         // swapped $sort/$limit order or off-by-one $skip cannot stay green.
-        foreach (var name in new[] { "e", "a", "d", "b", "c" })
-        {
-            await SeedAsync(name);
-        }
+        await SeedAsync("e", submittedMinutesAgo: 4);
+        await SeedAsync("a", submittedMinutesAgo: 0);
+        await SeedAsync("d", submittedMinutesAgo: 3);
+        await SeedAsync("b", submittedMinutesAgo: 1);
+        await SeedAsync("c", submittedMinutesAgo: 2);
 
         var page1 = await _persistence.QueryAsync(
-            new WorkItemQuery(Sort: "organisation", Page: 1, PageSize: 2),
+            new WorkItemQuery(Sort: "status", Page: 1, PageSize: 2),
             ct
         );
         var page2 = await _persistence.QueryAsync(
-            new WorkItemQuery(Sort: "organisation", Page: 2, PageSize: 2),
+            new WorkItemQuery(Sort: "status", Page: 2, PageSize: 2),
             ct
         );
         var page3 = await _persistence.QueryAsync(
-            new WorkItemQuery(Sort: "organisation", Page: 3, PageSize: 2),
+            new WorkItemQuery(Sort: "status", Page: 3, PageSize: 2),
             ct
         );
 
@@ -455,7 +373,7 @@ public sealed class WorkItemPersistenceMongoIntegrationTests : IAsyncDisposable,
         var now = _time.GetUtcNow().UtcDateTime;
         var item = new WorkItem
         {
-            TypeId = "re-accreditation",
+            TypeId = "test",
             StateId = "submitted",
             SubmittedAt = now,
             LastModifiedAt = now,
@@ -484,7 +402,7 @@ public sealed class WorkItemPersistenceMongoIntegrationTests : IAsyncDisposable,
         };
         await _persistence.CreateAsync(item, ct);
 
-        var page = await _persistence.QueryAsync(new WorkItemQuery(Sort: "organisation"), ct);
+        var page = await _persistence.QueryAsync(new WorkItemQuery(Sort: "status"), ct);
 
         var got = Assert.Single(page.Items);
         // Projection preserved on the aggregation path, and the computed sort
@@ -495,35 +413,19 @@ public sealed class WorkItemPersistenceMongoIntegrationTests : IAsyncDisposable,
     }
 
     [Fact]
-    public async Task QueryAsync_material_filter_matches_case_insensitively()
+    public async Task QueryAsync_sort_status_succeeds_when_no_work_item_types_are_registered()
     {
         var ct = TestContext.Current.CancellationToken;
-        await SeedAsync("p", material: "plastic");
-        await SeedAsync("g", material: "glass");
-
-        var page = await _persistence.QueryAsync(
-            new WorkItemQuery(Materials: s_materialsPlasticUpperCase),
-            ct
+        var persistence = new WorkItemPersistence(
+            _clientFactory,
+            NullLoggerFactory.Instance,
+            new WorkItemRegistry([])
         );
+        await SeedAsync("only", stateId: "submitted");
 
-        var got = Assert.Single(page.Items);
-        Assert.Equal("plastic", got.Payload["material"].AsString);
-    }
+        var page = await persistence.QueryAsync(new WorkItemQuery(Sort: "status"), ct);
 
-    [Fact]
-    public async Task QueryAsync_material_filter_matches_any_of_multiple_selections()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        await SeedAsync("p", material: "plastic");
-        await SeedAsync("g", material: "glass");
-        await SeedAsync("w", material: "wood");
-
-        var page = await _persistence.QueryAsync(
-            new WorkItemQuery(Materials: s_materialsPlasticAndGlass, Sort: "organisation"),
-            ct
-        );
-
-        Assert.Equal(s_expectedMultiMaterialMatches, OrgOrder(page));
+        Assert.Equal("only", Assert.Single(page.Items).Payload["organisationName"].AsString);
     }
 
     // RA-412 (self-review): a real-Mongo round trip for the applicant-type
@@ -531,74 +433,6 @@ public sealed class WorkItemPersistenceMongoIntegrationTests : IAsyncDisposable,
     // semantics that a render-only test (WorkItemPersistenceBuildFilterTests)
     // cannot — $regex/$not behaviour against a genuinely missing field is
     // exactly what the original version of this filter got wrong.
-
-    [Fact]
-    public async Task QueryAsync_exporter_filter_matches_only_the_literal_value()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        await SeedAsync("Exporter Co", wasteProcessingType: "exporter");
-        await SeedAsync("Reprocessor Co", wasteProcessingType: "reprocessor");
-        await SeedAsync("No Field Co");
-
-        var page = await _persistence.QueryAsync(
-            new WorkItemQuery(WasteProcessingTypes: s_wasteProcessingTypesExporter),
-            ct
-        );
-
-        Assert.Equal("Exporter Co", Assert.Single(page.Items).Payload["organisationName"].AsString);
-    }
-
-    [Fact]
-    public async Task QueryAsync_reprocessor_filter_includes_items_with_no_wasteProcessingType_field()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        await SeedAsync("Exporter Co", wasteProcessingType: "exporter");
-        await SeedAsync("Reprocessor Co", wasteProcessingType: "reprocessor");
-        await SeedAsync("No Field Co");
-
-        var page = await _persistence.QueryAsync(
-            new WorkItemQuery(WasteProcessingTypes: s_wasteProcessingTypesReprocessor, Sort: "organisation"),
-            ct
-        );
-
-        // Both the explicit "reprocessor" item AND the item with no field at
-        // all match — the pre-RA-314 fallback every other reader applies.
-        Assert.Equal(s_expectedReprocessorMatches, OrgOrder(page));
-    }
-
-    [Fact]
-    public async Task QueryAsync_wasteProcessingType_filter_matches_case_insensitively()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        await SeedAsync("Exporter Co", wasteProcessingType: "Exporter");
-
-        var page = await _persistence.QueryAsync(
-            new WorkItemQuery(WasteProcessingTypes: s_wasteProcessingTypesExporter),
-            ct
-        );
-
-        Assert.Single(page.Items);
-    }
-
-    [Fact]
-    public async Task QueryAsync_organisation_filter_matches_name_or_operator_org_id()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        await SeedAsync("Acme Recycling", operatorOrganisationId: "ORG-111-001");
-        await SeedAsync("Beta Metals", operatorOrganisationId: "ORG-222-002");
-
-        var byName = await _persistence.QueryAsync(new WorkItemQuery(Organisation: "acme"), ct);
-        Assert.Equal(
-            "Acme Recycling",
-            Assert.Single(byName.Items).Payload["organisationName"].AsString
-        );
-
-        var byOrgId = await _persistence.QueryAsync(new WorkItemQuery(Organisation: "ORG-222"), ct);
-        Assert.Equal(
-            "Beta Metals",
-            Assert.Single(byOrgId.Items).Payload["organisationName"].AsString
-        );
-    }
 
     [Fact]
     public async Task ReplaceAsync_throws_concurrency_exception_when_version_does_not_match()
@@ -704,111 +538,6 @@ public sealed class WorkItemPersistenceMongoIntegrationTests : IAsyncDisposable,
     }
 
     // ---------------------- RA-291 SetPayloadFieldAsync ----------------------
-
-    [Fact]
-    public async Task SetPayloadFieldAsync_sets_only_the_named_field_and_leaves_the_rest_intact()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        var now = s_seedNow.UtcDateTime;
-        var workItem = new WorkItem
-        {
-            TypeId = "re-accreditation",
-            StateId = "submitted",
-            SubmittedAt = now,
-            LastModifiedAt = now,
-            SubmittedBy = "client-1",
-        };
-        workItem.ReplacePayload(
-            new BsonDocument
-            {
-                ["organisationName"] = "Acme Recycling Ltd",
-                ["applicationReference"] = "RA-000000123",
-            }
-        );
-        await _persistence.CreateAsync(workItem, ct);
-        var versionBefore = workItem.Version;
-
-        var matched = await _persistence.SetPayloadFieldAsync(
-            workItem.Id,
-            "currentQuery",
-            new BsonDocument { ["reason"] = "why" },
-            ct
-        );
-
-        Assert.True(matched);
-        var fetched = await _persistence.GetByIdAsync(workItem.Id, ct);
-        Assert.Equal("why", fetched!.Payload["currentQuery"]["reason"].AsString);
-        // Existing keys untouched, absent keys still absent — the guarantee
-        // the whole method exists for (RA-291).
-        Assert.Equal("Acme Recycling Ltd", fetched.Payload["organisationName"].AsString);
-        Assert.Equal("RA-000000123", fetched.Payload["applicationReference"].AsString);
-        Assert.False(fetched.Payload.Contains("accreditationId"));
-        // Deliberately outside the optimistic-concurrency protocol.
-        Assert.Equal(versionBefore, fetched.Version);
-    }
-
-    [Fact]
-    public async Task SetPayloadFieldAsync_returns_false_when_no_work_item_matches()
-    {
-        var matched = await _persistence.SetPayloadFieldAsync(
-            Guid.NewGuid(),
-            "currentQuery",
-            BsonNull.Value,
-            TestContext.Current.CancellationToken
-        );
-
-        Assert.False(matched);
-    }
-
-    [Theory]
-    // Dotted paths would reach into a nested document ...
-    [InlineData("a.b")]
-    // ... and a $-prefixed name would be read as an update operator, letting a
-    // caller rewrite a different part of the envelope entirely.
-    [InlineData("$set")]
-    public async Task SetPayloadFieldAsync_rejects_field_names_that_escape_the_payload(
-        string fieldName
-    )
-    {
-        await Assert.ThrowsAsync<ArgumentException>(() =>
-            _persistence.SetPayloadFieldAsync(
-                Guid.NewGuid(),
-                fieldName,
-                BsonNull.Value,
-                TestContext.Current.CancellationToken
-            )
-        );
-    }
-
-    [Theory]
-    [InlineData("")]
-    [InlineData("   ")]
-    public async Task SetPayloadFieldAsync_rejects_a_blank_field_name(string fieldName)
-    {
-        await Assert.ThrowsAsync<ArgumentException>(() =>
-            _persistence.SetPayloadFieldAsync(
-                Guid.NewGuid(),
-                fieldName,
-                BsonNull.Value,
-                TestContext.Current.CancellationToken
-            )
-        );
-    }
-
-    // A C# null is rejected outright so it can't be written as an explicit
-    // BSON null by accident; a deliberate null must be BsonNull.Value.
-    [Fact]
-    public async Task SetPayloadFieldAsync_rejects_a_null_value()
-    {
-        await Assert.ThrowsAsync<ArgumentNullException>(() =>
-            _persistence.SetPayloadFieldAsync(
-                Guid.NewGuid(),
-                "currentQuery",
-                null!,
-                TestContext.Current.CancellationToken
-            )
-        );
-    }
 
     // ------------------- RA-342 legacy snapshot tolerance -------------------
 
@@ -971,118 +700,4 @@ public sealed class WorkItemPersistenceMongoIntegrationTests : IAsyncDisposable,
         return workItem;
     }
 
-    [Fact]
-    public async Task FindByPayloadFieldPrefixAsync_matches_the_literal_prefix_only_within_the_type()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        var match = await CreateWithAccreditationIdAsync("A27ER5005270322PL", ct: ct);
-        await CreateWithAccreditationIdAsync("A26ER5005270246PL", ct: ct);
-        await CreateWithAccreditationIdAsync("XA27ER5005270999PL", ct: ct);
-        await CreateWithAccreditationIdAsync("A27ER5005270111PL", typeId: "other-type", ct: ct);
-
-        var found = await _persistence.FindByPayloadFieldPrefixAsync(
-            "re-accreditation",
-            "accreditationId",
-            "A27ER500527",
-            ct
-        );
-
-        var item = Assert.Single(found);
-        Assert.Equal(match.Id, item.Id);
-        // Returned in full, unlike QueryAsync.
-        Assert.Single(item.AuditLog);
-    }
-
-    [Fact]
-    public async Task FindByPayloadFieldPrefixAsync_treats_regex_metacharacters_literally()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        await CreateWithAccreditationIdAsync("A27ER5005270322PL", ct: ct);
-
-        var found = await _persistence.FindByPayloadFieldPrefixAsync(
-            "re-accreditation",
-            "accreditationId",
-            "A27.*",
-            ct
-        );
-
-        Assert.Empty(found);
-    }
-
-    [Fact]
-    public async Task CorrectPayloadFieldAsync_sets_the_field_appends_the_entry_and_bumps_the_version()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        var workItem = await CreateWithAccreditationIdAsync("A27ER5005270322PL", ct: ct);
-        var versionBefore = workItem.Version;
-        var entry = new WorkItemAuditEntry
-        {
-            Action = "accreditation-number-corrected",
-            ActionDisplayName = "Accreditation number corrected",
-            CreatedAt = s_seedNow.UtcDateTime,
-            Details = new Dictionary<string, string?> { ["from"] = "A27ER5005270322PL" },
-        };
-
-        var written = await _persistence.CorrectPayloadFieldAsync(
-            workItem.Id,
-            "accreditationId",
-            "A27ER5005270322PL",
-            "A27ER5005270246PL",
-            entry,
-            ct
-        );
-
-        Assert.True(written);
-        var fetched = (await _persistence.GetByIdAsync(workItem.Id, ct))!;
-        Assert.Equal("A27ER5005270246PL", fetched.Payload["accreditationId"].AsString);
-        Assert.Equal(
-            ["accreditation-issued", "accreditation-number-corrected"],
-            fetched.AuditLog.Select(e => e.Action)
-        );
-        Assert.Equal(entry.Id, fetched.AuditLog[1].Id);
-        Assert.Equal(versionBefore + 1, fetched.Version);
-        Assert.Equal("approved", fetched.StateId);
-        Assert.Equal(workItem.LastModifiedAt, fetched.LastModifiedAt);
-    }
-
-    [Fact]
-    public async Task CorrectPayloadFieldAsync_writes_nothing_when_the_field_no_longer_holds_the_expected_value()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        var workItem = await CreateWithAccreditationIdAsync("A27ER5005270999PL", ct: ct);
-
-        var written = await _persistence.CorrectPayloadFieldAsync(
-            workItem.Id,
-            "accreditationId",
-            "A27ER5005270322PL",
-            "A27ER5005270246PL",
-            new WorkItemAuditEntry { Action = "x", ActionDisplayName = "x" },
-            ct
-        );
-
-        Assert.False(written);
-        var fetched = (await _persistence.GetByIdAsync(workItem.Id, ct))!;
-        Assert.Equal("A27ER5005270999PL", fetched.Payload["accreditationId"].AsString);
-        Assert.Single(fetched.AuditLog);
-        Assert.Equal(workItem.Version, fetched.Version);
-    }
-
-    [Theory]
-    [InlineData("a.b")]
-    [InlineData("$set")]
-    public async Task CorrectPayloadFieldAsync_rejects_field_names_that_escape_the_payload(
-        string fieldName
-    )
-    {
-        await Assert.ThrowsAsync<ArgumentException>(() =>
-            _persistence.CorrectPayloadFieldAsync(
-                Guid.NewGuid(),
-                fieldName,
-                "a",
-                "b",
-                new WorkItemAuditEntry { Action = "x", ActionDisplayName = "x" },
-                TestContext.Current.CancellationToken
-            )
-        );
-    }
 }

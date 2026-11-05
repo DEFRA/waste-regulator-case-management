@@ -97,7 +97,6 @@ public class WorkItemSortTests
     }
 
     [Theory]
-    [InlineData("ORGANISATION", WorkItemSort.OrgField)]
     [InlineData("Status", WorkItemSort.RankField)]
     public void BuildStages_normalises_token_casing_and_whitespace(string token, string expectedComputedField)
     {
@@ -117,33 +116,6 @@ public class WorkItemSortTests
     {
         Assert.Throws<ArgumentNullException>(() =>
             WorkItemSort.BuildStages("status", descendingOverride: null, null!));
-    }
-
-    [Fact]
-    public void BuildStages_organisation_lowercases_and_sorts_ascending_by_default()
-    {
-        var stages = WorkItemSort.BuildStages("organisation", descendingOverride: null, s_rank);
-
-        Assert.NotNull(stages);
-        var (addFields, sort) = stages!.Value;
-        // _sortOrg = $toLower($ifNull(payload.organisationName, ""))
-        var ifNull = addFields![WorkItemSort.OrgField]["$toLower"]["$ifNull"].AsBsonArray;
-        Assert.Equal("$payload.organisationName", ifNull[0].AsString);
-        Assert.Equal("", ifNull[1].AsString);
-        Assert.Equal(1, sort[WorkItemSort.OrgField].AsInt32);
-        // Stable tiebreak.
-        Assert.Equal(-1, sort["submittedAt"].AsInt32);
-        Assert.Equal(1, sort["_id"].AsInt32);
-    }
-
-    [Fact]
-    public void BuildStages_organisation_descending_flips_only_the_primary_key()
-    {
-        var stages = WorkItemSort.BuildStages("organisation", descendingOverride: true, s_rank);
-
-        var (_, sort) = stages!.Value;
-        Assert.Equal(-1, sort[WorkItemSort.OrgField].AsInt32);
-        Assert.Equal(-1, sort["submittedAt"].AsInt32);
     }
 
     [Fact]

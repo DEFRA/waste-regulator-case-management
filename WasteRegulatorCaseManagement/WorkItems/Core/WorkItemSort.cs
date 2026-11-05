@@ -4,7 +4,7 @@ namespace WasteRegulatorCaseManagement.WorkItems.Core;
 
 /// <summary>
 /// Translates the <c>?sort=</c> / <c>?dir=</c> query params into the MongoDB
-/// aggregation stages that reorder the Applications list (RA-324). Kept as a
+/// aggregation stages that reorder the work item list (RA-324). Kept as a
 /// pure, side-effect-free helper so the tricky bit — the status workflow
 /// ranking — can be unit-tested without a database.
 ///
@@ -16,18 +16,16 @@ namespace WasteRegulatorCaseManagement.WorkItems.Core;
 /// </summary>
 internal static class WorkItemSort
 {
-    internal const string OrganisationToken = "organisation";
     internal const string StatusToken = "status";
 
     // Computed fields injected by an $addFields stage. They must be removed
     // ($unset) before the aggregation result is deserialised because WorkItem
     // does not ignore extra BSON elements.
     internal const string RankField = "_sortRank";
-    internal const string OrgField = "_sortOrg";
 
     /// <summary>Every computed field name this helper can inject; always $unset before deserialising.</summary>
     internal static readonly IReadOnlyList<string> ComputedFields =
-        [RankField, OrgField];
+        [RankField];
 
     // Rank assigned to any state id the registry does not know about, so
     // unexpected states sort last under a Status sort rather than colliding
@@ -78,22 +76,9 @@ internal static class WorkItemSort
 
         return sortToken?.Trim().ToLowerInvariant() switch
         {
-            OrganisationToken => BuildOrganisationStages(descendingOverride),
             StatusToken => BuildStatusStages(descendingOverride, statusRank),
             _ => null
         };
-    }
-
-    private static (BsonDocument?, BsonDocument) BuildOrganisationStages(bool? descendingOverride)
-    {
-        // Default A→Z. Case-insensitive by lower-casing so "acme" and "Acme"
-        // sort together; a missing name becomes "" (sorts first ascending).
-        var dir = descendingOverride == true ? -1 : 1;
-        var addFields = new BsonDocument(OrgField,
-            new BsonDocument("$toLower",
-                new BsonDocument("$ifNull", new BsonArray { "$payload.organisationName", "" })));
-        var sort = StableSort(OrgField, dir);
-        return (addFields, sort);
     }
 
     private static (BsonDocument?, BsonDocument) BuildStatusStages(
