@@ -2,7 +2,6 @@ using System.Diagnostics.CodeAnalysis;
 using WasteRegulatorCaseManagement.Auth;
 using WasteRegulatorCaseManagement.Config;
 using WasteRegulatorCaseManagement.Health;
-using WasteRegulatorCaseManagement.Integrations.OperatorBackend;
 using WasteRegulatorCaseManagement.Notifications;
 using WasteRegulatorCaseManagement.Utils;
 using WasteRegulatorCaseManagement.Utils.Background;
@@ -11,7 +10,6 @@ using WasteRegulatorCaseManagement.Utils.Logging;
 using WasteRegulatorCaseManagement.Utils.Mongo;
 using WasteRegulatorCaseManagement.WorkItems.Core;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 using MongoDB.Driver.Authentication.AWS;
 using Notify.Client;
@@ -92,10 +90,9 @@ static void ConfigureServices(WebApplicationBuilder builder)
     // one — including named clients from AddHttpClient(...) that don't
     // configure a primary handler (an omitted handler is NOT the same as
     // "unproxied"; it just inherits this). Any client that must bypass
-    // Squid (e.g. "DefaultClient" below, for CDP-service-to-CDP-service
-    // calls) has to say so explicitly via
+    // Squid (CDP-service-to-CDP-service calls) has to say so explicitly via
     // ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
-    // { UseProxy = false }) — see RA-311 query-push-proxy-fix.
+    // { UseProxy = false }).
     var defaultProxy = ProxyHttpMessageHandler.BuildDefaultProxy();
     if (defaultProxy is not null)
     {
@@ -139,7 +136,6 @@ static void ConfigureServices(WebApplicationBuilder builder)
     ConfigureMongo(services, configuration);
     ConfigureCors(services, configuration);
     ConfigureNotifications(services, configuration, builder.Environment);
-    ConfigureOperatorBackendPush(services, configuration);
 
     services
         .AddOptions<LivenessHealthCheckOptions>()
@@ -271,9 +267,7 @@ static IReadOnlyDictionary<string, string> BuildClientSecrets(IConfiguration con
     // rewrites "__" to ":" while loading, so the real env var
     // AUTH_SHARED_SECRET__MANAGEMENT_FE is stored under config key
     // "AUTH_SHARED_SECRET:MANAGEMENT_FE" — a GetValue call using the literal
-    // double-underscore string never matches it. Same pattern OperatorBackendApi
-    // uses elsewhere in this file (GetSection("OperatorBackendApi"), not a
-    // literal "OperatorBackendApi__Url" GetValue key).
+    // double-underscore string never matches it.
     AddCallerSecret(
         map,
         config,
@@ -396,21 +390,6 @@ static void ConfigureHttpClients(IServiceCollection services)
 {
     services.AddTransient<ProxyHttpMessageHandler>();
 
-    // RA-311/MBE-1: plain, unproxied client for direct CDP-service-to-CDP-service
-    // calls (the operator backend push adapter) — mirrors the operator
-    // backend's own "DefaultClient" registration, which it uses for its own
-    // calls into this service. UseProxy = false is required, not optional:
-    // omitting the primary handler here would silently inherit
-    // HttpClient.DefaultProxy (set process-wide above for the Notify SDK),
-    // routing this internal cdp-int.defra.cloud traffic through Squid, which
-    // doesn't allow-list it and 502s the tunnel (see RA-311
-    // query-push-proxy-fix; caught this in CDP `test`, not locally, because
-    // HTTPS_PROXY is only set in CDP).
-    services
-        .AddHttpClient("DefaultClient")
-        .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { UseProxy = false })
-        .AddHeaderPropagation();
-
     // services.AddHttpClientWithTracing<IExampleClient, ExampleClient>();
     // services.AddHttpClientWithProxy<IExternalClient, ExternalClient>();
 }
@@ -428,55 +407,6 @@ static void ConfigureMongo(IServiceCollection services, IConfiguration configura
         .ValidateOnStart();
 
     services.AddSingleton<IMongoDbClientFactory, MongoDbClientFactory>();
-}
-
-/// <summary>
-/// RA-311/MBE-1: outbound push-to-operator-backend wiring. Adapter selection
-/// is keyed off the explicit <c>OperatorBackendApi:Enabled</c> switch
-/// (defaulting to <c>false</c>), not off whether <c>Url</c> happens to be
-/// set — so a deploy of this code is behaviour-neutral until the flag is
-/// turned on per environment, and the same flag doubles as the rollback
-/// lever (MBE-F5). When disabled, the no-op adapter is registered (the
-/// query flow still succeeds — the push is fire-and-forget) and a startup
-/// warning is logged once via
-/// <see cref="OperatorBackendPushDisabledWarningHostedService"/>. When
-/// enabled, <see cref="OperatorBackendApiConfigValidator"/> fails startup if
-/// <c>Url</c>/<c>ClientId</c>/<c>SharedSecret</c> are incomplete, rather than
-/// letting every push fail silently at runtime.
-/// </summary>
-[ExcludeFromCodeCoverage]
-static void ConfigureOperatorBackendPush(IServiceCollection services, IConfiguration configuration)
-{
-    // SharedSecret is deliberately NOT part of the OperatorBackendApi__* section —
-    // CDP's secrets naming convention is a flat UPPER_SNAKE_CASE name, not the
-    // nested Section__Property form the rest of this config uses — so it's
-    // sourced from OPERATOR_BACKEND_SHARED_SECRET instead (same flat name the
-    // operator backend's CaseManagementAuth verifies inbound pushes against).
-    services
-        .AddOptions<OperatorBackendApiConfig>()
-        .Configure<IConfiguration>(
-            (options, config) =>
-            {
-                config.GetSection("OperatorBackendApi").Bind(options);
-                options.SharedSecret = config.GetValue<string>("OPERATOR_BACKEND_SHARED_SECRET");
-            }
-        )
-        .ValidateOnStart();
-    services.AddSingleton<
-        IValidateOptions<OperatorBackendApiConfig>,
-        OperatorBackendApiConfigValidator
-    >();
-
-    var enabled = configuration.GetSection("OperatorBackendApi").GetValue("Enabled", false);
-
-    if (!enabled)
-    {
-        services.AddSingleton<IOperatorBackendPushAdapter, NullOperatorBackendPushAdapter>();
-        services.AddHostedService<OperatorBackendPushDisabledWarningHostedService>();
-        return;
-    }
-
-    services.AddSingleton<IOperatorBackendPushAdapter, HttpOperatorBackendPushAdapter>();
 }
 
 /// <summary>

@@ -178,20 +178,15 @@ per-environment list — the tables below summarise it.
 | --- | --- | --- |
 | `AUTH_SHARED_SECRET__BACKEND` | Yes | Verifies inbound signed requests from `epr-register-enrol-backend` — must match backend's `CASE_MANAGEMENT_API_SHARED_SECRET` exactly |
 | `AUTH_SHARED_SECRET__MANAGEMENT_FE` | Yes | Verifies inbound signed requests from `epr-register-enrol-management-fe` — must match management-fe's `BACKEND_API_SHARED_SECRET` exactly |
-| `OPERATOR_BACKEND_SHARED_SECRET` | Yes | Signs this service's outbound query-note push to `epr-register-enrol-backend` — must match backend's `AUTH_SHARED_SECRET__MANAGEMENT_BE` exactly |
 | `Auth__BackendClientId` | No | Expected `x-cdp-client-id` on inbound calls from backend (default `epr-register-enrol-backend`) |
 | `Auth__ManagementFeClientId` | No | Expected `x-cdp-client-id` on inbound calls from management-fe (default `frontend`) — must differ from `Auth__BackendClientId` or the service throws at first request |
 | `TestOrganisations__Enabled` | No | Default `false`. CDP **test** only (RA-000): enables the mgmt-tests caller below. The service refuses to start with it `true` when `ENVIRONMENT=prod` |
 | `AUTH_SHARED_SECRET__MGMT_TESTS` | Yes | Verifies inbound signed requests from the `epr-register-enrol-mgmt-tests` journey suite — must match the suite's `MANAGEMENT_BE_SHARED_SECRET`. Registered only when `TestOrganisations__Enabled=true`; never set in prod |
 | `Auth__MgmtTestsClientId` | No | Expected `x-cdp-client-id` on inbound calls from the mgmt-tests suite (default `epr-register-enrol-mgmt-tests`) |
-| `OperatorBackendApi__Enabled` | No | Master switch for the outbound query-note push to backend. `false` locally, `true` in dev/test/perf-test/ext-test/prod |
-| `OperatorBackendApi__Url` | No | Base URL of `epr-register-enrol-backend` |
-| `OperatorBackendApi__ClientId` | No | `clientId` this service asserts on its outbound push (default `waste-regulator-case-management`) — must match backend's `CaseManagementAuth:ExpectedClientId` |
 
-The `BACKEND`, `MANAGEMENT_FE` and `OPERATOR_BACKEND` secrets are optional in
-Development (the handler falls back to header-trust mode while no caller
-secret at all is registered, and the outbound push is disabled by default) but
-required in every other environment. `AUTH_SHARED_SECRET__MGMT_TESTS` is
+The `BACKEND` and `MANAGEMENT_FE` secrets are optional in Development (the
+handler falls back to header-trust mode while no caller secret at all is
+registered) but required in every other environment. `AUTH_SHARED_SECRET__MGMT_TESTS` is
 optional everywhere and set only on CDP test.
 
 ### GOV.UK Notify
@@ -222,12 +217,11 @@ Notify-testing walkthrough.
 ```bash
 AUTH_SHARED_SECRET__BACKEND=local-fake-backend-shared-secret-do-not-use
 AUTH_SHARED_SECRET__MANAGEMENT_FE=local-fake-managementfe-shared-secret-do-not-use
-OPERATOR_BACKEND_SHARED_SECRET=local-fake-operator-backend-shared-secret-do-not-use
 NOTIFY_API_KEY=local-dev-not-a-real-notify-key
 ```
 
 A fresh `dotnet run` needs none of these to boot or pass its own health
-check — Development falls back to header-trust auth, a no-op Notify client, and `OperatorBackendApi__Enabled=false` by default.
+check — Development falls back to header-trust auth and a no-op Notify client.
 
 ## Testing
 

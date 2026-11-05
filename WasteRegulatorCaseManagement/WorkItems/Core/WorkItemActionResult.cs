@@ -52,30 +52,6 @@ public enum WorkItemActionFailureCode
     /// it to a 503 and the caller can safely retry the submission.
     /// </summary>
     ApplicationReferenceExhausted,
-
-    /// <summary>
-    /// A mandatory upstream notification a mutation is gated on could not be
-    /// delivered within its retry budget, so the mutation was abandoned before
-    /// anything was persisted (epr-p86e / RA-410: the operator-journey status
-    /// push that the re-accreditation decision is gated on). No state changed —
-    /// the caller may retry. Distinct from a client error: the endpoint maps it
-    /// to a generic 500 rather than a 4xx, because the request itself was
-    /// well-formed and the failure is a server-side dependency being
-    /// unreachable.
-    /// </summary>
-    UpstreamNotificationFailed,
-
-    /// <summary>
-    /// RA-448 phase 2: the backend call to resolve a real accreditation
-    /// number failed or timed out, so re-accreditation approval was
-    /// abandoned before anything was persisted. Kept distinct from
-    /// <see cref="UpstreamNotificationFailed"/> (a different dependency, the
-    /// operator-journey status push on /decision) so logs/alerts/error
-    /// codes keyed on this enum can tell the two outages apart. No state
-    /// changed — the caller may retry. Maps to a generic 500, not a 4xx, for
-    /// the same reason as <see cref="UpstreamNotificationFailed"/>.
-    /// </summary>
-    AccreditationNumberUnavailable,
 }
 
 /// <summary>

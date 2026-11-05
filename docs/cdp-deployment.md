@@ -25,11 +25,8 @@ These are produced by the CDP portal at deploy time unless noted otherwise.
 | `Mongo__DatabaseUri`       | CDP MongoDB binding   | Authenticated via IAM (`MONGODB-AWS`).                      |
 | `Mongo__DatabaseName`      | Service config        | Defaults to `waste-regulator-case-management`.     |
 | `TraceHeader`              | Service config        | Defaults to `x-cdp-request-id`.                             |
-| `HTTP_PROXY` / `HTTPS_PROXY` | CDP platform        | CDP outbound proxy. Required for any external HTTP call. Also assigned process-wide to `HttpClient.DefaultProxy` at startup (for the GOV.UK Notify SDK's bare `HttpClient`) — any named `HttpClient` that must bypass Squid (e.g. `"DefaultClient"`, see [Operator backend push](#operator-backend-push-ra-311mbe-1)) has to opt out explicitly via `ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { UseProxy = false })`; omitting a primary handler is not the same as being unproxied. |
+| `HTTP_PROXY` / `HTTPS_PROXY` | CDP platform        | CDP outbound proxy. Required for any external HTTP call. Also assigned process-wide to `HttpClient.DefaultProxy` at startup (for the GOV.UK Notify SDK's bare `HttpClient`) — any named `HttpClient` that must bypass Squid has to opt out explicitly via `ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { UseProxy = false })`; omitting a primary handler is not the same as being unproxied. |
 | `TRUSTSTORE_*`             | CDP platform          | Loaded by `LoadCustomTrustStoreFromEnvironment`.            |
-| `OperatorBackendApi__Enabled` | Service config     | Master switch for the RA-311/MBE-1 outbound query push (see [Operator backend push](#operator-backend-push-ra-311mbe-1) below). Defaults to `false` — deploying this code is behaviour-neutral until this is explicitly set. |
-| `OperatorBackendApi__Url`  | Service config        | Internal base URL of `epr-register-enrol-backend` (CDP service-discovery name, not a public ingress hostname). Required (non-blank) when `OperatorBackendApi__Enabled=true` — startup fails otherwise. |
-| `OperatorBackendApi__ClientId` | Service config    | Defaults to `waste-regulator-case-management`. Only override if `epr-register-enrol-backend`'s `CaseManagementAuth:ExpectedClientId` expects a different value — prefer leaving both at their defaults. |
 | `Auth__ManagementFeClientId` | Service config  | The `clientId` (`x-cdp-client-id` value) that `management-fe` is expected to assert. Defaults to `frontend` — override only if `management-fe`'s own `BACKEND_API_CLIENT_ID` is set to something else. Must be distinct from `Auth__BackendClientId` (see RA-345 below). |
 | `Auth__BackendClientId` | Service config      | The `clientId` that `epr-register-enrol-backend` is expected to assert. Defaults to `epr-register-enrol-backend` — override only if that service's own `CaseWorking__ClientId` is set to something else. Must be distinct from `Auth__ManagementFeClientId`; the service throws at first request if the two collide. |
 | `ENVIRONMENT`              | CDP platform          | Platform environment name (`local`, `dev`, `test`, `perf-test`, `ext-test`, `prod`). Read by `CdpEnvironment.Read` for `NotifySendingPolicy` — see [Notify sending by environment](#notify-sending-by-environment) below — and for the [test organisations](#test-organisations-ra-000) prod startup guard. |
@@ -45,7 +42,6 @@ Create via the CDP self-service portal under the service's "secrets" tab:
 | `AUTH_SHARED_SECRET__MANAGEMENT_FE` | HMAC secret used to verify signed trust headers from `management-fe` (see [BFF signing contract](#bff-signing-contract) below). Must match the secret `management-fe` signs with (`AUTH_SHARED_SECRET` in that service). **Required in all non-Development environments.** The service will reject every authenticated request with `401` until at least one caller's secret is set (see RA-345 below). Generate with `openssl rand -base64 32`. |
 | `AUTH_SHARED_SECRET__BACKEND` | HMAC secret used to verify signed trust headers from `epr-register-enrol-backend` (see [BFF signing contract](#bff-signing-contract) below). Must match the secret `epr-register-enrol-backend` signs with (`CASE_MANAGEMENT_API_SHARED_SECRET` in that service — a flat name, not the nested `CaseWorking__*` form the rest of that service's `CaseWorking` config uses, per CDP's secrets naming convention). **Required in all non-Development environments.** Distinct from `AUTH_SHARED_SECRET__MANAGEMENT_FE` — this is the entire point of RA-345 (per-caller secrets): rotating or revoking one caller's secret must never require touching the other's. Generate with `openssl rand -base64 32`. |
 | `NOTIFY_API_KEY`     | GOV.UK Notify API key. Only takes effect when the `Notify__Enabled` master switch is `true` (RA-422; default `false`, set per environment in cdp-app-config). With the flag off — the default in every environment — the notification hook is never registered, so no email is sent and no `notification-*` audit entries are written regardless of this key. With the flag on but this key absent, the service boots with a no-op Notify client (notifications logged, not sent). Even with the flag on and this key set, dev and localhost suppress sending regardless — see [Notify sending by environment](#notify-sending-by-environment). |
-| `OPERATOR_BACKEND_SHARED_SECRET` | HMAC shared secret this service signs its outbound RA-311/MBE-1 query-push requests with — a flat name, not the nested `OperatorBackendApi__*` form the rest of that config section uses, per CDP's secrets naming convention. Must match `AUTH_SHARED_SECRET__MANAGEMENT_BE` on `epr-register-enrol-backend` exactly — a mismatch on either side 401s every push. The two secrets deliberately don't share a name: this service names its own outbound secrets by target/purpose (matching `epr-register-enrol-backend`'s own `CASE_MANAGEMENT_API_SHARED_SECRET` pattern for its outbound calls into this service), while `epr-register-enrol-backend` names its inbound secrets by caller (matching this service's own `AUTH_SHARED_SECRET__MANAGEMENT_FE`/`AUTH_SHARED_SECRET__BACKEND` pattern below) — same convention applied from each service's own side, not a shared literal name. **Required when `OperatorBackendApi__Enabled=true`** — startup fails otherwise. Generate with `openssl rand -base64 32`. Distinct from the two `AUTH_SHARED_SECRET__*` secrets above (this service's *inbound* secrets) and from whatever `epr-register-enrol-backend` uses for its own calls into this service (`CASE_MANAGEMENT_API_SHARED_SECRET`) — four separate secrets in total, not one, do not conflate them when rotating. |
 | `AUTH_SHARED_SECRET__MGMT_TESTS` | **CDP test only.** HMAC secret used to verify signed trust headers from the `epr-register-enrol-mgmt-tests` journey suite (clientId `Auth__MgmtTestsClientId`, default `epr-register-enrol-mgmt-tests`). Must match the suite's `MANAGEMENT_BE_SHARED_SECRET`. Registered only when `TestOrganisations__Enabled=true` as well; never set in prod. See [Test organisations](#test-organisations-ra-000). |
 
 > **RA-345 (per-caller secrets):** prior to RA-345 there was a single
@@ -180,35 +176,6 @@ is otherwise entirely the BFF's concern (see
 authoritative implementation and
 `docs/adr/0003-hmac-canonical-v2-timestamp-nonce.md` for the timestamp/nonce
 rationale.
-
-## Operator backend push (RA-311/MBE-1)
-
-When a case worker raises a query on a re-accreditation application, this
-service pushes the query note and queried sections to
-`epr-register-enrol-backend` so the operator's own record reflects it. The
-push is off by default (`OperatorBackendApi:Enabled=false`) so deploying this
-code never changes behaviour on its own — it must be explicitly turned on per
-environment once `Url`/`ClientId`/`SharedSecret` are configured there. The
-same flag is the rollback lever: set it back to `false` to disable the push
-without a code deploy (queries still succeed for the case worker either way —
-the push is fire-and-forget). Sequencing note: set the matching
-`AUTH_SHARED_SECRET__MANAGEMENT_BE` on `epr-register-enrol-backend` **before**
-flipping `OperatorBackendApi__Enabled=true` here, or the first pushes 401.
-
-Every push attempt is recorded on the work item's audit log:
-`query-push-sent` (2xx), `query-push-skipped` (disabled — not an error, does
-not alert), or `query-push-failed` (attempted and errored — does not alert on
-its own yet; see the RA-311 fix doc for the planned failure-rate alert).
-
-The push goes out on the `"DefaultClient"` named `HttpClient`
-(`Program.cs::ConfigureHttpClients`), which deliberately bypasses the Squid
-proxy (`UseProxy = false`) rather than inheriting `HttpClient.DefaultProxy`.
-This is required, not incidental: the target is an internal
-`*.cdp-int.defra.cloud` service-discovery hostname, which isn't (and
-shouldn't be) on Squid's outbound allow-list — see
-[Squid proxy allow-list](#squid-proxy-allow-list). Routing this traffic
-through Squid causes a `502` proxy-tunnel failure that only surfaces in CDP
-(where `HTTPS_PROXY` is set), not locally.
 
 ## AWS resources to provision
 

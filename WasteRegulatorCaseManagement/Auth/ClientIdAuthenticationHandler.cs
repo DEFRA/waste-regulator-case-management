@@ -627,9 +627,9 @@ public class ClientIdAuthenticationHandler(
 /// irrelevant to the wire format — <see cref="ClientIdAuthenticationHandler.ComputeSignature"/>
 /// reads named properties, not positional order; the WIRE order is fixed
 /// inside that method's own payload string. Role/nation default to null so
-/// every caller that has no use for them (e.g. <see cref="OperatorBackendSigning.AddHeaders"/>)
-/// can omit them — and null (as opposed to empty) is also what selects the
-/// legacy six-line wire form, see <see cref="ClientIdAuthenticationHandler.ComputeSignature"/>.
+/// every caller that has no use for them can omit them — and null (as opposed
+/// to empty) is also what selects the legacy six-line wire form, see
+/// <see cref="ClientIdAuthenticationHandler.ComputeSignature"/>.
 /// Declared top-level (not nested) so every caller in this namespace can
 /// reference it unqualified.
 /// </summary>

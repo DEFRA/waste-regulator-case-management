@@ -16,8 +16,7 @@ namespace WasteRegulatorCaseManagement.Notifications;
 /// </list>
 /// Consulted at service-registration time (before the options graph is
 /// built), so it reads raw configuration rather than a bound
-/// <see cref="NotifyConfig"/> — mirroring how <c>ConfigureOperatorBackendPush</c>
-/// reads <c>OperatorBackendApi:Enabled</c>.
+/// <see cref="NotifyConfig"/>.
 /// </summary>
 internal static class NotifyFeature
 {

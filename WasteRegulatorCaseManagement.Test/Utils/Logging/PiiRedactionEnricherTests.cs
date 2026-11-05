@@ -121,9 +121,8 @@ public class PiiRedactionEnricherTests
     [Fact]
     public void Enrich_RedactsEmailEmbeddedInAnyStringProperty_RegardlessOfPropertyName()
     {
-        // Mirrors HttpAccreditationNumberAdapter.cs / HttpOperatorBackendPushAdapter.cs's
-        // `{Body}` logging, which can echo a submitted email back inside the
-        // operator backend's raw error text.
+        // An HTTP adapter logging an upstream response `{Body}` can echo a
+        // submitted email back inside the upstream's raw error text.
         var logEvent = CreateLogEvent(
             new LogEventProperty(
                 "Body",
