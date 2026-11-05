@@ -33,10 +33,6 @@ public abstract class MongoService<T>
 			Collection.CollectionNamespace.CollectionName,
 			Collection.Database.DatabaseNamespace);
 
-		// Delegate to the reconciler so a deploy that tightens an existing
-		// index's options (e.g. RA-219 making payload.applicationReference
-		// unique+sparse) does not break startup with an IndexOptionsConflict
-		// against the older copy still on the server.
-		MongoIndexReconciler.EnsureIndexes(Collection, indexes, Logger);
+		Collection.Indexes.CreateMany(indexes);
 	}
 }
