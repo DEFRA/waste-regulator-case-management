@@ -4,7 +4,6 @@ using WasteRegulatorCaseManagement.Config;
 using WasteRegulatorCaseManagement.Health;
 using WasteRegulatorCaseManagement.Notifications;
 using WasteRegulatorCaseManagement.Utils;
-using WasteRegulatorCaseManagement.Utils.Background;
 using WasteRegulatorCaseManagement.Utils.Http;
 using WasteRegulatorCaseManagement.Utils.Logging;
 using WasteRegulatorCaseManagement.Utils.Mongo;
@@ -151,14 +150,6 @@ static void ConfigureServices(WebApplicationBuilder builder)
         .AddCheck<RequiredConfigHealthCheck>("required-config", tags: ["ready"]);
 
     ConfigureWorkItems(builder);
-
-    // RA-132: in-process background-task queue + hosted worker. Used by
-    // the re-accreditation approval service to fan out post-approval
-    // side-effects (audit appends, future "publishing" events) on a
-    // freshly-scoped service provider so HTTP request scope teardown
-    // does not unwind them.
-    services.AddSingleton<IBackgroundTaskQueue, BackgroundTaskQueue>();
-    services.AddHostedService<QueuedHostedService>();
 }
 
 [ExcludeFromCodeCoverage]
