@@ -371,10 +371,8 @@ public static class WorkItemEndpoints
         CancellationToken cancellationToken
     )
     {
-        // Security boundary (RA-311/MBE-1 review): some transitions
-        // (currently the re-accreditation module's resume-during-*/
-        // continue-review-during-* pairs) are declared with
-        // CallerInvocable: false because several of them share the same
+        // Security boundary (RA-311/MBE-1 review): a transition is declared
+        // CallerInvocable: false when several transitions share the same
         // FromStateId — the engine's normal "is the item in the right
         // state" guard cannot tell them apart, so a caller who could invoke
         // one directly here would pick the target state themselves instead
@@ -385,8 +383,7 @@ public static class WorkItemEndpoints
         // rules the item was submitted under.
         var workItem = await persistence.GetByIdAsync(id, cancellationToken);
         // RA-351: an action id can be declared on more than one state (e.g.
-        // `sla-extend` self-loops on both `assessment-in-progress` and
-        // `queried`). Resolve the CallerInvocable check against the transition
+        // a self-loop available from two states). Resolve the CallerInvocable check against the transition
         // for the item's CURRENT state — matching on action id alone would
         // test the first-declared transition, which can differ in
         // CallerInvocable from the one that actually applies here.

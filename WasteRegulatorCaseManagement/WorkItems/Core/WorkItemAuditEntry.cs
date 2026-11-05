@@ -79,9 +79,7 @@ public sealed class WorkItemAuditEntry
     /// Every runtime producer stamps this, so on current data null means
     /// "written before epr-rr9s" and nothing else. Keep it that way: if you
     /// add a new site that constructs a WorkItemAuditEntry, set StateId from
-    /// the work item AFTER any state mutation. The one deliberate exception
-    /// is the ReAccreditation backfill migrations, whose entries record a
-    /// data-repair event rather than a caseworker-visible state change.
+    /// the work item AFTER any state mutation.
     /// </summary>
     public string? StateId { get; init; }
 }

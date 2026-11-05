@@ -105,8 +105,8 @@ public sealed class WorkItem
 
     /// <summary>
     /// RA-132: swap the payload for a freshly-built <paramref name="payload"/>
-    /// document. Used by module service objects (e.g. the re-accreditation
-    /// approval service) that need to rebuild the payload as part of the same
+    /// document. Used by module service objects that need to rebuild the
+    /// payload as part of the same
     /// atomic <see cref="IWorkItemPersistence.ReplaceAsync"/> that records
     /// the state transition and audit entries.
     /// </summary>

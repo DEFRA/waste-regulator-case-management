@@ -12,8 +12,7 @@
     <InternalsVisibleTo Include="WasteRegulatorCaseManagement.Test" />
     <!-- Castle DynamicProxy (used by NSubstitute) emits proxies into a
          separate dynamic assembly. Without this entry NSubstitute
-         cannot substitute internal interfaces such as the
-         module-scoped IReAccreditationDecisionService. -->
+         cannot substitute internal interfaces. -->
     <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
   </ItemGroup>
 

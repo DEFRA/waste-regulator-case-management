@@ -73,8 +73,7 @@ public class WorkItemAvailableActionsWireContractTests
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
         using var document = JsonDocument.Parse(json);
 
-        // The seeder also populates demo re-accreditation items, so pick ours
-        // out by id rather than assuming a single-element list.
+        // Pick ours out by id rather than assuming a single-element list.
         var item = Assert.Single(
             document.RootElement.GetProperty("items").EnumerateArray()
                 .Where(i => i.GetProperty("id").GetString() == workItemId.ToString()));
@@ -148,8 +147,8 @@ public class WorkItemAvailableActionsWireContractTests
                 services.AddSingleton<IWorkItemPersistence>(sp =>
                     new WorkItemPersistence(clientFactory, sp.GetRequiredService<ILoggerFactory>(), sp.GetRequiredService<IWorkItemRegistry>()));
 
-                // Mirrors the re-accreditation shape that produced the bug:
-                // several non-invocable transitions sharing a FromStateId and
+                // Mirrors the shape that produced the bug: several
+                // non-invocable transitions sharing a FromStateId and
                 // a DisplayName, alongside one genuine caller-invocable action.
                 services.AddSingleton<IWorkItemType>(new TestWorkItemType(
                     TypeId,

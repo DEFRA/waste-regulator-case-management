@@ -375,9 +375,7 @@ static void ConfigureNotifications(
     // RA-422: outbound Case Management service email is centrally disabled via Notify:Enabled
     // (default false). Register the no-op client when notifications are
     // disabled OR no API key is configured — belt-and-braces, so no real email
-    // can leave even if something resolves INotifyClient directly. The
-    // notification post-action hook (which also writes the notification-* audit
-    // entries) is gated on the same flag in ReAccreditationModule.
+    // can leave even if something resolves INotifyClient directly.
     if (!NotifyFeature.NotificationsEnabled(configuration) || string.IsNullOrWhiteSpace(apiKey))
     {
         services.AddSingleton<INotifyClient, NoOpNotifyClient>();

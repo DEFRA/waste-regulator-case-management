@@ -481,10 +481,9 @@ public class ClientIdAuthenticationHandler(
     /// <item><b>Extended</b> (RA-469):
     /// <c>v3\nclientId\nuserId\nuserName\nrole\nnation\ntimestamp\nnonce</c>.
     /// Role/nation were dropped from the payload at v3 (ADR-0005) but
-    /// RA-469 puts them back: <see cref="ReAccreditationEndpoints"/>'s
-    /// recycling-operations endpoint enforces AC17 authorization backend-
-    /// side using the resulting user:role/user:nation claims, so those two
-    /// values need the same signed-integrity guarantee as userId/userName —
+    /// RA-469 puts them back: an endpoint that authorises backend-side on
+    /// the resulting user:role/user:nation claims needs those two values to
+    /// have the same signed-integrity guarantee as userId/userName —
     /// otherwise a party able to alter headers on an already-signed request
     /// (e.g. a misbehaving intermediary) could bypass that authorization
     /// while the signature still validates. Produced whenever either role

@@ -184,7 +184,7 @@ public sealed class WorkItemService : IWorkItemService
         // RA-126: enrich the birth entry with the originating BFF /
         // application context so audit consumers can reconstruct who
         // submitted from where without joining back to request logs.
-        // 'source' is caller-supplied (BFF / operator FE forward it);
+        // 'source' is caller-supplied (the BFF forwards it);
         // 'clientId' is the caller-asserted, HMAC-verified client id
         // (see ClientIdAuthenticationHandler); 'userId' is the end-user
         // identity claim required for any mutation.
@@ -697,12 +697,10 @@ public sealed class WorkItemService : IWorkItemService
                 // RA-364: never offer an action the generic action endpoint
                 // would reject. Transitions declared CallerInvocable: false
                 // are reachable only through a module's own bespoke service
-                // resolving them server-side (re-accreditation's
-                // resume-during-* / continue-review-during-*, and since RA-410
-                // submit-for-decision / reject), so listing them here
-                // advertised buttons that always failed — and, because each of
-                // those four shares a DisplayName and a FromStateId, rendered
-                // as four identical dead controls. This mirrors the guard in
+                // resolving them server-side, so listing them here would
+                // advertise buttons that always fail — and, where several
+                // share a DisplayName and a FromStateId, render as identical
+                // dead controls. This mirrors the guard in
                 // WorkItemEndpoints.Action; the bespoke services are
                 // unaffected because they call ApplyActionAsync directly and
                 // never consult AvailableActions.
@@ -967,8 +965,8 @@ public sealed class WorkItemService : IWorkItemService
     {
     // The transition is already committed by the time hooks run, so a client
     // that gives up waiting (management-fe times out) must not cancel them:
-    // the operator-backend push and its audit entries would be lost, leaving
-    // this service and the operator disagreeing about the application's state.
+    // a hook's outbound side effect and its audit entries would be lost,
+    // leaving this service and the other system disagreeing about the state.
         foreach (var hook in _postActionHooks)
         {
             try

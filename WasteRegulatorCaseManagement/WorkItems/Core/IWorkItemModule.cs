@@ -26,7 +26,7 @@ public interface IWorkItemModule
     /// <summary>
     /// Map the module's HTTP endpoints. Called after the framework has built its
     /// own routes. Modules should mount under a path that includes their TypeId
-    /// to stay isolated, e.g. <c>/work-items/re-accreditation/...</c>.
+    /// to stay isolated, e.g. <c>/work-items/&lt;type-id&gt;/...</c>.
     /// </summary>
     void MapEndpoints(IEndpointRouteBuilder endpoints);
 }
