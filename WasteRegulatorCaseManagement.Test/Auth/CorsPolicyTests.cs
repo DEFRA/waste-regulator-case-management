@@ -1,3 +1,4 @@
+using WasteRegulatorCaseManagement.Test.TestSupport;
 using System.Net.Http;
 using WasteRegulatorCaseManagement.Cases;
 using Microsoft.AspNetCore.Hosting;
@@ -162,6 +163,7 @@ public class CorsPolicyTests
             }
             builder.ConfigureServices(services =>
             {
+                services.UseCaseModuleConfigs();
                 services.RemoveAll<ICasePersistence>();
                 services.AddSingleton(Substitute.For<ICasePersistence>());
             });

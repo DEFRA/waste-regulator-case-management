@@ -36,7 +36,7 @@ public class CaseServiceTests : IAsyncDisposable
     public async ValueTask DisposeAsync() =>
         await _clientFactory.GetClient().DropDatabaseAsync(_databaseName);
 
-    private CaseService BuildService(ICaseType type) =>
+    private CaseService BuildService(CaseModuleConfig type) =>
         new(
             new CaseRegistry([type]),
             _persistence,
@@ -45,7 +45,7 @@ public class CaseServiceTests : IAsyncDisposable
         );
 
     private CaseService BuildServiceWithHook(
-        ICaseType type,
+        CaseModuleConfig type,
         ICasePostActionHook hook
     ) =>
         new(
@@ -66,7 +66,7 @@ public class CaseServiceTests : IAsyncDisposable
             DisplayData: new Dictionary<string, CaseDisplayField>()
         );
 
-    private static TestCaseType BuildType(CaseTransition[]? transitions = null)
+    private static CaseModuleConfig BuildType(CaseTransition[]? transitions = null)
     {
         var states = new[]
         {
@@ -74,7 +74,7 @@ public class CaseServiceTests : IAsyncDisposable
             new CaseState("approved", "Approved", IsTerminal: true),
             new CaseState("rejected", "Rejected", IsTerminal: true),
         };
-        return new TestCaseType(
+        return TestCaseType.Create(
             CaseType,
             "Test type",
             initialState: states[0],
@@ -320,7 +320,7 @@ public class CaseServiceTests : IAsyncDisposable
     {
         var stateA = new CaseState("state-a", "State A");
         var stateB = new CaseState("state-b", "State B");
-        var type = new TestCaseType(
+        var type = TestCaseType.Create(
             CaseType,
             "Test type",
             initialState: stateA,
@@ -354,7 +354,7 @@ public class CaseServiceTests : IAsyncDisposable
         var stateA = new CaseState("state-a", "State A");
         var stateB = new CaseState("state-b", "State B");
         var stateC = new CaseState("state-c", "State C");
-        var type = new TestCaseType(
+        var type = TestCaseType.Create(
             CaseType,
             "Test type",
             initialState: stateA,
@@ -550,7 +550,7 @@ public class CaseServiceTests : IAsyncDisposable
         // type rejecting an unknown action id): this covers LoadAsync's own
         // template-resolution guard, reached when the case's type has
         // been de-registered (or was never registered) AND it predates
-        // template snapshots, so CaseEngineRules.ResolveTemplate has
+        // template snapshots, so template resolution has
         // nothing to fall back on.
         var registeredType = BuildType();
         var orphanTypeId = "no-longer-registered-type";
@@ -926,7 +926,7 @@ public class CaseServiceTests : IAsyncDisposable
     /// anger. Built here rather than folded into <see cref="BuildType"/> so
     /// the existing assignment tests keep their original state machine.
     /// </summary>
-    private static TestCaseType BuildTypeWithTerminalStates()
+    private static CaseModuleConfig BuildTypeWithTerminalStates()
     {
         var states = new[]
         {
@@ -935,7 +935,7 @@ public class CaseServiceTests : IAsyncDisposable
             new CaseState("approved", "Approved", IsTerminal: true),
             new CaseState("rejected", "Rejected", IsTerminal: true),
         };
-        return new TestCaseType(CaseType, "Test type", initialState: states[0], states: states);
+        return TestCaseType.Create(CaseType, "Test type", initialState: states[0], states: states);
     }
 
     [Theory]
@@ -1057,7 +1057,7 @@ public class CaseServiceTests : IAsyncDisposable
         // Template versioning: the item was submitted under a template that
         // calls "closed" terminal. The live registry no longer declares that
         // state at all, but the in-flight item must still be treated as closed.
-        var snapshotType = new TestCaseType(
+        var snapshotType = TestCaseType.Create(
             CaseType,
             "Test type",
             initialState: new CaseState("submitted", "Submitted"),
@@ -1914,7 +1914,7 @@ public class CaseServiceTests : IAsyncDisposable
     /// load and replace, triggering the optimistic-concurrency exception
     /// for real (no mocked throws — see epr-efp).
     /// </summary>
-    private CaseService BuildRacingService(ICaseType type, string id)
+    private CaseService BuildRacingService(CaseModuleConfig type, string id)
     {
         var racing = new RacingPersistence(
             _persistence,

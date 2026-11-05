@@ -142,8 +142,6 @@ static void ConfigureCases(WebApplicationBuilder builder)
 {
     var services = builder.Services;
 
-    // Register the framework, then add one line per case module.
-    // See docs in WasteRegulatorCaseManagement/Cases for the contract a module must implement.
     services.AddCaseFramework();
     services.AddSingleton<ICasePersistence, CasePersistence>();
 }
@@ -630,5 +628,4 @@ static void ConfigureEndpoints(WebApplication app)
     }
 
     app.MapCaseFrameworkEndpoints();
-    app.MapCaseModules();
 }

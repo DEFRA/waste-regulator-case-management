@@ -7,8 +7,8 @@ public class CaseRegistryTests
     [Fact]
     public void Find_returns_registered_type_by_id()
     {
-        var typeA = new TestCaseType("alpha", "Alpha");
-        var typeB = new TestCaseType("beta", "Beta");
+        var typeA = TestCaseType.Create("alpha", "Alpha");
+        var typeB = TestCaseType.Create("beta", "Beta");
 
         var registry = new CaseRegistry([typeA, typeB]);
 
@@ -19,7 +19,7 @@ public class CaseRegistryTests
     [Fact]
     public void Find_is_case_insensitive_on_type_id()
     {
-        var typeA = new TestCaseType("Alpha", "Alpha");
+        var typeA = TestCaseType.Create("Alpha", "Alpha");
 
         var registry = new CaseRegistry([typeA]);
 
@@ -29,7 +29,7 @@ public class CaseRegistryTests
     [Fact]
     public void Find_returns_null_when_type_is_not_registered()
     {
-        var registry = new CaseRegistry([new TestCaseType("alpha", "Alpha")]);
+        var registry = new CaseRegistry([TestCaseType.Create("alpha", "Alpha")]);
 
         Assert.Null(registry.Find("missing"));
     }
@@ -37,8 +37,8 @@ public class CaseRegistryTests
     [Fact]
     public void Types_lists_every_registered_type()
     {
-        var typeA = new TestCaseType("alpha", "Alpha");
-        var typeB = new TestCaseType("beta", "Beta");
+        var typeA = TestCaseType.Create("alpha", "Alpha");
+        var typeB = TestCaseType.Create("beta", "Beta");
 
         var registry = new CaseRegistry([typeA, typeB]);
 
@@ -48,21 +48,53 @@ public class CaseRegistryTests
     }
 
     [Fact]
-    public void Constructor_throws_when_a_type_id_is_blank()
+    public void Load_replaces_every_registered_type()
     {
-        var invalid = new TestCaseType(" ", "Blank");
+        // Arrange
+        var registry = new CaseRegistry([TestCaseType.Create("alpha", "Alpha")]);
+        var beta = TestCaseType.Create("beta", "Beta");
 
-        Assert.Throws<InvalidCaseTypeException>(() => new CaseRegistry([invalid]));
+        // Act
+        registry.Load([beta]);
+
+        // Assert
+        Assert.Same(beta, Assert.Single(registry.Types));
     }
 
     [Fact]
-    public void Constructor_throws_when_two_types_share_an_id()
+    public void Load_throws_when_the_initial_state_is_not_declared()
     {
-        var first = new TestCaseType("alpha", "First");
-        var second = new TestCaseType("alpha", "Second");
+        // Arrange
+        var registry = new CaseRegistry([]);
+        var invalid = TestCaseType.Create(
+            "alpha",
+            "Alpha",
+            initialState: new CaseState("submitted", "Submitted"),
+            states: [new CaseState("accepted", "Accepted", IsTerminal: true)]);
 
-        var ex = Assert.Throws<DuplicateCaseTypeException>(
-            () => new CaseRegistry([first, second]));
-        Assert.Equal("alpha", ex.CaseType);
+        // Act
+        var exception = Record.Exception(() => registry.Load([invalid]));
+
+        // Assert
+        Assert.IsType<InvalidCaseModuleConfigException>(exception);
+        Assert.Contains("undeclared state 'submitted'", exception.Message);
+    }
+
+    [Fact]
+    public void Load_throws_when_a_transition_moves_to_an_undeclared_state()
+    {
+        // Arrange
+        var registry = new CaseRegistry([]);
+        var invalid = TestCaseType.Create(
+            "alpha",
+            "Alpha",
+            transitions: [new CaseTransition("accept", "Accept", "submitted", "accepted")]);
+
+        // Act
+        var exception = Record.Exception(() => registry.Load([invalid]));
+
+        // Assert
+        Assert.IsType<InvalidCaseModuleConfigException>(exception);
+        Assert.Contains("action 'accept'", exception.Message);
     }
 }

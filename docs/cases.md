@@ -1,18 +1,14 @@
 # Case framework (backend)
 
-The case management system manages **cases**. The design must
-accommodate multiple types without rewrites.
-This document describes the framework that makes adding a new case type
-a localised change to a new module.
+The case management system manages **cases**. Each case type is a state
+machine held as configuration in the `caseModuleConfig` collection, so the
+engine serves every case type with the same endpoints, rules and timeline.
 
 ## Goals
 
-- Each case type is **self-contained** in its own module.
-- The core application provides the framework; modules provide the behaviour.
-- **Adding a new type is one folder + one line in `Program.cs`.** No other
-  module changes; no core changes beyond the registration call.
-- It is obvious from reading a module which **transitions** are allowed for each
-  **state** of the case.
+- **Adding a case type is one configuration file.** No code changes.
+- It is obvious from reading a case type's configuration which
+  **transitions** are allowed from each **state** of the case.
 
 ## Building blocks
 
@@ -23,18 +19,16 @@ Defined in `WasteRegulatorCaseManagement/Cases/`:
 | `CaseState` | Identifier + display name for a state. `IsTerminal` marks completion states (e.g. approved/rejected). |
 | `CaseTask` | Identifier + display name for a unit of work to be completed in a state. |
 | `CaseTransition` | A named action (`approve`, `reject`, `withdraw`) that moves a case from one state to another. |
-| `ICaseType` | Declares a type's `CaseType`, `DisplayName`, `InitialState`, `States`, `GetTasksForState(stateId)` and `Transitions`. Pure & side-effect free. |
-| `ICaseModule` | A module's entry point. Exposes the `Type` and contributes `RegisterServices(services)` and `MapEndpoints(endpoints)`. |
-| `ICaseRegistry` | DI-resolvable lookup of every registered type. |
+| `CaseModuleConfig` | A case type: `CaseType`, `DisplayName`, `TemplateVersion`, `InitialStateId`, `States` and `Transitions`. Stored in the `caseModuleConfig` collection with the case type as its id. |
+| `CaseModuleConfigLoader` | Startup hosted service: writes the configurations embedded under `Cases/CaseModuleConfigs/` to the database, then loads every case type in the database into the registry. |
+| `CaseRegistry` | Lookup of every loaded case type. |
 | `ICaseService` | Framework service object that drives state transitions. Resolves the case, validates the request against the type, persists the change and writes an timeline. |
 | `Case` | The persisted case: id, case type, state id, terminal flag, submitted-at, last-modified-at, submitted-by (CDP client id), the intake fields (source system id, callback URL, nation, org id, producer type, display data) and the timeline. |
 | `ICasePersistence` | Framework-owned MongoDB persistence for `Case`s. |
-| `CaseModuleExtensions` | `AddCaseFramework()`, `AddCaseModule<T>()`, `MapCaseModules()`, `MapCaseFrameworkEndpoints()`. |
+| `CaseModuleExtensions` | `AddCaseFramework()`. |
 
 > The **state engine** validates progressions and handles the
 > corresponding HTTP requests.
-> Module-specific business logic belongs in module service objects which
-> may call (or wrap) `ICaseService`.
 
 ## Ingestion API
 
@@ -44,7 +38,7 @@ are mounted by `MapCaseFrameworkEndpoints()`:
 
 | Method | Route | Description |
 | --- | --- | --- |
-| `POST` | `/cases` | Submit a new case. Body: `{ "caseType", "sourceSystemId", "callbackUrl", "nation", "orgId", "producerType"?, "displayData"? }` — see below. The `caseType` must be registered with the framework; the server stamps the case with the type's `InitialState`, the caller's CDP client id and a server-side timestamp. Returns `201 Created` with `Location: /cases/{id}`; a `sourceSystemId` that already has a case returns that case with `200 OK` and `X-Idempotent-Replay: true`. |
+| `POST` | `/cases` | Submit a new case. Body: `{ "caseType", "sourceSystemId", "callbackUrl", "nation", "orgId", "producerType"?, "displayData"? }` — see below. The `caseType` must be a case type in `caseModuleConfig`; the server stamps the case with the type's `InitialState`, the caller's CDP client id and a server-side timestamp. Returns `201 Created` with `Location: /cases/{id}`; a `sourceSystemId` that already has a case returns that case with `200 OK` and `X-Idempotent-Replay: true`. |
 | `GET` | `/cases/{id}` | Fetch a single case by id, projected with the actions the engine will currently allow. |
 | `GET` | `/cases` | List persisted cases (with the same projection), newest first, with filter / search / pagination per RA-93. Query string parameters: `caseType` (repeatable), `stateId` (repeatable), `search` (free-text — matched on id and submitter), `page` (1-based, default 1), `pageSize` (default 20, capped at 100). Returns a paged envelope: `{ items, totalCount, page, pageSize }`. |
 | `POST` | `/cases/{id}/actions/{actionId}` | Invoke a named action declared by the type's transitions. `409` if the case is in a terminal state; `400` for unknown actions and transitions whose from-state does not match. |
@@ -83,64 +77,33 @@ The list is filtered to the caller's nation before any other filter applies.
 
 ## Adding a new case type
 
-1. **Create a folder** under `WasteRegulatorCaseManagement/Cases/<TypeName>/` containing:
+Add a JSON file to `WasteRegulatorCaseManagement/Cases/CaseModuleConfigs/`,
+for example `CSoC.json`:
 
-   ```
-   Cases/MyType/
-     MyType.cs            // implements ICaseType
-     MyTypeModule.cs      // implements ICaseModule
-     Endpoints/           // module-scoped HTTP endpoints
-     Services/            // module-scoped service objects
-     Models/              // module-scoped models
-   ```
+```json
+{
+  "caseType": "CSoC",
+  "displayName": "CSoC",
+  "templateVersion": "v1",
+  "initialStateId": "SUBMITTED",
+  "states": [
+    { "id": "SUBMITTED", "displayName": "Submitted" },
+    { "id": "ACCEPTED", "displayName": "Accepted", "isTerminal": true },
+    { "id": "CANCELLED", "displayName": "Cancelled", "isTerminal": true }
+  ],
+  "transitions": [
+    { "actionId": "accept", "displayName": "Accept", "fromStateId": "SUBMITTED", "toStateId": "ACCEPTED" },
+    { "actionId": "cancel", "displayName": "Cancel", "fromStateId": "SUBMITTED", "toStateId": "CANCELLED" }
+  ]
+}
+```
 
-2. **Implement `ICaseType`**, declaring states and transitions. Make
-   the static structure obvious from a glance; if transitions depend on data, return
-   a dynamically-built collection from `GetTasksForState` — but keep the
-   declaration co-located with the type.
-
-3. **Implement `ICaseModule`** to register the module's services and
-   endpoints. Mount endpoints under `/cases/<type-id>/...` to keep
-   modules isolated from each other.
-
-4. **Register the module** in `Program.cs`:
-
-   ```csharp
-   static void ConfigureCases(IServiceCollection services)
-   {
-       services.AddCaseFramework();
-       services.AddCaseModule<MyTypeModule>();   // <-- one line per module
-   }
-   ```
-
-   `MapCaseModules()` is already invoked from `ConfigureEndpoints`.
-
-That is the complete list of changes required outside the new module folder.
-
-## Conventions
-
-- A module **must not** depend on another module. If two modules need shared
-  behaviour, lift it into the framework (or a clearly shared utility under
-  `WasteRegulatorCaseManagement/Utils`).
-- Module DI registrations should use **module-scoped interfaces**
-  (`IMyTypePersistence`, not `IPersistence`) to avoid colliding with other
-  modules.
-- A module's HTTP routes should namespace themselves under
-  `/cases/<type-id>` so they do not clash with another module's routes.
-- Treat `ICaseType` as data: no I/O, no DI dependencies. Behaviour
-  belongs in service objects registered via `RegisterServices`.
-- Form submissions (state transitions)
-  **must** flow through service objects. The framework's `ICaseService`
-  covers transitions, assignment and notes; module-scoped services should
-  follow the same pattern (intent-named methods, return result objects
-  rather than raw exceptions).
-- A bespoke module endpoint that performs a state change **outside** a
-  registered `CaseTransition` does not inherit the engine's guards. Such
-  a service **must** resolve the same template the engine would, via
-  `CaseEngineRules.ResolveTemplate`, so an in-flight item is judged by
-  the rules it was submitted under. Put every check before any side effect,
-  and return the shared failure code rather than a bespoke one — the
-  frontend maps a single message per failure reason.
+Every file in the folder is embedded in the assembly and written to
+`caseModuleConfig` at startup, replacing the stored copy, so a deployment
+carries its case types with it. Startup fails if the initial state or a
+transition names a state the file does not declare. Change
+`templateVersion` whenever a change would render existing cases
+inconsistently (see below).
 
 ## Template versioning (RA-94)
 
@@ -152,15 +115,11 @@ submission**.
 
 ### Wiring
 
-`ICaseTemplate` is the slice of `ICaseType` the engine actually
-needs at runtime: `States`, `Transitions`, `GetTasksForState(stateId)` and
-a `TemplateVersion` string. `ICaseType` extends `ICaseTemplate`.
+`ICaseTemplate` is the slice of `CaseModuleConfig` the engine actually
+needs at runtime: `States`, `Transitions` and a `TemplateVersion` string.
 
-`CaseTemplateSnapshot` is a sealed, frozen `ICaseTemplate` produced
-from a live `ICaseType` via `CaseTemplateSnapshot.Capture(type)`.
-`Capture` walks every state, evaluates `GetTasksForState` and stores the
-result in an in-memory dictionary so the snapshot does not call back into
-the live type after capture.
+`CaseTemplateSnapshot` is a sealed, frozen `ICaseTemplate` copied from a
+live `CaseModuleConfig` via `CaseTemplateSnapshot.Capture(type)`.
 
 ### Storage
 
@@ -177,8 +136,7 @@ Both are populated by `POST /cases` before the envelope is persisted.
 
 `CaseService.ResolveTemplate(caseRecord)` returns the case's
 `TemplateSnapshot` if present, otherwise it falls back to the live
-`ICaseType` from the registry (so legacy items submitted before this
-change continue to work). Every engine operation — action validation,
+`CaseModuleConfig` from the registry. Every engine operation — action validation,
 projection of available actions — runs
 against the resolved template, never the live type. As a result, shipping
 v2 of a type cannot retroactively change the rules under which an in-flight
@@ -293,11 +251,11 @@ case itself.
 
 ### Mechanism
 
-Every state-changing engine call (`SubmitAsync`, `CompleteTaskAsync`,
+Every state-changing engine call (`SubmitAsync`,
 `ApplyActionAsync`, `AssignAsync`, `UnassignAsync`, `AddNoteAsync`)
 automatically appends a `CaseTimelineEntry` to `Case.Timeline` on
-success. The framework owns this — modules do not opt in and cannot opt
-out, so every type inherits an identical audit trail. The submission entry
+success. The framework owns this, so every case type has an identical audit
+trail. The submission entry
 is the case's birth event: it is appended to the in-memory document
 before the single `CreateAsync` call so the new document and its first
 audit entry land in storage together.
@@ -310,7 +268,7 @@ the case document. An entry carries:
 | Field | Purpose |
 | --- | --- |
 | `Id` | Server-generated ULID. |
-| `Action` | Stable machine id of the action: `case-created`, `state-changed`, `assigned`, `unassigned`, `note-added`. Modules append their own alongside these (e.g. `notification-sent`). |
+| `Action` | Stable machine id of the action: `case-created`, `state-changed`, `assigned`, `unassigned`, `note-added`. Post-action hooks append their own alongside these (e.g. `notification-sent`). |
 | `ActionDisplayName` | Human-readable description (e.g. `Note added`). |
 | `Details` | `Dictionary<string, string?>` of contextual fields per action: `caseType`/`stateId`/`templateVersion` (submission); `actionId`/`actionDisplayName`/`fromStateId`/`toStateId`; `assigneeId`/`assigneeName`/`previousAssigneeId`/`previousAssigneeName` (unassigned); `text` (note). |
 | `PerformedAt` | UTC timestamp from the injected `TimeProvider`. |
@@ -331,8 +289,8 @@ timeline without re-sorting.
   same user, unassigning an already-unassigned item, re-recording a decision
   that has already been made) and validation / authorization rejections do
   **not** append an entry. This keeps the timeline meaningful.
-- **No module-specific entry shape.** If a module needs richer details,
-  extend the framework's `Details` keys rather than introducing a parallel
+- **No case-type-specific entry shape.** If a case type needs richer
+  details, extend the framework's `Details` keys rather than introducing a parallel
   audit channel.
 - **Snapshot identity at write time.** `PerformedById` / `PerformedByName` are
   not live foreign keys — the audit narrative survives directory changes.

@@ -155,8 +155,8 @@ public class CaseAuthBoundaryTests
                 var clientFactory = new TestMongoDbClientFactory(_fixture.ConnectionString, _databaseName);
                 services.AddSingleton<IMongoDbClientFactory>(clientFactory);
                 services.AddSingleton<ICasePersistence>(sp =>
-                    new CasePersistence(clientFactory, sp.GetRequiredService<ILoggerFactory>(), sp.GetRequiredService<ICaseRegistry>()));
-                services.AddSingleton<ICaseType>(new TestCaseType(CaseType, "Test type"));
+                    new CasePersistence(clientFactory, sp.GetRequiredService<ILoggerFactory>(), sp.GetRequiredService<CaseRegistry>()));
+                services.UseCaseModuleConfigs(TestCaseType.Create(CaseType, "Test type"));
             });
         }
 

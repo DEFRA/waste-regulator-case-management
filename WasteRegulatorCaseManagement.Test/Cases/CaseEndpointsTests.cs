@@ -164,9 +164,9 @@ public class CaseEndpointsTests
         Assert.Equal("DIRECT_PRODUCER", persisted.ProducerType);
         Assert.Equal(new CaseDisplayField("Acme Packaging Ltd", "string"), persisted.DisplayData["organisationName"]);
 
-        // Snapshot of the type's template (states, tasks, transitions, version)
+        // Snapshot of the type's template (states, transitions, version)
         // is frozen onto the case at submission for faithful historical
-        // rendering after the live module changes.
+        // rendering after the case type's configuration changes.
         Assert.NotNull(persisted.TemplateSnapshot);
         Assert.Equal("v1", persisted.TemplateVersion);
         Assert.Equal("v1", persisted.TemplateSnapshot!.TemplateVersion);
@@ -185,6 +185,38 @@ public class CaseEndpointsTests
         Assert.Equal("org-00456", body.OrgId);
         Assert.Equal("DIRECT_PRODUCER", body.ProducerType);
         Assert.Equal(new CaseDisplayField("87.3", "number"), body.DisplayData["percentageMet"]);
+    }
+
+    [Fact]
+    public async Task Post_creates_a_CSoC_case_from_the_embedded_case_type_configuration()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var factory = NewFactory();
+        using var client = factory.CreateClient();
+
+        // Act
+        var response = await client.PostAsJsonAsync(
+            "/cases",
+            new
+            {
+                caseType = "CSoC",
+                sourceSystemId = "csoc-2024-eng-00124",
+                callbackUrl = "https://source-system.test/declarations/00124",
+                nation = "ENGLAND",
+                orgId = "org-00456",
+            },
+            cancellationToken
+        );
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
+        Assert.Equal("SUBMITTED", body!.StateId);
+        Assert.Equal(
+            ["accept", "cancel"],
+            body.AvailableActions.Select(a => a.ActionId).OrderBy(a => a, StringComparer.Ordinal).ToArray()
+        );
     }
 
     [Fact]
@@ -964,7 +996,7 @@ public class CaseEndpointsTests
         // rather than calling GetRawText() on an undefined element (which
         // throws).
         var cancellationToken = TestContext.Current.CancellationToken;
-        var type = new TestCaseType(CaseType, "Test type");
+        var type = TestCaseType.Create(CaseType, "Test type");
         var registry = new CaseRegistry([type]);
         var engine = Substitute.For<ICaseService>();
         var httpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext
@@ -999,7 +1031,7 @@ public class CaseEndpointsTests
         // request succeeds; the assertion is just that it doesn't throw
         // and completes normally, proving the truncation path ran.
         var cancellationToken = TestContext.Current.CancellationToken;
-        var type = new TestCaseType(CaseType, "Test type");
+        var type = TestCaseType.Create(CaseType, "Test type");
         var registry = new CaseRegistry([type]);
         var engine = Substitute.For<ICaseService>();
         var submittedCase = new Case
@@ -1017,7 +1049,7 @@ public class CaseEndpointsTests
         };
         engine
             .SubmitAsync(
-                Arg.Any<ICaseType>(),
+                Arg.Any<CaseModuleConfig>(),
                 Arg.Any<CaseIntake>(),
                 Arg.Any<string?>(),
                 Arg.Any<System.Security.Claims.ClaimsPrincipal>(),
@@ -1076,12 +1108,12 @@ public class CaseEndpointsTests
         // an unexpected engine failure should surface as a 500, not be
         // disguised as a client error.
         var cancellationToken = TestContext.Current.CancellationToken;
-        var type = new TestCaseType(CaseType, "Test type");
+        var type = TestCaseType.Create(CaseType, "Test type");
         var registry = new CaseRegistry([type]);
         var engine = Substitute.For<ICaseService>();
         engine
             .SubmitAsync(
-                Arg.Any<ICaseType>(),
+                Arg.Any<CaseModuleConfig>(),
                 Arg.Any<CaseIntake>(),
                 Arg.Any<string?>(),
                 Arg.Any<System.Security.Claims.ClaimsPrincipal>(),
@@ -1172,12 +1204,12 @@ public class CaseEndpointsTests
         // is MissingActorIdentity, which has its own named switch arm; this
         // exercises the fallback arm that catches anything else.
         var cancellationToken = TestContext.Current.CancellationToken;
-        var type = new TestCaseType(CaseType, "Test type");
+        var type = TestCaseType.Create(CaseType, "Test type");
         var registry = new CaseRegistry([type]);
         var engine = Substitute.For<ICaseService>();
         engine
             .SubmitAsync(
-                Arg.Any<ICaseType>(),
+                Arg.Any<CaseModuleConfig>(),
                 Arg.Any<CaseIntake>(),
                 Arg.Any<string?>(),
                 Arg.Any<System.Security.Claims.ClaimsPrincipal>(),
@@ -2312,10 +2344,10 @@ public class CaseEndpointsTests
                     new CasePersistence(
                         clientFactory,
                         sp.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>(),
-                        sp.GetRequiredService<ICaseRegistry>())
+                        sp.GetRequiredService<CaseRegistry>())
                 ));
-                services.AddSingleton<ICaseType>(
-                    new TestCaseType(
+                services.UseCaseModuleConfigs(
+                    TestCaseType.Create(
                         CaseType,
                         "Test type",
                         states: _states

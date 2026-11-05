@@ -1,3 +1,4 @@
+using WasteRegulatorCaseManagement.Test.TestSupport;
 using System.Net;
 using WasteRegulatorCaseManagement.Health;
 using WasteRegulatorCaseManagement.Utils.Mongo;
@@ -119,6 +120,7 @@ public class ReadinessHealthCheckTests
         {
             builder.ConfigureServices(services =>
             {
+                services.UseCaseModuleConfigs();
                 services.RemoveAll<IMongoDbClientFactory>();
                 var mongoFactory = Substitute.For<IMongoDbClientFactory>();
                 var client = Substitute.For<IMongoClient>();

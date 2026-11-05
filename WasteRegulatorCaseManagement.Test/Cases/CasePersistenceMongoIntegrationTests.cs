@@ -66,7 +66,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
             _clientFactory,
             NullLoggerFactory.Instance,
             new CaseRegistry([
-                new TestCaseType(
+                TestCaseType.Create(
                     "test",
                     "Test type",
                     states: s_expectedStatusRankAscending

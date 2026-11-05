@@ -177,9 +177,9 @@ public class CaseEngineEndpointsTests
                 var clientFactory = new TestMongoDbClientFactory(_fixture.ConnectionString, _databaseName);
                 services.AddSingleton<IMongoDbClientFactory>(clientFactory);
                 services.AddSingleton<ICasePersistence>(sp =>
-                    new CasePersistence(clientFactory, sp.GetRequiredService<ILoggerFactory>(), sp.GetRequiredService<ICaseRegistry>()));
+                    new CasePersistence(clientFactory, sp.GetRequiredService<ILoggerFactory>(), sp.GetRequiredService<CaseRegistry>()));
 
-                services.AddSingleton<ICaseType>(new TestCaseType(
+                services.UseCaseModuleConfigs(TestCaseType.Create(
                     CaseType,
                     "Test type",
                     states:

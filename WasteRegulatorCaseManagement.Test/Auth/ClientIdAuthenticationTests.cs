@@ -1,3 +1,4 @@
+using WasteRegulatorCaseManagement.Test.TestSupport;
 using System.Net;
 using System.Net.Http.Headers;
 using WasteRegulatorCaseManagement.Auth;
@@ -1220,6 +1221,7 @@ internal sealed class BareFactory(
         }
         builder.ConfigureServices(services =>
         {
+            services.UseCaseModuleConfigs();
             services.RemoveAll<ICasePersistence>();
             services.AddSingleton(MockPersistence);
             services.RemoveAll<TimeProvider>();

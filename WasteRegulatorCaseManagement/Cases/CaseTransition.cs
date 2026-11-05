@@ -4,8 +4,8 @@ namespace WasteRegulatorCaseManagement.Cases;
 
 /// <summary>
 /// Declares an allowed move between two <see cref="CaseState"/>s, exposed
-/// as a named action (e.g. "approve", "reject"). Modules attach transitions to
-/// their <see cref="ICaseType"/> so the engine can decide which actions a
+/// as a named action (e.g. "accept", "cancel"). Declared on a
+/// <see cref="CaseModuleConfig"/> so the engine can decide which actions a
 /// caller may invoke for a case in its current state.
 ///
 /// Embedded verbatim in a frozen <see cref="CaseTemplateSnapshot"/>, so it

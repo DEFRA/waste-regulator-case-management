@@ -8,8 +8,7 @@ namespace WasteRegulatorCaseManagement.Cases;
 /// item type. Lives in core because the rules ("you cannot act on a closed
 /// case", "you cannot invoke an action
 /// that does not apply to the current state", etc.) are universal across
-/// modules. Module-specific business logic belongs in module service objects
-/// that may be called before/after this engine.
+/// case types.
 /// </summary>
 public interface ICaseService
 {
@@ -27,7 +26,7 @@ public interface ICaseService
     /// than creating a second one, so a source system can safely resend.
     /// </summary>
     Task<CaseActionResult> SubmitAsync(
-        ICaseType type,
+        CaseModuleConfig type,
         CaseIntake intake,
         string? submittedBy,
         ClaimsPrincipal user,
@@ -108,14 +107,14 @@ public sealed class CaseService : ICaseService
 {
     private const string SourceKey = "source";
 
-    private readonly ICaseRegistry _registry;
+    private readonly CaseRegistry _registry;
     private readonly ICasePersistence _persistence;
     private readonly ILogger<CaseService> _logger;
     private readonly IReadOnlyCollection<ICasePostActionHook> _postActionHooks;
     private readonly TimeProvider _timeProvider;
 
     public CaseService(
-        ICaseRegistry registry,
+        CaseRegistry registry,
         ICasePersistence persistence,
         ILogger<CaseService> logger,
         TimeProvider? timeProvider = null,
@@ -130,7 +129,7 @@ public sealed class CaseService : ICaseService
     }
 
     public async Task<CaseActionResult> SubmitAsync(
-        ICaseType type,
+        CaseModuleConfig type,
         CaseIntake intake,
         string? submittedBy,
         ClaimsPrincipal user,
@@ -610,7 +609,7 @@ public sealed class CaseService : ICaseService
 
         // Case-level note (RA-96): a single GetByIdAsync, no template
         // resolution required, so the note still works for legacy items
-        // whose module is no longer registered and which carry no
+        // whose case type is no longer configured and which carry no
         // template snapshot.
         var caseRecord = await _persistence.GetByIdAsync(caseId, cancellationToken);
         if (caseRecord is null || !CaseNationScope.Includes(user, caseRecord))
@@ -699,7 +698,7 @@ public sealed class CaseService : ICaseService
         var template = ResolveTemplate(caseRecord);
         if (template is null)
         {
-            // The case exists but its module is no longer registered and
+            // The case exists but its case type is no longer configured and
             // no snapshot is on file (e.g. a legacy item). Render it as having
             // no available actions so callers can still display it.
             return new CaseEngineProjection(
@@ -766,12 +765,14 @@ public sealed class CaseService : ICaseService
     }
 
     /// <summary>
-    /// Pick the template the engine should reason about for a case.
-    /// Delegates to <see cref="CaseEngineRules.ResolveTemplate"/> so
-    /// bespoke module services resolve the same template the engine does.
+    /// Pick the template the engine should reason about for a case. The
+    /// snapshot stored on the case wins so that historical items keep
+    /// their original action set even if the live type has since changed; the
+    /// live type is used only as a fallback for items submitted without a
+    /// snapshot.
     /// </summary>
     private ICaseTemplate? ResolveTemplate(Case caseRecord) =>
-        CaseEngineRules.ResolveTemplate(caseRecord, _registry);
+        caseRecord.TemplateSnapshot ?? (ICaseTemplate?)_registry.Find(caseRecord.CaseType);
 
     /// <summary>
     /// RA-358: refuse an envelope mutation on a closed case. Assignment and
@@ -864,9 +865,8 @@ public sealed class CaseService : ICaseService
 
     /// <summary>
     /// Append a single entry to the case's timeline (RA-97). Called
-    /// from every engine method on the success path so modules inherit a
-    /// complete, automatic audit trail without writing any audit code
-    /// themselves. Identity is snapshotted from the supplied principal at
+    /// from every engine method on the success path so every case type
+    /// has a complete, automatic audit trail. Identity is snapshotted from the supplied principal at
     /// write time.
     /// </summary>
     private static void AppendTimelineEntry(

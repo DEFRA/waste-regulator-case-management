@@ -2,8 +2,7 @@ namespace WasteRegulatorCaseManagement.Cases;
 
 /// <summary>
 /// Failure reasons returned by the case engine. Endpoints translate
-/// these into HTTP problem responses; module service objects can branch on
-/// them to decide what to show the user.
+/// these into HTTP problem responses.
 /// </summary>
 public enum CaseActionFailureCode
 {

@@ -1,3 +1,4 @@
+using WasteRegulatorCaseManagement.Test.TestSupport;
 using System.Net;
 using WasteRegulatorCaseManagement.Utils.Mongo;
 using Microsoft.AspNetCore.Hosting;
@@ -77,6 +78,7 @@ public class SwaggerUiEndpointTests
         {
             builder.ConfigureServices(services =>
             {
+                services.UseCaseModuleConfigs();
                 services.RemoveAll<IMongoDbClientFactory>();
                 services.AddSingleton(Substitute.For<IMongoDbClientFactory>());
             });

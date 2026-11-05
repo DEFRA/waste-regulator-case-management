@@ -6,9 +6,8 @@ using MongoDB.Driver;
 namespace WasteRegulatorCaseManagement.Cases;
 
 /// <summary>
-/// Persistence for <see cref="Case"/>s. Owned by the framework so every
-/// type shares a single envelope/index strategy; modules read/write their own
-/// payload shape on top of it.
+/// Persistence for <see cref="Case"/>s. Every case type shares a single
+/// envelope and index strategy.
 /// </summary>
 public interface ICasePersistence
 {
@@ -51,17 +50,16 @@ public sealed class CasePersistence
     : MongoService<Case>,
         ICasePersistence
 {
-    // Computed once: state id → workflow rank (RA-324), used by the Status sort.
-    private readonly IReadOnlyDictionary<string, int> _statusRank;
+    private readonly CaseRegistry _registry;
 
     public CasePersistence(
         IMongoDbClientFactory connectionFactory,
         ILoggerFactory loggerFactory,
-        ICaseRegistry registry
+        CaseRegistry registry
     )
         : base(connectionFactory, "cases", loggerFactory)
     {
-        _statusRank = CaseSort.StatusRank(registry);
+        _registry = registry;
     }
 
     [ExcludeFromCodeCoverage]
@@ -113,7 +111,11 @@ public sealed class CasePersistence
         var pageSize = query.NormalisedPageSize;
         var skip = (page - 1) * pageSize;
 
-        var sortStages = CaseSort.BuildStages(query.Sort, query.SortDescending, _statusRank);
+        var sortStages = CaseSort.BuildStages(
+            query.Sort,
+            query.SortDescending,
+            CaseSort.StatusRank(_registry)
+        );
 
         List<Case> items;
         if (sortStages is null)

@@ -23,6 +23,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="Cases\CaseModuleConfigs\*.json" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Elastic.CommonSchema.Serilog" Version="9.0.0" />
     <PackageReference Include="Elastic.Serilog.Enrichers.Web" Version="9.0.0" />
     <PackageReference Include="GovukNotify" Version="8.1.0" />

@@ -29,7 +29,7 @@ public class CaseTemplateVersioningTests
     [Fact]
     public void Capture_freezes_states_and_transitions()
     {
-        var type = new VersionedTestType(
+        var type = VersionedType(
             templateVersion: "v3",
             states:
             [
@@ -50,12 +50,12 @@ public class CaseTemplateVersioningTests
     {
         // The case was assessed against v1 (one task: "check"). The live
         // type has since been bumped to v2 and renamed the task to "review".
-        var snapshot = CaseTemplateSnapshot.Capture(new VersionedTestType(
+        var snapshot = CaseTemplateSnapshot.Capture(VersionedType(
             templateVersion: "v1",
             states: [new CaseState("submitted", "Submitted")],
             transitions: []));
 
-        var liveType = new VersionedTestType(
+        var liveType = VersionedType(
             templateVersion: "v2",
             states: [new CaseState("submitted", "Submitted")],
             transitions: []);
@@ -83,7 +83,7 @@ public class CaseTemplateVersioningTests
     public async Task ApplyAction_uses_snapshot_so_actions_removed_from_live_type_still_apply()
     {
         // Snapshot keeps an "approve" transition that the live type has dropped.
-        var snapshot = CaseTemplateSnapshot.Capture(new VersionedTestType(
+        var snapshot = CaseTemplateSnapshot.Capture(VersionedType(
             templateVersion: "v1",
             states:
             [
@@ -92,7 +92,7 @@ public class CaseTemplateVersioningTests
             ],
             transitions: [new CaseTransition("approve", "Approve", "submitted", "approved")]));
 
-        var liveType = new VersionedTestType(
+        var liveType = VersionedType(
             templateVersion: "v2",
             states: [new CaseState("submitted", "Submitted")],
             transitions: []);
@@ -123,7 +123,7 @@ public class CaseTemplateVersioningTests
     [Fact]
     public void Project_falls_back_to_live_type_when_legacy_item_has_no_snapshot()
     {
-        var liveType = new VersionedTestType(
+        var liveType = VersionedType(
             templateVersion: "v1",
             states: [new CaseState("submitted", "Submitted")],
             transitions: []);
@@ -151,7 +151,7 @@ public class CaseTemplateVersioningTests
     {
         // No live type registered, no snapshot — engine still produces a
         // displayable projection so the audit UI can render the envelope.
-        var liveType = new VersionedTestType(
+        var liveType = VersionedType(
             templateVersion: "v1",
             states: [new CaseState("submitted", "Submitted")],
             transitions: []);
@@ -174,31 +174,24 @@ public class CaseTemplateVersioningTests
         Assert.Empty(projection.AvailableActions);
     }
 
-    private CaseService BuildService(ICaseType type) =>
+    private CaseService BuildService(CaseModuleConfig type) =>
         new(new CaseRegistry([type]), _persistence, NullLogger<CaseService>.Instance);
 
     /// <summary>
     /// Test fixture exposing TemplateVersion override so we can register
     /// multiple incompatible template versions side by side.
     /// </summary>
-    private sealed class VersionedTestType : ICaseType
-    {
-        public VersionedTestType(
-            string templateVersion,
-            IReadOnlyCollection<CaseState> states,
-            IReadOnlyCollection<CaseTransition> transitions)
+    private static CaseModuleConfig VersionedType(
+        string templateVersion,
+        IReadOnlyCollection<CaseState> states,
+        IReadOnlyCollection<CaseTransition> transitions) =>
+        new()
         {
-            TemplateVersion = templateVersion;
-            States = states;
-            InitialState = states.First();
-            Transitions = transitions;
-        }
-
-        public string CaseType => "test-type";
-        public string DisplayName => "Versioned test type";
-        public CaseState InitialState { get; }
-        public IReadOnlyCollection<CaseState> States { get; }
-        public IReadOnlyCollection<CaseTransition> Transitions { get; }
-        public string TemplateVersion { get; }
-    }
+            CaseType = "test-type",
+            DisplayName = "Versioned test type",
+            TemplateVersion = templateVersion,
+            InitialStateId = states.First().Id,
+            States = states,
+            Transitions = transitions,
+        };
 }

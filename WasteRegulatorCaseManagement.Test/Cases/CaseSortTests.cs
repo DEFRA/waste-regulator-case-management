@@ -19,7 +19,7 @@ public class CaseSortTests
             ["approved"] = 2
         };
 
-    private static ICaseRegistry Registry(params ICaseType[] types) =>
+    private static CaseRegistry Registry(params CaseModuleConfig[] types) =>
         new CaseRegistry(types);
 
     // ─────────────────────────────── StatusRank ──────────────────────────────
@@ -27,7 +27,7 @@ public class CaseSortTests
     [Fact]
     public void StatusRank_ranks_states_in_declaration_order()
     {
-        var registry = Registry(new TestCaseType("t1", "T1", states: new[]
+        var registry = Registry(TestCaseType.Create("t1", "T1", states: new[]
         {
             new CaseState("submitted", "Submitted"),
             new CaseState("duly-made", "Duly made"),
@@ -44,7 +44,7 @@ public class CaseSortTests
     [Fact]
     public void StatusRank_is_case_insensitive()
     {
-        var registry = Registry(new TestCaseType("t1", "T1", states: new[]
+        var registry = Registry(TestCaseType.Create("t1", "T1", states: new[]
         {
             new CaseState("submitted", "Submitted")
         }));
@@ -58,12 +58,12 @@ public class CaseSortTests
     public void StatusRank_first_declaration_wins_across_types()
     {
         var registry = Registry(
-            new TestCaseType("t1", "T1", states: new[]
+            TestCaseType.Create("t1", "T1", states: new[]
             {
                 new CaseState("submitted", "Submitted"),
                 new CaseState("shared", "Shared")
             }),
-            new TestCaseType("t2", "T2", states: new[]
+            TestCaseType.Create("t2", "T2", initialState: new CaseState("shared", "Shared"), states: new[]
             {
                 new CaseState("shared", "Shared"),
                 new CaseState("other", "Other")

@@ -1,47 +1,52 @@
 namespace WasteRegulatorCaseManagement.Cases;
 
 /// <summary>
-/// Lookup over the case types registered by modules. Resolved as a
-/// singleton; safe to inject anywhere in the application.
+/// The case types this instance accepts, replaced as a whole by
+/// <see cref="Load"/> when <see cref="CaseModuleConfigLoader"/> reads them
+/// from the database at startup.
 /// </summary>
-public interface ICaseRegistry
+public sealed class CaseRegistry
 {
-    IReadOnlyCollection<ICaseType> Types { get; }
+    private volatile Dictionary<string, CaseModuleConfig> _types;
 
-    ICaseType? Find(string caseType);
-}
+    public CaseRegistry(IEnumerable<CaseModuleConfig> types) => _types = Index(types);
 
-public sealed class CaseRegistry : ICaseRegistry
-{
-    private readonly Dictionary<string, ICaseType> _types;
+    public IReadOnlyCollection<CaseModuleConfig> Types => _types.Values.ToList().AsReadOnly();
 
-    public CaseRegistry(IEnumerable<ICaseType> types)
+    public CaseModuleConfig? Find(string caseType) =>
+        caseType is not null && _types.TryGetValue(caseType, out var type) ? type : null;
+
+    public void Load(IEnumerable<CaseModuleConfig> types) => _types = Index(types);
+
+    private static Dictionary<string, CaseModuleConfig> Index(IEnumerable<CaseModuleConfig> types)
     {
-        _types = new Dictionary<string, ICaseType>(StringComparer.OrdinalIgnoreCase);
+        var indexed = new Dictionary<string, CaseModuleConfig>(StringComparer.OrdinalIgnoreCase);
         foreach (var type in types)
         {
-            if (string.IsNullOrWhiteSpace(type.CaseType))
-            {
-                throw new InvalidCaseTypeException("Case case type cannot be empty.");
-            }
+            Validate(type);
+            indexed[type.CaseType] = type;
+        }
+        return indexed;
+    }
 
-            if (!_types.TryAdd(type.CaseType, type))
+    private static void Validate(CaseModuleConfig type)
+    {
+        var stateIds = type.States.Select(s => s.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (!stateIds.Contains(type.InitialStateId))
+        {
+            throw new InvalidCaseModuleConfigException(
+                $"Case type '{type.CaseType}' starts in undeclared state '{type.InitialStateId}'.");
+        }
+
+        foreach (var transition in type.Transitions)
+        {
+            if (!stateIds.Contains(transition.FromStateId) || !stateIds.Contains(transition.ToStateId))
             {
-                throw new DuplicateCaseTypeException(type.CaseType);
+                throw new InvalidCaseModuleConfigException(
+                    $"Case type '{type.CaseType}' action '{transition.ActionId}' moves between undeclared states.");
             }
         }
     }
-
-    public IReadOnlyCollection<ICaseType> Types => _types.Values.ToList().AsReadOnly();
-
-    public ICaseType? Find(string caseType) =>
-        caseType is not null && _types.TryGetValue(caseType, out var type) ? type : null;
 }
 
-public sealed class DuplicateCaseTypeException(string caseType)
-    : Exception($"A case type with id '{caseType}' is already registered.")
-{
-    public string CaseType { get; } = caseType;
-}
-
-public sealed class InvalidCaseTypeException(string message) : Exception(message);
+public sealed class InvalidCaseModuleConfigException(string message) : Exception(message);

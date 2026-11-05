@@ -42,15 +42,15 @@ public class CaseServiceTimestampTests
     public async ValueTask DisposeAsync() =>
         await _clientFactory.GetClient().DropDatabaseAsync(_databaseName);
 
-    private CaseService BuildService(ICaseType type) =>
+    private CaseService BuildService(CaseModuleConfig type) =>
         new(
             new CaseRegistry([type]),
             _persistence,
             NullLogger<CaseService>.Instance,
             _time);
 
-    private static TestCaseType BuildType() =>
-        new(
+    private static CaseModuleConfig BuildType() =>
+        TestCaseType.Create(
             CaseType,
             "Test type",
             initialState: new CaseState("submitted", "Submitted"),

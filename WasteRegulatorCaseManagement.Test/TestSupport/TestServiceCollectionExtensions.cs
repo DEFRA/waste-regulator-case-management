@@ -34,8 +34,22 @@ public static class TestServiceCollectionExtensions
         var clientFactory = new TestMongoDbClientFactory(fixture.ConnectionString, databaseName);
         services.AddSingleton<IMongoDbClientFactory>(clientFactory);
         services.AddSingleton<ICasePersistence>(sp =>
-            new CasePersistence(clientFactory, sp.GetRequiredService<ILoggerFactory>(), sp.GetRequiredService<ICaseRegistry>()));
+            new CasePersistence(clientFactory, sp.GetRequiredService<ILoggerFactory>(), sp.GetRequiredService<CaseRegistry>()));
 
+        return services;
+    }
+
+    /// <summary>
+    /// Replace the database-backed case type store with one already holding
+    /// <paramref name="configs"/>, so a test host starts with those case
+    /// types (plus the embedded ones the loader writes) without a database.
+    /// </summary>
+    public static IServiceCollection UseCaseModuleConfigs(
+        this IServiceCollection services,
+        params CaseModuleConfig[] configs)
+    {
+        services.RemoveAll<ICaseModuleConfigStore>();
+        services.AddSingleton<ICaseModuleConfigStore>(new InMemoryCaseModuleConfigStore(configs));
         return services;
     }
 }

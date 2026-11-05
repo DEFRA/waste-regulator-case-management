@@ -1,0 +1,15 @@
+{
+  "caseType": "CSoC",
+  "displayName": "CSoC",
+  "templateVersion": "v1",
+  "initialStateId": "SUBMITTED",
+  "states": [
+    { "id": "SUBMITTED", "displayName": "Submitted" },
+    { "id": "ACCEPTED", "displayName": "Accepted", "isTerminal": true },
+    { "id": "CANCELLED", "displayName": "Cancelled", "isTerminal": true }
+  ],
+  "transitions": [
+    { "actionId": "accept", "displayName": "Accept", "fromStateId": "SUBMITTED", "toStateId": "ACCEPTED" },
+    { "actionId": "cancel", "displayName": "Cancel", "fromStateId": "SUBMITTED", "toStateId": "CANCELLED" }
+  ]
+}

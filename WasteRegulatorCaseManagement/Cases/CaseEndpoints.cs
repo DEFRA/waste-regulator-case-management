@@ -14,10 +14,8 @@ namespace WasteRegulatorCaseManagement.Cases;
 internal sealed class CaseEndpointsLogger;
 
 /// <summary>
-/// Framework-level HTTP endpoints for ingesting and listing cases. The
-/// envelope (id, type, state, submitted-by, payload) is owned by the
-/// framework; type-specific behaviour and routes are added by modules under
-/// <c>/cases/&lt;type-id&gt;/...</c>.
+/// HTTP endpoints for ingesting, listing and progressing cases of every
+/// case type.
 /// </summary>
 public static class CaseEndpoints
 {
@@ -86,7 +84,7 @@ public static class CaseEndpoints
     internal static async Task<Results<CreatedAtRoute<CaseResponse>, Ok<CaseResponse>, ProblemHttpResult>> Submit(
         JsonElement body,
         HttpContext httpContext,
-        [FromServices] ICaseRegistry registry,
+        [FromServices] CaseRegistry registry,
         [FromServices] ICaseService engine,
         [FromServices] IStructuredLogger<CaseEndpointsLogger> log,
         CancellationToken cancellationToken

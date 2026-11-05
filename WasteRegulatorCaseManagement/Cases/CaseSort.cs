@@ -34,12 +34,12 @@ internal static class CaseSort
 
     /// <summary>
     /// Map each state id to a workflow rank derived from the order states are
-    /// declared in on their <see cref="ICaseType"/>: data-driven from the
-    /// registry rather than hardcoded, so a module's declared state order IS its
-    /// sort order.
+    /// declared in on their <see cref="CaseModuleConfig"/>: data-driven from the
+    /// registry rather than hardcoded, so a case type's declared state order IS
+    /// its sort order.
     /// First declaration wins when types share an id.
     /// </summary>
-    internal static IReadOnlyDictionary<string, int> StatusRank(ICaseRegistry registry)
+    internal static IReadOnlyDictionary<string, int> StatusRank(CaseRegistry registry)
     {
         ArgumentNullException.ThrowIfNull(registry);
 

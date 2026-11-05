@@ -1,3 +1,4 @@
+using WasteRegulatorCaseManagement.Test.TestSupport;
 using System.Net;
 using System.Text.Json;
 using WasteRegulatorCaseManagement.Utils.Mongo;
@@ -89,6 +90,7 @@ public class OpenApiEndpointTests
         {
             builder.ConfigureServices(services =>
             {
+                services.UseCaseModuleConfigs();
                 // OpenAPI generation does not need a live Mongo client, but
                 // the host wires one up. Stub it so the factory boots.
                 services.RemoveAll<IMongoDbClientFactory>();

@@ -2,10 +2,10 @@ namespace WasteRegulatorCaseManagement.Cases;
 
 /// <summary>
 /// The shape the engine actually queries to decide what actions apply to
-/// a case. Implemented by both the live <see cref="ICaseType"/> (used
+/// a case. Implemented by both the live <see cref="CaseModuleConfig"/> (used
 /// for new cases) and by <see cref="CaseTemplateSnapshot"/> (a frozen
 /// copy stored on each case when it is submitted, so that audit/history
-/// rendering remains faithful even when a module's templates change later).
+/// rendering remains faithful even when a case type's configuration changes later).
 /// </summary>
 public interface ICaseTemplate
 {

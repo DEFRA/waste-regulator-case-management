@@ -5,8 +5,7 @@ namespace WasteRegulatorCaseManagement.Cases;
 /// <summary>
 /// A single entry in a case's timeline (RA-97). The framework appends
 /// one of these for every successful state-changing engine call (action
-/// application, assignment, unassignment, note added) so modules inherit a complete audit trail without writing any audit code
-/// themselves.
+/// application, assignment, unassignment, note added) so every case type has a complete audit trail.
 ///
 /// Author identity is snapshotted from the <see cref="System.Security.Claims.ClaimsPrincipal"/>
 /// at write time so the audit narrative survives later directory changes.

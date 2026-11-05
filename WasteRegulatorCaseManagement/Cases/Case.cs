@@ -4,10 +4,8 @@ using NUlid;
 namespace WasteRegulatorCaseManagement.Cases;
 
 /// <summary>
-/// A persisted case. The framework owns the envelope (id, type, state,
-/// timestamps, submitted-by, payload); modules describe what their payload
-/// means via their <see cref="ICaseType"/> and operate on it via their
-/// own service objects.
+/// A persisted case, progressed through the states of its
+/// <see cref="CaseModuleConfig"/>.
 ///
 /// RA-410: ignores extra BSON elements. The task framework's
 /// <c>completedTaskIdsByState</c> / <c>taskStatusesByState</c> fields were
@@ -24,7 +22,7 @@ public sealed class Case
     [BsonId]
     public string Id { get; init; } = Ulid.NewUlid().ToString();
 
-    /// <summary>The <see cref="ICaseType.CaseType"/> this item is an instance of.</summary>
+    /// <summary>The <see cref="CaseModuleConfig.CaseType"/> this item is an instance of.</summary>
     public required string CaseType { get; init; }
 
     /// <summary>Current <see cref="CaseState.Id"/>. Set to the type's initial state on creation.</summary>
@@ -60,9 +58,7 @@ public sealed class Case
 
     /// <summary>
     /// Identifier of the user the case is currently assigned to, or
-    /// <c>null</c> when no one is assigned. Set via the assignment endpoints
-    /// rather than directly by modules so the engine can enforce role-based
-    /// rules consistently.
+    /// <c>null</c> when no one is assigned. Set via the assignment endpoints.
     /// </summary>
     public string? AssignedToId { get; set; }
 
@@ -82,9 +78,9 @@ public sealed class Case
     /// <summary>
     /// Frozen copy of the type's template (states,
     /// transitions and version) captured at submission time. Used by the
-    /// engine in preference to the live <see cref="ICaseType"/> so that
+    /// engine in preference to the live <see cref="CaseModuleConfig"/> so that
     /// the case — and its audit history — keep rendering as they did at
-    /// the time they were assessed, even when the live module's template
+    /// the time they were assessed, even when the case type's configuration
     /// changes later. Optional only to support legacy items submitted before
     /// versioning existed.
     /// </summary>
