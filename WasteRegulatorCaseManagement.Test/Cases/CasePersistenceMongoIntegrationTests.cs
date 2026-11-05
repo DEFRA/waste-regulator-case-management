@@ -137,7 +137,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
 	}
 
 	[Fact]
-	public async Task DefineIndexes_creates_the_six_documented_indexes_on_startup()
+	public async Task DefineIndexes_creates_the_eight_documented_indexes_on_startup()
 	{
 		// Constructor of CasePersistence calls EnsureIndexes; we
 		// assert what the driver actually wrote (not what we asked for)
@@ -154,7 +154,15 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
 			.OrderBy(s => s, StringComparer.Ordinal)
 			.ToList();
 
-		Assert.Equal(6, keyDocs.Count);
+		Assert.Equal(8, keyDocs.Count);
+		Assert.Contains(
+			keyDocs,
+			k => k.Contains("\"nation\" : 1, \"orgId\" : 1, \"submittedAt\" : -1")
+		);
+		Assert.Contains(
+			keyDocs,
+			k => k.Contains("\"nation\" : 1, \"isTerminal\" : 1, \"submittedAt\" : -1")
+		);
 		Assert.Contains(
 			keyDocs,
 			k => k.Contains("\"nation\" : 1") && k.Contains("\"submittedAt\" : -1")
@@ -202,8 +210,8 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
 			var indexes = await (
 				await collection.Indexes.ListAsync(TestContext.Current.CancellationToken)
 			).ToListAsync(TestContext.Current.CancellationToken);
-			// Mongo's default _id_ index plus our six.
-			Assert.Equal(7, indexes.Count);
+			// Mongo's default _id_ index plus our eight.
+			Assert.Equal(9, indexes.Count);
 		}
 		finally
 		{

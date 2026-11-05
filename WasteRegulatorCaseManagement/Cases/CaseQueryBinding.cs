@@ -22,6 +22,8 @@ internal static class CaseQueryBinding
 	internal const string SortDirectionParam = "dir";
 
 	internal const string SubmittedByParam = "submittedBy";
+	internal const string OrgIdParam = "orgId";
+	internal const string IsTerminalParam = "isTerminal";
 
 	public static CaseQuery FromQueryString(IQueryCollection query)
 	{
@@ -37,7 +39,9 @@ internal static class CaseQueryBinding
 			PageSize: ReadInt(query, PageSizeParam, defaultValue: CaseQuery.DefaultPageSize),
 			SubmittedBy: ReadString(query, SubmittedByParam),
 			Sort: ReadString(query, SortParam),
-			SortDescending: ReadSortDirection(query, SortDirectionParam));
+			SortDescending: ReadSortDirection(query, SortDirectionParam),
+			OrgId: ReadString(query, OrgIdParam),
+			IsTerminal: ReadOptionalBool(query, IsTerminalParam));
 	}
 
 	/// <summary>
@@ -65,6 +69,13 @@ internal static class CaseQueryBinding
 		}
 		return null;
 	}
+
+	/// <summary>
+	/// Reads <c>true</c> or <c>false</c> (any case); anything else, including
+	/// an absent parameter, is <c>null</c>.
+	/// </summary>
+	private static bool? ReadOptionalBool(IQueryCollection query, string key) =>
+		bool.TryParse(ReadString(query, key)?.Trim(), out var parsed) ? parsed : null;
 
 	private static IReadOnlyCollection<string>? ReadStrings(IQueryCollection query, string key)
 	{

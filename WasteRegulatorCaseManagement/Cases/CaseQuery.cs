@@ -40,6 +40,13 @@ namespace WasteRegulatorCaseManagement.Cases;
 /// is enforced by the frontend, not this filter — the backend applies
 /// whatever scope the request asks for. Empty/null means "any submitter".
 /// </param>
+/// <param name="OrgId">
+/// Restrict to cases of this organisation. Empty/null means "any organisation".
+/// </param>
+/// <param name="IsTerminal">
+/// <c>true</c> restricts to concluded cases, <c>false</c> to open ones;
+/// <c>null</c> means both.
+/// </param>
 public sealed record CaseQuery(
 	IReadOnlyCollection<string>? CaseTypes = null,
 	IReadOnlyCollection<string>? StateIds = null,
@@ -51,7 +58,9 @@ public sealed record CaseQuery(
 	string? SubmittedBy = null,
 	string? Nation = null,
 	string? Sort = null,
-	bool? SortDescending = null)
+	bool? SortDescending = null,
+	string? OrgId = null,
+	bool? IsTerminal = null)
 {
 	public const int DefaultPageSize = 20;
 	public const int MinPageSize = 1;
@@ -86,6 +95,10 @@ public sealed record CaseQuery(
 	/// <summary>Trimmed assignee id, or <c>null</c> if blank/whitespace.</summary>
 	public string? NormalisedAssigneeId =>
 		string.IsNullOrWhiteSpace(AssigneeId) ? null : AssigneeId.Trim();
+
+	/// <summary>Trimmed organisation id, or <c>null</c> if blank/whitespace.</summary>
+	public string? NormalisedOrgId =>
+		string.IsNullOrWhiteSpace(OrgId) ? null : OrgId.Trim();
 
 	/// <summary>Trimmed submitted-by, or <c>null</c> if blank/whitespace.</summary>
 	public string? NormalisedSubmittedBy =>

@@ -239,12 +239,14 @@ The Mongo collection has an `assigneeAndSubmitted` index for the common
 
 ### List filters
 
-`GET /cases` accepts two extra query parameters:
+`GET /cases` accepts these extra query parameters:
 
 | Param | Effect |
 | --- | --- |
 | `assigneeId=<userId>` | only items currently assigned to that user |
 | `unassigned=true` | only items with no current assignee |
+| `orgId=<orgId>` | only cases of that organisation |
+| `isTerminal=true` | only concluded cases (`false`: only open ones) |
 
 If both are supplied, `assigneeId` wins.
 

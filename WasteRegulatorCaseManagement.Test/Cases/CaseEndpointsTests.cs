@@ -1246,6 +1246,56 @@ public class CaseEndpointsTests
 	}
 
 	[Fact]
+	public async Task Get_list_filters_by_organisation()
+	{
+		// Arrange
+		var cancellationToken = TestContext.Current.CancellationToken;
+		await using var factory = NewFactory();
+		using var client = factory.CreateClient();
+		await factory.SeedAsync(ListedCase(orgId: "org-00456", stateId: "submitted", isTerminal: false), cancellationToken);
+		await factory.SeedAsync(ListedCase(orgId: "org-00789", stateId: "submitted", isTerminal: false), cancellationToken);
+
+		// Act
+		var body = await client.GetFromJsonAsync<CaseListResponse>("/cases?orgId=org-00456", cancellationToken);
+
+		// Assert
+		var item = Assert.Single(body!.Items);
+		Assert.Equal("org-00456", item.OrgId);
+	}
+
+	[Fact]
+	public async Task Get_list_filters_to_concluded_cases()
+	{
+		// Arrange
+		var cancellationToken = TestContext.Current.CancellationToken;
+		await using var factory = NewFactory();
+		using var client = factory.CreateClient();
+		await factory.SeedAsync(ListedCase(orgId: "org-00456", stateId: "submitted", isTerminal: false), cancellationToken);
+		await factory.SeedAsync(ListedCase(orgId: "org-00456", stateId: "approved", isTerminal: true), cancellationToken);
+
+		// Act
+		var body = await client.GetFromJsonAsync<CaseListResponse>("/cases?isTerminal=true", cancellationToken);
+
+		// Assert
+		var item = Assert.Single(body!.Items);
+		Assert.Equal("approved", item.StateId);
+	}
+
+	private static Case ListedCase(string orgId, string stateId, bool isTerminal) =>
+		new()
+		{
+			SourceSystemId = Ulid.NewUlid().ToString(),
+			CallbackUrl = "https://source-system.test/callback",
+			Nation = "ENGLAND",
+			OrgId = orgId,
+			Id = Ulid.NewUlid().ToString(),
+			CaseType = CaseType,
+			StateId = stateId,
+			IsTerminal = isTerminal,
+			SubmittedBy = "test-client",
+		};
+
+	[Fact]
 	public async Task Get_list_filters_by_submittedBy_query_param_when_supplied()
 	{
 		// Scoping ("give me only my items") is now something the frontend

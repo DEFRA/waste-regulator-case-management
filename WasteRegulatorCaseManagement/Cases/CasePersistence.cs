@@ -268,6 +268,16 @@ public sealed class CasePersistence
 			clauses.Add(builder.Eq(w => w.Nation, nation));
 		}
 
+		if (query.NormalisedOrgId is { } orgId)
+		{
+			clauses.Add(builder.Eq(w => w.OrgId, orgId));
+		}
+
+		if (query.IsTerminal is { } isTerminal)
+		{
+			clauses.Add(builder.Eq(w => w.IsTerminal, isTerminal));
+		}
+
 		var submittedBy = query.NormalisedSubmittedBy;
 		if (submittedBy is not null)
 		{
@@ -391,6 +401,20 @@ public sealed class CasePersistence
 		var nationAndSubmitted = new CreateIndexModel<Case>(
 			builder.Combine(builder.Ascending(w => w.Nation), builder.Descending(w => w.SubmittedAt))
 		);
+		var nationOrgAndSubmitted = new CreateIndexModel<Case>(
+			builder.Combine(
+				builder.Ascending(w => w.Nation),
+				builder.Ascending(w => w.OrgId),
+				builder.Descending(w => w.SubmittedAt)
+			)
+		);
+		var nationTerminalAndSubmitted = new CreateIndexModel<Case>(
+			builder.Combine(
+				builder.Ascending(w => w.Nation),
+				builder.Ascending(w => w.IsTerminal),
+				builder.Descending(w => w.SubmittedAt)
+			)
+		);
 		// One case per source system submission: backs the idempotent intake
 		// lookup and arbitrates concurrent submits of the same reference.
 		var sourceSystemId = new CreateIndexModel<Case>(
@@ -404,6 +428,8 @@ public sealed class CasePersistence
 			submittedDescending,
 			assigneeAndSubmitted,
 			nationAndSubmitted,
+			nationOrgAndSubmitted,
+			nationTerminalAndSubmitted,
 			sourceSystemId,
 		];
 	}
