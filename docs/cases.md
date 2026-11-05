@@ -200,14 +200,14 @@ with `caseType`) to pick the correct detail template for the case.
 
 ## Assignment (RA-95)
 
-Cases can be assigned to a user. RA-323 unified caseworker
-permissions — every authenticated caseworker can assign or re-assign any
-case to any user, and can unassign; there is no role tier that
-restricts assignment to self-assign-only any more. This is enforced (or
-rather, not restricted) by `CaseService.AssignAsync` / `UnassignAsync`,
-which no longer check role membership at all — see ADR-0005: authorization
-(including any future assignment-permission tiering) is the frontend BFF's
-responsibility, not this backend's.
+Cases can be assigned to a user. Any caseworker in the case's nation can
+assign or re-assign it to any user, and can unassign it; authorization
+beyond nation is the frontend's responsibility (see ADR-0005).
+
+The assignee's id and name come from the caller, which holds the
+caseworker list. This service does not check them against the Accounts
+Service: that service is part of the legacy Azure estate being retired, and
+Entra ID is not provisioned yet.
 
 ### Identity from the BFF
 

@@ -33,7 +33,7 @@ These are produced by the CDP portal at deploy time unless noted otherwise.
 | `NOTIFY_SENDEMAILS`        | Service config        | Optional. Overrides the environment-derived decision about whether email is really dispatched (`true`/`false`). A flat top-level key, matching `NOTIFY_API_KEY`'s convention. Leave unset in normal operation. |
 | `AnalyticsAuditEventProcessor__ProcessingEnabled` | Service config | `true` to publish audit events to the analytics topic. Defaults to `false`, which does not start the processor. |
 | `AnalyticsAuditEventProcessor__TopicArn` | Service config | ARN of the analytics SNS topic. Required when processing is enabled. |
-| `Notify__RegulatorMailboxes__<Nation>` | Service config | Regulator shared-mailbox address that regulator-facing emails are sent to, one per nation (`England`, `Scotland`, `Wales`, `NorthernIreland`). `appsettings.json` ships every nation blank, so each environment sets its own addresses in cdp-app-config. The real regulator inboxes are set in prod's config only; a non-prod environment never falls back to a real regulator. A missing or blank nation skips the send and records a `notification-skipped` audit entry with reason `missing-regulator-mailbox`. |
+| `Notify__RegulatorMailboxes__<Nation>` | Service config | Regulator shared-mailbox address that regulator-facing emails are sent to, one per nation (`England`, `Scotland`, `Wales`, `NorthernIreland`). `appsettings.json` ships every nation blank, so each environment sets its own addresses in cdp-app-config. The real regulator inboxes are set in prod's config only; a non-prod environment never falls back to a real regulator. A missing or blank nation resolves to no address. |
 
 ## Required secrets (cdp-portal)
 
@@ -44,7 +44,7 @@ Create via the CDP self-service portal under the service's "secrets" tab:
 | `AUTH_SHARED_SECRET__MANAGEMENT_FE` | HMAC secret used to verify signed trust headers from the regulator frontend (see [BFF signing contract](#bff-signing-contract) below). Must match the secret the regulator frontend signs with. **Required in all non-Development environments.** The service will reject every authenticated request with `401` until at least one caller's secret is set (see RA-345 below). Generate with `openssl rand -base64 32`. |
 | `AUTH_SHARED_SECRET__CASE_INTAKE` | HMAC secret used to verify signed trust headers from the Case Intake Processor (see [BFF signing contract](#bff-signing-contract) below). Must match the secret the Case Intake Processor signs with. **Required in all non-Development environments.** Distinct from `AUTH_SHARED_SECRET__MANAGEMENT_FE` — each caller has its own secret so one can be rotated without touching the other (RA-345). Generate with `openssl rand -base64 32`. |
 | `CALLBACK_AUTH__CSOC` | Basic credentials, as `clientId:clientSecret`, that this service presents when it PATCHes a concluded CSoC case to the Waste Obligations API. The client must be on the Waste Obligations API's access list with `write` scope, to send the decision, and `read` scope, to check a decision it refuses as already held. Without it the callback is sent unauthenticated and rejected, so CSoC cases cannot be accepted or cancelled. |
-| `NOTIFY_API_KEY`     | GOV.UK Notify API key. Only takes effect when the `Notify__Enabled` master switch is `true` (RA-422; default `false`, set per environment in cdp-app-config). With the flag off — the default in every environment — the notification hook is never registered, so no email is sent and no `notification-*` audit entries are written regardless of this key. With the flag on but this key absent, the service boots with a no-op Notify client (notifications logged, not sent). Even with the flag on and this key set, dev and localhost suppress sending regardless — see [Notify sending by environment](#notify-sending-by-environment). |
+| `NOTIFY_API_KEY`     | GOV.UK Notify API key. Only takes effect when the `Notify__Enabled` master switch is `true` (RA-422; default `false`, set per environment in cdp-app-config). With the flag off — the default in every environment — the no-op client is registered, so no email is sent regardless of this key. With the flag on but this key absent, the service boots with a no-op Notify client (notifications logged, not sent). Even with the flag on and this key set, dev and localhost suppress sending regardless — see [Notify sending by environment](#notify-sending-by-environment). |
 
 > **RA-345 (per-caller secrets):** prior to RA-345 there was a single
 > `AUTH_SHARED_SECRET` shared by both inbound callers, with `clientId`
@@ -74,10 +74,9 @@ dispatched:
 | unset or unrecognised, non-Development host | Yes (fail-open) |
 
 When sending is suppressed, `NoOpNotifyClient` is registered **even though
-`NOTIFY_API_KEY` is set**. It returns success, so the case's timeline
-still records a `notification-sent` entry and the UI behaves exactly as it does
-in a sending environment. The only difference is that no HTTP traffic reaches
-Notify. Suppressed sends are logged with
+`NOTIFY_API_KEY` is set**. It returns success, so a caller behaves exactly as
+it does in a sending environment. The only difference is that no HTTP traffic
+reaches Notify. Suppressed sends are logged with
 `notify.suppression_reason=sending_disabled_for_environment` (as opposed to
 `no_api_key` when no key is configured at all), and the startup line
 `Notify integration: … sendingEnabled=… environment=…` records the decision.
@@ -100,9 +99,9 @@ repo.
 
 ## BFF signing contract
 
-Every request the BFF sends to this backend must carry four headers. The
-backend verifies them before accepting the CDP-injected identity headers as
-authoritative. Requests missing any of these headers, or with an invalid
+Every request a caller sends to this backend must carry the four headers below,
+alongside the identity headers it signs. The backend verifies them before
+accepting the identity headers as authoritative. Requests missing any of these headers, or with an invalid
 signature, are rejected with `401`.
 
 | Header                    | Description                                                                                      |
@@ -180,7 +179,6 @@ flows so they appear under the service's owning team:
 Outbound hostnames the service must reach from CDP environments. Add via
 the cdp-portal "Outbound proxy" form:
 
-- `cognito-idp.eu-west-2.amazonaws.com` — IAM auth for Cognito.
 - `sts.eu-west-2.amazonaws.com` — STS for IAM roles for service accounts.
 - `mongodb-*.eu-west-2.docdb.amazonaws.com` (CDP-managed MongoDB endpoint).
 - `api.notifications.service.gov.uk` — GOV.UK Notify (required when `NOTIFY_API_KEY` is set).
@@ -190,4 +188,3 @@ the cdp-portal "Outbound proxy" form:
 ## Related
 
 - [docs/cdp-tracing.md](./cdp-tracing.md)
-- [Registrations-353](#) — register the service in the CDP portal (prereq).
