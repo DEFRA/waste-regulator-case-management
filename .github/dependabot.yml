@@ -11,6 +11,16 @@ updates:
       time: '10:30'
       timezone: 'Europe/London'
 
+    groups:
+      nuget:
+        applies-to: version-updates
+        patterns:
+          - '*'
+      nuget-security:
+        applies-to: security-updates
+        patterns:
+          - '*'
+
     allow:
       - dependency-type: direct
 
@@ -23,3 +33,8 @@ updates:
       interval: weekly
       time: '10:30'
       timezone: 'Europe/London'
+
+    groups:
+      github-actions:
+        patterns:
+          - '*'
