@@ -28,7 +28,7 @@
 
   <ItemGroup>
     <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="4.0.102.8" />
-    <PackageReference Include="AWSSDK.SecurityToken" Version="4.0.101.8" />
+    <PackageReference Include="AWSSDK.SecurityToken" Version="4.0.101.9" />
     <PackageReference Include="AWSSDK.SimpleNotificationService" Version="4.0.100.23" />
     <PackageReference Include="Elastic.CommonSchema.Serilog" Version="9.0.0" />
     <PackageReference Include="Elastic.Serilog.Enrichers.Web" Version="9.0.0" />
