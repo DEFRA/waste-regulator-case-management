@@ -69,9 +69,9 @@ and every "Try it out" call is sent with that user's trust headers:
 (`ENGLAND`) and `x-cdp-user-email`. The selection persists in the browser's
 `localStorage`. Picking "— anonymous —" clears it.
 
-The picker's client id, `local-swagger-ui`, is not the Case Intake Processor, so
-`POST /cases` returns 403 from Swagger; create cases with `curl` and the
-`x-cdp-client-id: case-intake-processor` header instead.
+The caseworkers are sent with the client id `local-swagger-ui`. To create a
+case with `POST /cases`, pick "Case Intake Processor", which sends only
+`x-cdp-client-id: case-intake-processor`.
 
 > The cURL preview Swagger UI shows in the response panel is generated
 > *before* the request is sent and does **not** include the headers
