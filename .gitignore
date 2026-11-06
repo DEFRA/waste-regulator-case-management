@@ -84,6 +84,7 @@ ipch/
 *.opensdf
 *.sdf
 *.cachefile
+*.lscache
 *.VC.db
 *.VC.VC.opendb
 
@@ -267,3 +268,16 @@ __pycache__/
 
 library.db
 .envrc
+
+# Local developer overrides — never commit API keys or secrets
+appsettings.*.local.json
+appsettings.Local.json
+secrets.json
+*.lscache
+
+# Coverage output
+cov/
+*.cobertura.xml
+coverage.json
+
+.claude/

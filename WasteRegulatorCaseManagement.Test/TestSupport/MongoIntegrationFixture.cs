@@ -1,0 +1,83 @@
+using EphemeralMongo;
+using WasteRegulatorCaseManagement.Utils.Mongo;
+using WasteRegulatorCaseManagement.Cases;
+using MongoDB.Driver;
+
+namespace WasteRegulatorCaseManagement.Test.TestSupport;
+
+/// <summary>
+/// xUnit class fixture that boots a single ephemeral <c>mongod</c>
+/// instance for the lifetime of every test class that
+/// <c>IClassFixture</c>s it. Tests get a fresh per-test database name
+/// from <see cref="NewDatabaseName"/> so collections / indexes from
+/// one test do not leak into another, but the (slow) mongod boot is
+/// amortised across the class.
+///
+/// Shared so endpoint suites and service suites run against the real
+/// driver — the same code path production uses — and catch regressions
+/// in BSON conventions, indexes, projections, optimistic concurrency and
+/// transactions.
+/// </summary>
+public sealed class MongoIntegrationFixture : IAsyncLifetime
+{
+	private IMongoRunner? _runner;
+
+	static MongoIntegrationFixture()
+	{
+		// Match production startup ordering — these are the same calls
+		// Program.cs makes before any IMongoClient is constructed.
+		// Idempotent, so the static cctor is safe even though the
+		// fixture itself can be instantiated more than once across
+		// parallel test classes.
+		MongoConventions.Register();
+	}
+
+	public string ConnectionString =>
+		_runner?.ConnectionString
+		?? throw new InvalidOperationException("Mongo runner has not started yet.");
+
+	public async ValueTask InitializeAsync()
+	{
+		_runner = await MongoRunner.RunAsync(new MongoRunnerOptions
+		{
+			// Case writes use transactions, which need a replica set.
+			UseSingleNodeReplicaSet = true,
+		});
+	}
+
+	public ValueTask DisposeAsync()
+	{
+		_runner?.Dispose();
+		return ValueTask.CompletedTask;
+	}
+
+	/// <summary>
+	/// Build a unique database name so each test gets a clean slate
+	/// without paying for a fresh mongod.
+	/// </summary>
+	public static string NewDatabaseName(string prefix = "test") =>
+		$"{prefix}_{Guid.NewGuid():N}";
+}
+
+/// <summary>
+/// Minimal <see cref="IMongoDbClientFactory"/> that points at the
+/// fixture's ephemeral <c>mongod</c>. Exists so tests can drive the
+/// production <see cref="CasePersistence"/> constructor without
+/// standing up the full DI container / Options pipeline.
+/// </summary>
+public sealed class TestMongoDbClientFactory : IMongoDbClientFactory
+{
+	private readonly MongoClient _client;
+	private readonly IMongoDatabase _database;
+
+	public TestMongoDbClientFactory(string connectionString, string databaseName)
+	{
+		_client = new MongoClient(connectionString);
+		_database = _client.GetDatabase(databaseName);
+	}
+
+	public IMongoClient GetClient() => _client;
+
+	public IMongoCollection<T> GetCollection<T>(string collection) =>
+		_database.GetCollection<T>(collection);
+}

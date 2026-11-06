@@ -1,0 +1,190 @@
+# CDP deployment configuration
+
+This document captures the metadata required to deploy
+`waste-regulator-case-management` onto the CDP platform. It
+complements the official
+[CDP documentation](https://github.com/DEFRA/cdp-documentation) — refer to
+those how-tos for the authoritative platform behaviour.
+
+## Service identity
+
+| Attribute      | Value                                          |
+| -------------- | ---------------------------------------------- |
+| Service name   | `waste-regulator-case-management`     |
+| Runtime        | .NET 10 (`dotnet10`) ASP.NET Core              |
+| Container port | `8085`                                         |
+| Health probe   | `GET /health` (anonymous, returns `200`)       |
+
+## Required environment variables
+
+These are produced by the CDP portal at deploy time unless noted otherwise.
+
+| Variable                   | Source                | Notes                                                       |
+| -------------------------- | --------------------- | ----------------------------------------------------------- |
+| `ASPNETCORE_URLS`          | Container             | Set to `http://+:8085` (matches `EXPOSE`).                  |
+| `Mongo__DatabaseUri`       | CDP MongoDB binding   | Authenticated via IAM (`MONGODB-AWS`).                      |
+| `Mongo__DatabaseName`      | Service config        | Defaults to `waste-regulator-case-management`.     |
+| `TraceHeader`              | Service config        | Defaults to `x-cdp-request-id`.                             |
+| `HTTP_PROXY` / `HTTPS_PROXY` | CDP platform        | CDP outbound proxy. Required for any external HTTP call. Also assigned process-wide to `HttpClient.DefaultProxy` at startup (for the GOV.UK Notify SDK's bare `HttpClient`) — any named `HttpClient` that must bypass Squid has to opt out explicitly via `ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { UseProxy = false })`; omitting a primary handler is not the same as being unproxied. |
+| `TRUSTSTORE_*`             | CDP platform          | Loaded by `LoadCustomTrustStoreFromEnvironment`.            |
+| `Auth__ManagementFeClientId` | Service config  | The `clientId` (`x-cdp-client-id` value) that the regulator frontend is expected to assert. Defaults to `frontend`. Must be distinct from `Auth__CaseIntakeClientId` (see RA-345 below). |
+| `Auth__CaseIntakeClientId` | Service config  | The `clientId` that the Case Intake Processor is expected to assert, and the only client allowed to create cases. Defaults to `case-intake-processor`. Must be distinct from `Auth__ManagementFeClientId`; the service throws at first request if the two collide. |
+| `ENVIRONMENT`              | CDP platform          | Platform environment name (`local`, `dev`, `test`, `perf-test`, `ext-test`, `prod`). Read by `CdpEnvironment.Read` for `NotifySendingPolicy` — see [Notify sending by environment](#notify-sending-by-environment) below. |
+| `NOTIFY_SENDEMAILS`        | Service config        | Optional. Overrides the environment-derived decision about whether email is really dispatched (`true`/`false`). A flat top-level key, matching `NOTIFY_API_KEY`'s convention. Leave unset in normal operation. |
+| `AnalyticsAuditEventProcessor__ProcessingEnabled` | Service config | `true` to publish audit events to the analytics topic. Defaults to `false`, which does not start the processor. |
+| `AnalyticsAuditEventProcessor__TopicArn` | Service config | ARN of the analytics SNS topic. Required when processing is enabled. |
+| `Notify__RegulatorMailboxes__<Nation>` | Service config | Regulator shared-mailbox address that regulator-facing emails are sent to, one per nation (`England`, `Scotland`, `Wales`, `NorthernIreland`). `appsettings.json` ships every nation blank, so each environment sets its own addresses in cdp-app-config. The real regulator inboxes are set in prod's config only; a non-prod environment never falls back to a real regulator. A missing or blank nation resolves to no address. |
+
+## Required secrets (cdp-portal)
+
+Create via the CDP self-service portal under the service's "secrets" tab:
+
+| Secret               | Notes                                                                                                                    |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `AUTH_SHARED_SECRET__MANAGEMENT_FE` | HMAC secret used to verify signed trust headers from the regulator frontend (see [BFF signing contract](#bff-signing-contract) below). Must match the secret the regulator frontend signs with. **Required in all non-Development environments.** The service will reject every authenticated request with `401` until at least one caller's secret is set (see RA-345 below). Generate with `openssl rand -base64 32`. |
+| `AUTH_SHARED_SECRET__CASE_INTAKE` | HMAC secret used to verify signed trust headers from the Case Intake Processor (see [BFF signing contract](#bff-signing-contract) below). Must match the secret the Case Intake Processor signs with. **Required in all non-Development environments.** Distinct from `AUTH_SHARED_SECRET__MANAGEMENT_FE` — each caller has its own secret so one can be rotated without touching the other (RA-345). Generate with `openssl rand -base64 32`. |
+| `CALLBACK_AUTH__CSOC` | Basic credentials, as `clientId:clientSecret`, that this service presents when it PATCHes a concluded CSoC case to the Waste Obligations API. The client must be on the Waste Obligations API's access list with `write` scope, to send the decision, and `read` scope, to check a decision it refuses as already held. Without it the callback is sent unauthenticated and rejected, so CSoC cases cannot be accepted or cancelled. |
+| `NOTIFY_API_KEY`     | GOV.UK Notify API key. Only takes effect when the `Notify__Enabled` master switch is `true` (RA-422; default `false`, set per environment in cdp-app-config). With the flag off — the default in every environment — the no-op client is registered, so no email is sent regardless of this key. With the flag on but this key absent, the service boots with a no-op Notify client (notifications logged, not sent). Even with the flag on and this key set, dev and localhost suppress sending regardless — see [Notify sending by environment](#notify-sending-by-environment). |
+
+> **RA-345 (per-caller secrets):** prior to RA-345 there was a single
+> `AUTH_SHARED_SECRET` shared by both inbound callers, with `clientId`
+> self-asserted rather than bound to the secret — any holder of the one
+> secret could forge a request claiming to be either caller. `AUTH_SHARED_SECRET`
+> is no longer read by this service; it has been replaced by the two secrets
+> above, each verified only against the specific `clientId` it is registered
+> for. See `docs/adr/0005-rbac-in-frontend-drop-roles-from-payload.md`'s
+> "Follow-up: per-caller shared secrets" section for the rationale.
+
+## Notify sending by environment
+
+The non-production GOV.UK Notify service is driven by a **team** API key. A
+team key may only send to addresses registered on the Notify team, plus a hard
+limit of five guest addresses — and those guest slots are exhausted. A send to
+any other address fails, and the case worker sees that failure in the
+case-management UI as a failed action.
+
+`NotifySendingPolicy` therefore decides, at startup, whether sends are really
+dispatched:
+
+| `ENVIRONMENT`                            | Dispatches email? |
+| ---------------------------------------- | ----------------- |
+| `local`, `dev`                            | No                |
+| unset, with `ASPNETCORE_ENVIRONMENT=Development` (Compose, `dotnet run`) | No |
+| `test`, `perf-test`, `ext-test`, `prod`   | Yes               |
+| unset or unrecognised, non-Development host | Yes (fail-open) |
+
+When sending is suppressed, `NoOpNotifyClient` is registered **even though
+`NOTIFY_API_KEY` is set**. It returns success, so a caller behaves exactly as
+it does in a sending environment. The only difference is that no HTTP traffic
+reaches Notify. Suppressed sends are logged with
+`notify.suppression_reason=sending_disabled_for_environment` (as opposed to
+`no_api_key` when no key is configured at all), and the startup line
+`Notify integration: … sendingEnabled=… environment=…` records the decision.
+
+`ENVIRONMENT` is read straight from the process environment
+(`CdpEnvironment.Read`), not through `IConfiguration`:
+`ENVIRONMENT` is also `WebHostDefaults.EnvironmentKey`, so when the ASP.NET
+host environment is set explicitly, host configuration shadows the key and
+`configuration["ENVIRONMENT"]` returns the host environment name
+(`Development`) rather than the platform value (`dev`). It cannot therefore be
+set from `appsettings.json`.
+
+The fail-open default is deliberate: an unset or renamed `ENVIRONMENT` in a
+deployed environment must not silently swallow real notifications. To force the
+decision either way, set `NOTIFY_SENDEMAILS` (`true` to smoke-test the real
+integration in dev against a Notify-registered address, `false` to silence a
+sending environment). Environment variables for deployed environments live in
+[DEFRA/cdp-app-config](https://github.com/DEFRA/cdp-app-config), not in this
+repo.
+
+## BFF signing contract
+
+Every request a caller sends to this backend must carry the four headers below,
+alongside the identity headers it signs. The backend verifies them before
+accepting the identity headers as authoritative. Requests missing any of these headers, or with an invalid
+signature, are rejected with `401`.
+
+| Header                    | Description                                                                                      |
+| ------------------------- | ------------------------------------------------------------------------------------------------ |
+| `x-cdp-client-id` | The clientId the caller asserts (each caller sets this from its own config — see RA-345 above). The `x-cdp-` prefix matches this scheme's other trust headers by convention only — this value is *not* injected or verified by CDP itself, which is exactly why the HMAC signature below exists. |
+| `x-cdp-auth-timestamp`    | ISO-8601 UTC instant the BFF assembled the request (e.g. `2026-05-18T10:00:00Z`). Must be within 5 minutes of the backend clock. |
+| `x-cdp-auth-nonce`        | Per-request opaque random token minted by the BFF (e.g. base64url of 16 random bytes). Single-use — a replayed nonce is rejected for 10 minutes. |
+| `x-cdp-auth-signature`    | Base64 HMAC-SHA256 of the canonical payload (see below), keyed with the secret registered for the asserted `x-cdp-client-id` (`AUTH_SHARED_SECRET__MANAGEMENT_FE` or `AUTH_SHARED_SECRET__CASE_INTAKE` — see RA-345 above). |
+
+### Canonical payload (v3)
+
+Join the following fields with a newline (`\n`), in this order, then compute
+`HMAC-SHA256(key=secret for the asserted clientId, message=payload)` and base64-encode the result.
+Two wire forms exist — see `docs/adr/0007-role-nation-in-v3-payload-dual-form.md`
+for which peer uses which and why both are accepted.
+
+**Legacy form** — the original v3 string. This is what a service caller with no
+user role or nation (the Case Intake Processor) signs:
+
+```
+v3
+{x-cdp-client-id}
+{x-cdp-user-id or ""}
+{x-cdp-user-name or ""}
+{x-cdp-auth-timestamp}
+{x-cdp-auth-nonce}
+```
+
+**Extended form (RA-469)** — adds the role, nation and email trust headers so
+they carry the same signed-integrity guarantee as user-id/user-name. This is what
+the regulator frontend signs on every call (each as `""` when it has
+none to forward), and the **only** form accepted when any of `x-cdp-user-role`,
+`x-cdp-user-nation` or `x-cdp-user-email` is present on the request:
+
+```
+v3
+{x-cdp-client-id}
+{x-cdp-user-id or ""}
+{x-cdp-user-name or ""}
+{x-cdp-user-role or ""}
+{x-cdp-user-nation or ""}
+{x-cdp-user-email or ""}
+{x-cdp-auth-timestamp}
+{x-cdp-auth-nonce}
+```
+
+Empty-string placeholders must be included for absent optional fields — the
+field count and separator positions are fixed within each form. When a request
+carries no role, nation or email header, either form verifies; when it carries
+one, only the extended form over the sent values does. The email is sent to the
+source system as the deciding user's address when a case is concluded (see
+`docs/cases.md`). Nation scopes every caseworker route (`ENGLAND`, `WALES`,
+`SCOTLAND` or `N_IRELAND`; see `docs/cases.md`); role is an audit-only claim,
+and role-based authorization is the BFF's concern (see
+`docs/adr/0005-rbac-in-frontend-drop-roles-from-payload.md`). See
+`ClientIdAuthenticationHandler.ComputeSignature` / `VerifySignature` for the
+authoritative implementation and
+`docs/adr/0003-hmac-canonical-v2-timestamp-nonce.md` for the timestamp/nonce
+rationale.
+
+## AWS resources to provision
+
+Provision through the cdp-portal "Create a service" / "Create a resource"
+flows so they appear under the service's owning team:
+
+- ECR repository (named after the service).
+- MongoDB database (`waste-regulator-case-management`).
+- SNS topic for analytics events, with publish permission for the service's
+  role.
+- CloudWatch log group + dashboard (created automatically once the service
+  publishes ECS metrics).
+
+## Squid proxy allow-list
+
+Outbound hostnames the service must reach from CDP environments. Add via
+the cdp-portal "Outbound proxy" form:
+
+- `sts.eu-west-2.amazonaws.com` — STS for IAM roles for service accounts.
+- `mongodb-*.eu-west-2.docdb.amazonaws.com` (CDP-managed MongoDB endpoint).
+- `api.notifications.service.gov.uk` — GOV.UK Notify (required when `NOTIFY_API_KEY` is set).
+- `sns.eu-west-2.amazonaws.com` — the analytics topic (required when analytics processing is enabled).
+- `sqs.eu-west-2.amazonaws.com` — only when SQS queues are added.
+
+## Related
+
+- [docs/cdp-tracing.md](./cdp-tracing.md)

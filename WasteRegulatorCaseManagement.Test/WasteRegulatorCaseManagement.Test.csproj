@@ -8,14 +8,17 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Using Include="AwesomeAssertions" />
     <Using Include="Xunit" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.12.0" />
+    <PackageReference Include="AwesomeAssertions" Version="9.6.0" />
+    <PackageReference Include="EphemeralMongo" Version="3.3.0" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.11.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.14" />
-    <PackageReference Include="MongoDB.Driver" Version="3.13.0" />
-    <PackageReference Include="MongoDB.Driver.Authentication.AWS" Version="3.13.0" />
     <PackageReference Include="NSubstitute" Version="6.2.0" />
     <PackageReference Include="xunit.runner.visualstudio" Version="4.0.1">
       <PrivateAssets>all</PrivateAssets>
@@ -24,7 +27,15 @@
     <PackageReference Include="xunit.v3" Version="4.0.2" />
   </ItemGroup>
 
+  <!-- Explicit overrides to silence NU19xx vulnerability warnings on
+       transitive packages pulled in by EphemeralMongo / MongoDB.Driver. -->
+  <ItemGroup>
+    <PackageReference Include="SharpCompress" Version="0.50.8" />
+    <PackageReference Include="Snappier" Version="1.3.1" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\WasteRegulatorCaseManagement\WasteRegulatorCaseManagement.csproj" />
   </ItemGroup>
+
 </Project>

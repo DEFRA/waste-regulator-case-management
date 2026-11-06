@@ -3,16 +3,6 @@ name: Publish Hot Fix
 on:
   workflow_dispatch:
 
-concurrency:
-  group: $${{ github.head_ref || github.ref_name }}
-  cancel-in-progress: false
-  queue: max
-
-permissions:
-  id-token: write
-  contents: write
-  pull-requests: write
-
 env:
   AWS_REGION: eu-west-2
   AWS_ACCOUNT_ID: "094954420758"
@@ -21,12 +11,16 @@ jobs:
   build:
     name: CDP-build-hotfix-workflow
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: write
+      pull-requests: write
     steps:
       - name: Check out code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0 # Depth 0 required for branch-based versioning
       - name: Publish Hot Fix
-        uses: DEFRA/cdp-build-action/build-hotfix@main
+        uses: DEFRA/cdp-build-action/build-hotfix@b1eaad635bf3305b0dd4b3a0f910424a12e77cee # main
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
