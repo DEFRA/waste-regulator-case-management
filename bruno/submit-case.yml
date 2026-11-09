@@ -1,0 +1,26 @@
+info:
+  name: Submit case
+  type: http
+  seq: 4
+http:
+  method: POST
+  url: "{{baseUrl}}/cases"
+  auth: inherit
+  body:
+    type: json
+    data: |-
+      {
+        "caseType": "CSoC",
+        "sourceSystemId": "{{$randomUUID}}",
+        "callbackUrl": "https://source-system.example/submissions/callback",
+        "nation": "{{userNation}}",
+        "orgId": "557735a2-495a-457c-95a2-465b26a827eb",
+        "producerType": "DIRECT_PRODUCER"
+      }
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        bru.setVar("caseId", res.getBody().id);
+settings:
+  encodeUrl: true

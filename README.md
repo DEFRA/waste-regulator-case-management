@@ -98,6 +98,16 @@ Tear it down with:
 docker compose down -v
 ```
 
+## Calling the API with Bruno
+
+The [Bruno](https://www.usebruno.com/) collection in [bruno/](bruno/) provides runnable HTTP calls for the endpoints in this repo, with both local and cdp-dev environments configured.
+
+To open the collection in bruno, run Bruno, click "Open collection" and select the [`bruno/`](bruno/) folder in this repo.
+
+See the [collection documentation](bruno/opencollection.yml) in Bruno for further information on using the bruno collection.
+
+You will need to add the relevant secrets to be able to use it against cdp-dev.
+
 ## Endpoints
 
 | Method | Path                             | Caller                    | Description                            |

@@ -1,0 +1,94 @@
+opencollection: 1.0.0
+
+info:
+  name: waste-regulator-case-management
+config:
+  proxy:
+    inherit: true
+    config:
+      protocol: http
+      hostname: ""
+      port: ""
+      auth:
+        username: ""
+        password: ""
+      bypassProxy: ""
+
+request:
+  auth:
+    type: apikey
+    key: x-api-key
+    value: "{{CDP_API_KEY}}"
+    placement: header
+  scripts:
+    - type: before-request
+      code: |-
+        const CryptoJS = require("crypto-js");
+
+        const isCaseIntake = req.getMethod() === "POST" && req.getUrl().endsWith("/cases");
+        const clientId = isCaseIntake
+          ? bru.getEnvVar("caseIntakeClientId")
+          : bru.getEnvVar("frontendClientId");
+        const secret = isCaseIntake
+          ? bru.getEnvVar("AUTH_SHARED_SECRET__CASE_INTAKE")
+          : bru.getEnvVar("AUTH_SHARED_SECRET__MANAGEMENT_FE");
+        const userId = isCaseIntake ? "" : bru.getEnvVar("userId");
+        const userName = isCaseIntake ? "" : bru.getEnvVar("userName");
+        const nation = isCaseIntake ? "" : bru.getEnvVar("userNation");
+        const email = isCaseIntake ? "" : bru.getEnvVar("userEmail");
+
+        req.setHeader("x-cdp-client-id", clientId);
+        if (!isCaseIntake) {
+          req.setHeader("x-cdp-user-id", userId);
+          req.setHeader("x-cdp-user-name", userName);
+          req.setHeader("x-cdp-user-nation", nation);
+          req.setHeader("x-cdp-user-email", email);
+        }
+
+        if (secret) {
+          const timestamp = new Date().toISOString();
+          const nonce = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+          const payload = ["v3", clientId, userId, userName, "", nation, email, timestamp, nonce].join("\n");
+          req.setHeader("x-cdp-auth-timestamp", timestamp);
+          req.setHeader("x-cdp-auth-nonce", nonce);
+          req.setHeader("x-cdp-auth-signature", CryptoJS.HmacSHA256(payload, secret).toString(CryptoJS.enc.Base64));
+        }
+
+docs:
+  content: |-
+    # waste-regulator-case-management
+
+    Calls every endpoint of the case management API, in the `local` or `dev` environment.
+
+    ## Set up
+
+    `local` needs nothing: the service runs in Development there and accepts unsigned requests.
+
+    For `dev`, set these secret variables in the `dev` environment. Bruno keeps their values on your machine, not in the repository.
+
+    | Variable | Value |
+    | --- | --- |
+    | `CDP_API_KEY` | A [CDP developer API key](https://portal.cdp-int.defra.cloud/documentation/how-to/developer-api-key.md) |
+    | `AUTH_SHARED_SECRET__CASE_INTAKE` | The service's Case Intake secret in dev |
+    | `AUTH_SHARED_SECRET__MANAGEMENT_FE` | The service's regulator frontend secret in dev |
+
+    ## How requests are authenticated
+
+    Every request inherits the collection's API key auth, which sends `CDP_API_KEY` in the `x-api-key` header.
+
+    The collection's pre-request script then sets the caller headers:
+
+    - `POST /cases` is sent as the Case Intake Processor (`caseIntakeClientId`).
+    - Every other request is sent as the regulator frontend (`frontendClientId`), acting for the caseworker in the environment's `userId`, `userName`, `userEmail` and `userNation`.
+
+    When that caller's secret is set, the script also signs the request (`x-cdp-auth-timestamp`, `x-cdp-auth-nonce`, `x-cdp-auth-signature`) as described in the service's [BFF signing contract](https://github.com/DEFRA/waste-regulator-case-management/blob/main/docs/cdp-deployment.md#bff-signing-contract).
+
+    ## Running the collection
+
+    Run the requests in order. `Submit case` creates a case and saves its id as `caseId`, which the requests after it use.
+  type: text/markdown
+bundled: false
+extensions:
+  bruno:
+    presets:
+      defaultEnvironment: local
