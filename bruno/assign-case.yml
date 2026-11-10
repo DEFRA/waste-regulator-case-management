@@ -1,0 +1,17 @@
+info:
+  name: Assign case
+  type: http
+  seq: 7
+http:
+  method: POST
+  url: "{{baseUrl}}/cases/{{caseId}}/assign"
+  auth: inherit
+  body:
+    type: json
+    data: |-
+      {
+        "assigneeId": "{{userId}}",
+        "assigneeName": "{{userName}}"
+      }
+settings:
+  encodeUrl: true

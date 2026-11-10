@@ -1,0 +1,10 @@
+info:
+  name: Unassign case
+  type: http
+  seq: 9
+http:
+  method: POST
+  url: "{{baseUrl}}/cases/{{caseId}}/unassign"
+  auth: inherit
+settings:
+  encodeUrl: true

@@ -1,0 +1,16 @@
+info:
+  name: Add note
+  type: http
+  seq: 8
+http:
+  method: POST
+  url: "{{baseUrl}}/cases/{{caseId}}/notes"
+  auth: inherit
+  body:
+    type: json
+    data: |-
+      {
+        "text": "Test note."
+      }
+settings:
+  encodeUrl: true

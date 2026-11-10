@@ -1,0 +1,25 @@
+name: dev
+variables:
+  - name: baseUrl
+    value: https://ephemeral-protected.api.dev.cdp-int.defra.cloud/waste-regulator-case-management
+  - name: frontendClientId
+    value: frontend
+  - name: caseIntakeClientId
+    value: case-intake-processor
+  - name: userId
+    value: f42cb9a0-8365-4624-a788-e856735dcaaa
+  - name: userName
+    value: Test Caseworker
+  - name: userEmail
+    value: test.caseworker@regulator.example
+  - name: userNation
+    value: ENGLAND
+  - secret: true
+    name: CDP_API_KEY
+    description: ""
+  - secret: true
+    name: AUTH_SHARED_SECRET__CASE_INTAKE
+    description: ""
+  - secret: true
+    name: AUTH_SHARED_SECRET__MANAGEMENT_FE
+    description: ""
