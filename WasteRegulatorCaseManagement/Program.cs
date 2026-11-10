@@ -656,5 +656,11 @@ static void ConfigureEndpoints(WebApplication app)
 		});
 	}
 
+	app.UseReDoc(options =>
+	{
+		options.RoutePrefix = "documentation";
+		options.SpecUrl = "/openapi/v1.json";
+	});
+
 	app.MapCaseFrameworkEndpoints();
 }

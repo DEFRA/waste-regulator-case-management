@@ -116,6 +116,7 @@ You will need to add the relevant secrets to be able to use it against cdp-dev.
 | GET    | `/health/ready`                  | Anyone                    | Readiness probe                        |
 | GET    | `/openapi/v1.json`               | Anyone                    | OpenAPI document                       |
 | GET    | `/swagger`                       | Anyone                    | Swagger UI explorer (non-Production)   |
+| GET    | `/documentation`                 | Anyone                    | ReDoc API documentation                |
 | POST   | `/cases`                         | Case Intake Processor     | Create a case for a submission         |
 | GET    | `/cases`                         | Caseworker                | List cases in the caller's nation      |
 | GET    | `/cases/{id}`                    | Caseworker                | Get a case                             |
