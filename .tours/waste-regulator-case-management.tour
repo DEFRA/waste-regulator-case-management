@@ -1,0 +1,471 @@
+{
+  "$schema": "https://aka.ms/codetour-schema",
+  "title": "Waste Regulator Case Management",
+  "description": "What the service is for, how it is built, and its known defects.",
+  "ref": "769d5a87715632e81ce58fb4111e05504b2df517",
+  "isPrimary": true,
+  "steps": [
+    {
+      "title": "📋 THE LIFE OF A CASE",
+      "description": ""
+    },
+    {
+      "file": "WasteRegulatorCaseManagement.Test/Cases/CaseEndpointsTests.cs",
+      "line": 192,
+      "title": "A declaration needs a regulator's decision",
+      "description": "A producer or compliance scheme files a CSoC compliance declaration with the Waste Obligations API. Someone at the regulator has to accept or cancel it. This service holds that piece of work as a **case**: the source system's Case Intake Processor posts a reference to the declaration, and a case opens in `SUBMITTED` with `accept` and `cancel` available."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement.Test/Cases/CaseEndpointsTests.cs",
+      "line": 604,
+      "title": "Each declaration opens one case",
+      "description": "The intake service may redeliver. The same `sourceSystemId` returns the existing case (`200`, `X-Idempotent-Replay: true`) rather than opening a second. Only the intake service can open cases at all (line 297)."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement.Test/Cases/CaseEndpointsTests.cs",
+      "line": 1225,
+      "title": "It lands in the right nation's queue",
+      "description": "Regulation is devolved, so a caseworker in Wales, working through the regulator frontend, sees only Welsh cases. A case from another nation is a 404 (line 1150), so they cannot even learn it exists."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement.Test/Cases/CaseEndpointsTests.cs",
+      "line": 1716,
+      "title": "A caseworker picks it up",
+      "description": "Cases are assigned between caseworkers and annotated with notes (line 2232) while they are worked. Each of these goes on the case's timeline."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement.Test/Cases/CaseEndpointsTests.cs",
+      "line": 714,
+      "title": "Cancelling needs a reason",
+      "description": "`accept` needs nothing, but `cancel` is refused without a `reason`, and the case stays open. A given reason is kept on the case and its timeline (line 737)."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement.Test/Cases/CaseEndpointsTests.cs",
+      "line": 869,
+      "title": "The decision goes back to the source",
+      "description": "Concluding the case PATCHes the declaration's `callbackUrl` with the outcome in the source system's own terms (`Accepted`/`Cancelled`) and who decided. The Waste Obligations API, not this service, is where the declaration's status lives."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement.Test/Cases/CaseEndpointsTests.cs",
+      "line": 917,
+      "title": "The source system has the last word",
+      "description": "If the callback fails, the case does not move: it stays `SUBMITTED`, records `callback-failed` with the reason, and the caseworker sees a 502. The two systems never disagree about the outcome."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement.Test/Cases/CaseEndpointsTests.cs",
+      "line": 763,
+      "title": "Everything is on the record",
+      "description": "Every change, from opening to decision, is stored as an audit event with the case before and after and who did it, then published to the platform's analytics topic (`AuditEvents/Analytics/AnalyticsAuditEventProcessorTests.cs`). The rest of the tours show how each of these steps is built."
+    },
+    {
+      "title": "🧩 CASE TYPES AS CONFIGURATION",
+      "description": ""
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Cases/CaseModuleConfigs/CSoC.json",
+      "line": 1,
+      "title": "A case type is a JSON file",
+      "description": "Each case type is a state machine held as configuration, so one engine and one set of endpoints serve every type and adding a type needs no code (`docs/cases.md`). CSoC, the only type, has `initialStateId` `SUBMITTED` and two terminal states; terminality is a per-state flag, not hard-coded."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Cases/CaseModuleConfigs/CSoC.json",
+      "line": 13,
+      "title": "Transitions and required decisions",
+      "description": "Each transition is one `actionId` (the `POST /cases/{id}/actions/{actionId}` segment) from one state to another; an action available from two states needs two entries. `requiredDecisionFields` makes the engine reject the action with 400 unless each field is a non-blank string in the request's `decision`."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Cases/CaseModuleConfigs/CSoC.json",
+      "line": 15,
+      "title": "Callback mappings",
+      "description": "Keyed by state id: entering a mapped state PATCHes this body to the case's `callbackUrl`, filling `{{actor.*}}` and `{{decision.*}}` (ADR `docs/adr/0011-gated-source-system-callback.md`). `status` values are the source system's vocabulary. Stored as `BsonDocument` via `CallbackMappingsJsonConverter`, whose `Write` throws, so never serialise a `CaseModuleConfig` with System.Text.Json."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Cases/CaseModuleConfigLoader.cs",
+      "line": 21,
+      "title": "Upsert embedded, then load all",
+      "description": "A hosted service, so a bad config stops the host before requests are served. It replaces each embedded JSON file's stored copy in `caseModuleConfig` (keyed on `CaseType` as `_id`), then loads every document in the collection, so database-only types are served too.\n\nKnown issue: a type removed from the repo lingers in Mongo and keeps loading; an invalid embedded file is written before validation fails."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Cases/CaseRegistry.cs",
+      "line": 32,
+      "title": "Registry validation",
+      "description": "Fails startup if the initial state, any transition's from/to state, or any callback mapping key is undeclared. Not checked: duplicate state ids or `(actionId, fromStateId)` pairs, or that `{{decision.x}}` placeholders match `requiredDecisionFields`. `Load` swaps a whole `volatile` dictionary, keyed case-insensitively on type name."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Cases/CaseRegistry.cs",
+      "line": 34,
+      "title": "Case-insensitive state ids",
+      "description": "The registry and engine compare state and action ids with `OrdinalIgnoreCase`.\n\nKnown issue: the bulk-load `initialState` is checked ordinally (`CaseEndpoints.cs:238`, `CaseService.cs:147`), and the status sort's Mongo `$eq` is case-sensitive, so a differently cased id passes validation here but fails or mis-sorts there."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Cases/CaseTemplateSnapshot.cs",
+      "line": 23,
+      "title": "Template snapshot on each case",
+      "description": "At submission `CaseService.SubmitAsync` stores `Capture(type)` (version, states, transitions) on the case. `ResolveTemplate` (`CaseService.cs:890`) prefers it over the live type, so shipping v2 cannot change the rules for an in-flight v1 case; legacy cases without one fall back to the live type. `[BsonIgnoreExtraElements]` keeps old snapshots readable after fields are removed."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Cases/CaseService.cs",
+      "line": 344,
+      "title": "Callbacks come from the live type",
+      "description": "Known issue: `ICaseTemplate` has no callback mappings, so the snapshot does not hold them and the payload is read from the live registry type at action time. Changing or removing a type's mapping changes callbacks for in-flight cases. Tests: `CaseTemplateVersioningTests` (snapshot vs live) and `CaseModuleConfigLoaderTests` (real ephemeral Mongo, embedded-wins rule)."
+    },
+    {
+      "title": "🌐 CASE API",
+      "description": ""
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Cases/CaseEndpoints.cs",
+      "line": 62,
+      "title": "Routes and auth",
+      "description": "Seven routes: `POST /cases` (intake), `GET /cases/{id}`, `GET /cases`, `POST .../actions/{actionId}`, `.../assign`, `.../unassign`, `.../notes`. Only intake has a named policy: `client_id` must equal `Auth:CaseIntakeClientId`. The rest accept any authenticated client; roles are left to the frontend (`docs/adr/0005-rbac-in-frontend-drop-roles-from-payload.md`). Handlers are thin and delegate to `ICaseService`."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Cases/CaseEndpoints.cs",
+      "line": 35,
+      "title": "Body size limits",
+      "description": "Intake 1 MB, note 100 KB, assign 10 KB, attached as `RequestSizeLimitAttribute`. Routes using `.DisableValidation()` do their own checks; `CaseRequestSizeLimitTests` fails any such route without a cap. Known issue: the action route has neither, so it falls back to Kestrel's ~30 MB default and the test does not catch it."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Cases/CaseIntakeBinding.cs",
+      "line": 13,
+      "title": "Intake validation",
+      "description": "Validation disabled, so required fields can arrive null. Wrong JSON types fail deserialisation (400). Then: `caseType` must be registered; `callbackUrl` absolute http(s); `nation` exactly one of `ENGLAND`, `WALES`, `SCOTLAND`, `N_IRELAND`; each `displayData` entry needs `value` and a known `type`. First failure wins, 400 `Invalid request`."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Cases/CaseEndpoints.cs",
+      "line": 335,
+      "title": "Idempotent replay and bulk load",
+      "description": "A repeated `sourceSystemId` returns 200 with the existing case and `X-Idempotent-Replay: true`, so the Case Intake Processor can drop redelivered events; a unique index arbitrates races. A new case is 201 with `Location`. Bulk-load fields: `initialState` (ordinal match against the type's states) and `createdAt` (no offset means UTC). The birth entry is attributed to `service:<client id>`."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Cases/CaseEndpoints.cs",
+      "line": 373,
+      "title": "Nation scoping",
+      "description": "Nation comes only from the signed `user:nation` claim; without it reads are 403 (so the intake client cannot read). A case in another nation is a 404, indistinguishable from a missing one. Mutations get the same rule inside `CaseService`, which reports it as `CaseNotFound`. Known issue: `docs/adr/0005-rbac-in-frontend-drop-roles-from-payload.md` says authorisation lives entirely in the frontend; that holds only for role. Timelines are returned newest first, ties broken by reverse append order."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Cases/CaseEndpoints.cs",
+      "line": 427,
+      "title": "List filter, sort, paging",
+      "description": "The query's `Nation` is overwritten from the claim, so it cannot be set from the query string. Filters: `caseType`/`stateId` (repeatable), `search` (id prefix), `assigneeId` + `unassigned` (union), `orgId`, `isTerminal`. `page` > 1000 is 400; `pageSize` is clamped to 1–100. Items omit the timeline. Known issue: `docs/cases.md` does not document `sort`/`dir`."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Cases/CaseSort.cs",
+      "line": 41,
+      "title": "Status sort",
+      "description": "`sort=status` is the only sort token: it ranks states in the order the case type JSON declares them (workflow order, not alphabetical) via a Mongo `$switch`, with `submittedAt` and `_id` as tie-breakers for stable paging. Any other token gives the default newest-submitted-first order."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Cases/CaseEndpoints.cs",
+      "line": 555,
+      "title": "Failure codes to HTTP",
+      "description": "Mutations return `CaseActionResult` rather than throwing. Mapping:\n- `CaseNotFound` → 404\n- invalid action, transition, assignment, note, missing decision field → 400\n- `NotAuthorized` (no nation) → 403\n- `MissingActorIdentity` (no `user:id`) → 401\n- `CallbackFailed` → 502\n- `TerminalState`, `ConcurrencyConflict` → 409\nTests run the real app against ephemeral Mongo (`CaseEndpointsTests`)."
+    },
+    {
+      "title": "🔄 CASE LIFECYCLE AND PERSISTENCE",
+      "description": ""
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Cases/CaseService.cs",
+      "line": 205,
+      "title": "Losing a concurrent submit",
+      "description": "The lookup and insert are not atomic; the unique index on `sourceSystemId` is the real guarantee. The losing insert gets a duplicate-key error, reloads the winner and returns it as a replay."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Cases/CaseService.cs",
+      "line": 341,
+      "title": "Callback before commit",
+      "description": "If the live registry's `CallbackMappings` has an entry for the transition's `ToStateId`, the decision is PATCHed to the source system first, per `docs/adr/0011-gated-source-system-callback.md`. On failure the state is unchanged, a `callback-failed` entry is saved and the endpoint returns 502. The mapping comes from the current registry, not the case's template snapshot."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Cases/CaseService.cs",
+      "line": 377,
+      "title": "Write loop after callback",
+      "description": "Once the callback is accepted the case must follow it: the write uses `CancellationToken.None`, and a `CaseConcurrencyException` (a note or assignment landed meanwhile) reloads the case and reapplies the transition, up to `MaxWriteAttemptsAfterCallback` (3). Without a callback a conflict returns 409 immediately."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Cases/CaseService.cs",
+      "line": 509,
+      "title": "Recording callback failure",
+      "description": "Known issue: this save uses the pre-callback copy, so if a note or assignment landed during the callback it hits a version conflict, returns 409 instead of 502, and the `callback-failed` entry is lost."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Cases/CaseService.cs",
+      "line": 528,
+      "title": "Assign, unassign, notes",
+      "description": "- Any caseworker may assign anyone (RA-323 removed tiers).\n- Assign/unassign are refused on terminal cases; a no-op change is an `IdempotentReplay` with no write or version bump.\n- Notes (`AddNoteAsync`, max 4000 chars trimmed) are allowed on closed and legacy-type cases.\n- All mutations require `user:id` and `user:nation` and are nation-scoped."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Cases/CaseService.cs",
+      "line": 1002,
+      "title": "Timeline entries",
+      "description": "Every change appends a timeline entry, which snapshots the case's current `StateId`, so callers append after mutating state. The newest entry also becomes the audit event, so a write without one throws."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Cases/CasePersistence.cs",
+      "line": 275,
+      "title": "Optimistic concurrency",
+      "description": "`Version` is bumped in memory and `FindOneAndReplaceAsync` matches on `Id` plus the old `Version`; no match throws `CaseConcurrencyException` and the in-memory version is rolled back. The case replace and its `Update` audit event (with Mongo's before-image) commit in one transaction, as `CreateAsync` does for inserts. Tests run against a real ephemeral Mongo replica set; `RacingPersistence` in `CaseServiceTests.cs` writes a genuine competing version to produce conflicts."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Cases/CaseCallbackClient.cs",
+      "line": 35,
+      "title": "Callback client",
+      "description": "PATCHes the payload with Basic credentials from `CALLBACK_AUTH:<caseType>` (env `CALLBACK_AUTH__<caseType>`, `clientId:clientSecret`). Any 2xx is success; network errors and timeouts become a failure reason, but cancellation by the caller propagates. Known issue: missing credentials only log a warning and the request goes out unauthenticated."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Cases/CaseCallbackClient.cs",
+      "line": 76,
+      "title": "422 already applied",
+      "description": "A 422 may mean the source system already holds this decision (e.g. a retry after this service's write failed). A GET of the same URL counts as applied when every shared top-level string field matches. Known issue: nested objects such as `user` are ignored, so another caseworker's identical decision also matches."
+    },
+    {
+      "title": "📜 AUDIT EVENTS AND ANALYTICS",
+      "description": ""
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Cases/CasePersistence.cs",
+      "line": 321,
+      "title": "Outbox event per write",
+      "description": "Every case create and replace writes an `auditEvents` document in the same Mongo transaction (`docs/adr/0010-transactional-audit-events.md`), built from the newest timeline entry and carrying the whole case before and after. A write that appends no timeline entry throws. Transactions need a replica set everywhere.\n\nKnown issue: ADR 0004 still says Accepted though superseded, and it and ADR 0002 name predecessor-codebase files."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/AuditEvents/AuditEventService.cs",
+      "line": 59,
+      "title": "Global sequence",
+      "description": "One counter document (`auditEventCounters`/`audit_event`) is incremented on the caller's session, so sequence matches commit order and aborts leave no gap. Every case write contends on it; `MongoTransactions` retries the write conflicts. `Sequence` has a unique index."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/AuditEvents/AuditEventLeaseService.cs",
+      "line": 22,
+      "title": "Single-runner lease",
+      "description": "Only one instance publishes at a time. The upsert matches the `analytics` lease only if expired or already ours; if another instance holds it, the upsert collides on `_id` (error 11000) and returns false. The lease is acquired and released per batch, and renewed before every event."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/AuditEvents/Analytics/AnalyticsAuditEventProcessor.cs",
+      "line": 48,
+      "title": "Processor batch",
+      "description": "Off unless `ProcessingEnabled`; throws at start if `TopicArn` is empty. Each poll (15 s + 0–5 s jitter): take lease, read up to 25 unsent events, renew-send-mark each, stop if renewal fails. `ProcessBatch` is `internal` so tests drive single iterations against real ephemeral Mongo with `FakeTimeProvider` and a recording sender."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/AuditEvents/AuditEventDispatchService.cs",
+      "line": 22,
+      "title": "Unsent query",
+      "description": "Dispatch state lives on the event under `dispatches.analytics`. Unsent means no entry, or `Failed` with `nextAttemptAt` due, ordered by `Sequence`.\n\nKnown issue: ordering and uniqueness are best effort. A failed event waiting to retry does not block later ones, and a stale read or a failed `MarkDispatched` after a successful send republishes. Consumers must dedupe and order by `sequence`/`version`."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/AuditEvents/Analytics/AnalyticsAuditEventProcessor.cs",
+      "line": 81,
+      "title": "Retry and dead-letter",
+      "description": "Any failure marks the event `Failed` with a fixed 60 s retry delay and moves on to the next event; the fifth failure marks it `DeadLettered`, never read again.\n\nKnown issues: permanent failures (bad vocabulary, oversize message) are retried all 5 times; nothing recovers dead letters except hand-editing Mongo, and only an error log signals them."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/AuditEvents/Analytics/AnalyticsEventVocabulary.cs",
+      "line": 13,
+      "title": "Vocabulary",
+      "description": "Allow-list the topic contract depends on: entity `case`, six event types, actor prefixes `service`/`user`/`system`, schema `case.v1.0`; stored `insert` becomes `create`. Anything else throws before publishing.\n\nKnown issue: the event types duplicate string literals in `CaseService` (e.g. line 181) and are kept in step by hand."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/AuditEvents/Analytics/SnsAnalyticsEventSender.cs",
+      "line": 39,
+      "title": "SNS message shape",
+      "description": "Plain JSON body (millisecond-UTC dates, `Before`/`After` as plain JSON not Mongo extended JSON) with a `Content-Type` attribute. Over 252 KiB it is gzipped, base64-encoded and flagged `Content-Encoding: gzip+base64`, which consumers must check. Still too big throws."
+    },
+    {
+      "title": "🔐 AUTHENTICATION",
+      "description": ""
+    },
+    {
+      "file": "docs/cdp-deployment.md",
+      "line": 109,
+      "title": "Trust model",
+      "description": "CDP does not inject or verify `x-cdp-client-id`; any caller can send any value. The HMAC signature over the identity headers is the only proof of identity (see the 2026-08 amendment in `docs/adr/0001-cognito-client-id-auth.md`). The two callers are the regulator frontend BFF and the Case Intake Processor."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Auth/ClientIdAuthenticationHandler.cs",
+      "line": 153,
+      "title": "Any secret means all sign",
+      "description": "A missing client id header is anonymous (`NoResult`), so `/health` works and protected routes get 401 from authorisation. If any caller's secret is configured, every request must be fully signed; there is no per-caller opt-out."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Auth/ClientIdAuthenticationHandler.cs",
+      "line": 168,
+      "title": "No secrets: fail closed",
+      "description": "With no secrets outside `Development` every request is 401 and logged at `Critical`, so a typo in an env var cannot become \"anyone may claim any identity\". In `Development` the headers are trusted unsigned, with one warning per process: `curl` with `x-cdp-client-id` and `x-cdp-user-nation` is enough locally."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Auth/ClientIdAuthenticationHandler.cs",
+      "line": 280,
+      "title": "Timestamp skew",
+      "description": "`x-cdp-auth-timestamp` must be within 5 minutes of server time in either direction (`Duration()`), so future timestamps are rejected too. The raw header string, not the parsed value, is signed. Header length caps are checked before parsing or hashing and oversize values are rejected, never truncated."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Auth/ClientIdAuthenticationHandler.cs",
+      "line": 338,
+      "title": "Per-caller secrets",
+      "description": "The secret is looked up by the asserted client id, so the id is bound to a key and each caller can be rotated alone (`docs/adr/0006-per-caller-client-secrets.md`). Keys: `AUTH_SHARED_SECRET__MANAGEMENT_FE`, `AUTH_SHARED_SECRET__CASE_INTAKE`. Unknown id and bad signature return the same 401 message. Known issue: ADR-0003 and ADR-0006 name the predecessor's `AUTH_SHARED_SECRET__BACKEND` / `Auth:BackendClientId`."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Auth/ClientIdAuthenticationHandler.cs",
+      "line": 548,
+      "title": "9-line v3 payload",
+      "description": "`v3`, client id, user id, user name, role, nation, email, timestamp, nonce, joined by `\\n`, nulls as `\"\"`. The frontend signs this; the Case Intake Processor signs the 6-line legacy form, accepted only when no role/nation/email header is sent (`VerifySignature`, ADR-0007). Tests check against an independent `WireFormatReference`. Known issue: ADR-0007 says 8 lines; email was added later without an ADR."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Auth/ClientIdAuthenticationHandler.cs",
+      "line": 369,
+      "title": "Nonce replay store",
+      "description": "The nonce is consumed only after the signature verifies, so forged requests cannot burn a real caller's nonce. `ClientIdAuthNonceStore` inserts the nonce as Mongo `_id`; a duplicate-key error means replay, across all instances. A TTL index expires it after 10 minutes. The store is `Lazy` so `/health` never touches Mongo."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Auth/ClientIdAuthenticationHandler.cs",
+      "line": 390,
+      "title": "Claims produced",
+      "description": "`NameIdentifier` and `client_id` carry the verified client id; `user:id`, `user:name`, `user:role`, `user:nation`, `user:email` are added when non-blank. `user:id`/`user:name` become timeline actor, `user:email` goes to the source-system callback, `user:role` is audit-only. In Development header-trust mode these come from unsigned headers."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Program.cs",
+      "line": 222,
+      "title": "Intake vs caseworker",
+      "description": "`POST /cases` requires `client_id` equal to `Auth:CaseIntakeClientId` (default `case-intake-processor`), the same key that registers that caller's secret, so the two cannot drift. A frontend request there authenticates and gets 403. Every other case route is for caseworkers via the frontend and is scoped by nation."
+    },
+    {
+      "title": "🚀 STARTUP AND HOSTING",
+      "description": ""
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Program.cs",
+      "line": 82,
+      "title": "Process-wide proxy",
+      "description": "CDP egress must go via Squid, and the Notify SDK builds its own `new HttpClient()`, so `HttpClient.DefaultProxy` is set globally. Every client without its own primary handler inherits it; CDP-to-CDP clients must opt out with `UseProxy = false` (the source-system callback client in `Cases/CaseModuleExtensions.cs` does)."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Program.cs",
+      "line": 189,
+      "title": "Deferred auth options",
+      "description": "`ClientIdAuthenticationOptions` are bound via `.Configure<IConfiguration>` so config added by `WebApplicationFactory.ConfigureAppConfiguration` (applied during `Build()`) is still seen; `ConfigureCors` does the same. `CaseIntakePolicy` below restricts `POST /cases` to the configured Case Intake client id."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Program.cs",
+      "line": 130,
+      "title": "Live and ready are disjoint",
+      "description": "`/health` runs only the thread-pool probe (`Task.Run` with timeout, catches a wedged process); `/health/ready` runs Mongo ping (against `admin`, so connectivity only) and `RequiredConfigHealthCheck`. The latter fails readiness outside Development when an `AUTH_SHARED_SECRET__*` is blank, catching the silent skip above. Both endpoints are anonymous, GET/HEAD only."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Program.cs",
+      "line": 322,
+      "title": "Header propagation allow-list",
+      "description": "Security boundary: only the `TraceHeader` (`x-cdp-request-id`), `traceparent`, `tracestate` and `x-request-id` reach outbound clients; credentials, `x-cdp-auth-*` and identity headers never do. `HeaderPropagationAllowListTests` pins this. Known issue: the comment and test omit the newer `x-cdp-user-nation`/`x-cdp-user-email` (still blocked, but unguarded against regression)."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Program.cs",
+      "line": 577,
+      "title": "Problem details everywhere",
+      "description": "Exceptions and bare status codes (e.g. routing 404) all become `application/problem+json`, which the OpenAPI description promises. CORS (deny-all unless `Cors:AllowedOrigins` is set) runs before auth so preflights succeed. `ProblemDetailsExceptionHandlerTests` proves it by wrapping real Mongo-backed persistence in a decorator that throws only from `QueryAsync`."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Program.cs",
+      "line": 631,
+      "title": "Swagger UI and stub users",
+      "description": "On outside Production, or where `Swagger:Enabled=true`. It injects `SwaggerUiStubUserAssets`, which patches `window.fetch` to send `x-cdp-client-id: local-swagger-ui` plus stub `x-cdp-user-*` headers (or `case-intake-processor`). Safe only while header-trust mode is off there and `local-swagger-ui` has no secret. Swagger's cURL preview omits these headers."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Program.cs",
+      "line": 656,
+      "title": "ReDoc on in Production",
+      "description": "`/openapi/v1.json` and ReDoc at `/documentation` are anonymous and ungated, including Production (`ReDocEndpointTests`), since the service is internal to CDP and ReDoc cannot send requests. Request examples are keyed by operation id in `Config/CaseOpenApiExampleTransformer.cs`. Known issue: the drift guard in `OpenApiEndpointTests` omits `ApplyCaseAction`."
+    },
+    {
+      "title": "🧰 NOTIFICATIONS AND UTILITIES",
+      "description": ""
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Program.cs",
+      "line": 408,
+      "title": "Notify client choice",
+      "description": "Three gates must all pass for `GovukNotifyClient`: `Notify:Enabled` (RA-422, default false, read raw via `NotifyFeature` because options do not exist yet), a non-blank `NOTIFY_API_KEY`, and `NotifySendingPolicy`. Otherwise `NoOpNotifyClient` is registered, which logs the same ECS shape and returns success so callers behave identically. Nothing outside startup logging resolves `INotifyClient` yet."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Notifications/NotifySendingPolicy.cs",
+      "line": 86,
+      "title": "Environment sending policy",
+      "description": "The non-prod Notify team key can only reach team members and five guest slots, all used, so dev and local suppress sends. Order: explicit `NOTIFY_SENDEMAILS` wins both ways; else `ENVIRONMENT` `local`/`dev` or a Development host means off; else send. Deliberately fail-open so an unset `ENVIRONMENT` never silences test or prod."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Utils/Http/ProxyHttpMessageHandler.cs",
+      "line": 27,
+      "title": "Proxy handler fails closed",
+      "description": "Outside Development a missing `HTTPS_PROXY`/`HTTP_PROXY` throws rather than bypassing the CDP Squid proxy. Known issue: `AddHttpClientWithTracing`/`AddHttpClientWithProxy` have no callers, so no real client uses this handler."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Utils/Logging/PiiRedactionEnricher.cs",
+      "line": 27,
+      "title": "PII redaction enricher",
+      "description": "Runs last in the Serilog pipeline. Masks client IP/address and clears user name, full name, email and hash (ids are kept), then replaces any email address inside any top-level string property. A regex timeout replaces the whole value. Emails inside destructured objects, sequences or the message template text are not scanned."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Utils/Mongo/MongoDbClientFactory.cs",
+      "line": 45,
+      "title": "Mongo client and URI redaction",
+      "description": "One process-wide `MongoClient`; in CDP it authenticates with the service IAM role (`authMechanism=MONGODB-AWS`, enabled once by `MongoExtensions.Register`). Parse failures are rethrown with a redacted URI and no inner exception, since the driver message contains the password. Known issue: `MongoUriRedactor` cuts at the first `@`, so an unencoded `@` in a password leaks its tail."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Utils/Mongo/MongoTransactions.cs",
+      "line": 18,
+      "title": "Transaction retry helper",
+      "description": "Used by `CasePersistence`. Wraps `WithTransactionAsync` in a 5 s budget and retries `TransientTransactionError` or code 112 (write conflict, e.g. two caseworkers on one case) up to five times with jittered backoff; budget expiry becomes `TimeoutException`. The driver keeps the caller's token so its abort can still run. Known issue: no direct tests."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement/Utils/TrustStore.cs",
+      "line": 30,
+      "title": "CDP trust store",
+      "description": "First thing `ConfigureServices` does: CDP injects CA certificates as base64 `TRUSTSTORE_*` environment variables, imported into the CurrentUser Root store so TLS to internal endpoints, including MongoDB, validates. An empty value passes the base64 check as zero bytes, which `TrustStoreTests` pins as current behaviour."
+    },
+    {
+      "title": "🧪 TESTING, TOOLING AND DELIVERY",
+      "description": ""
+    },
+    {
+      "file": "WasteRegulatorCaseManagement.Test/TestSupport/AssemblyFixtures.cs",
+      "line": 10,
+      "title": "One mongod per test run",
+      "description": "Tests use a real `mongod` via EphemeralMongo, no Docker or fake. It is an xUnit v3 assembly fixture so it starts once without serialising the classes that use it, as a collection fixture would. Known issue: `Notifications/NotifyEnvironmentGatingTests.cs` still declares `IClassFixture<MongoIntegrationFixture>`, a leftover from the per-class design."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement.Test/TestSupport/MongoIntegrationFixture.cs",
+      "line": 54,
+      "title": "Replica set, database per test",
+      "description": "Single-node replica set because case writes use transactions, which standalone Mongo rejects. Isolation is by database name (`NewDatabaseName` gives `<prefix>_<guid>`), not by process. BSON conventions are also registered in `TestAssemblyInitializer.cs` so tests that serialise a `Case` without this fixture do not cache PascalCase class maps and fail depending on order."
+    },
+    {
+      "file": "WasteRegulatorCaseManagement.Test/TestSupport/EphemeralMongoTestFactory.cs",
+      "line": 17,
+      "title": "WebApplicationFactory on ephemeral Mongo",
+      "description": "HTTP tests run `Program` in-process, with `UseEphemeralMongoPersistence` (`TestServiceCollectionExtensions.cs`) swapping only the connection target of the production `CasePersistence`. Even tests that never touch Mongo use it: the default connection string made startup index reconciliation wait about 90 s per test. `UseCaseModuleConfigs` swaps in an in-memory case-type store. Endpoint tests stub only the source system (`StubCallbackHandler` records each callback) and authenticate in Development header-trust mode; signing is proved in `Auth/ClientIdAuthenticationTests.cs`."
+    },
+    {
+      "file": "compose.yml",
+      "line": 41,
+      "title": "Compose Mongo replica set",
+      "description": "`mongod --replSet rs0`, initiated by the healthcheck itself when `rs.status()` throws, so the backend's `service_healthy` wait covers replica-set start-up. The member host is `mongodb:27017`, hence `directConnection=true` in the backend URI. Known issue: `compose/mongo/10-init.js` is never mounted, and the `redis` service and `compose/start-localstack.sh` are unused template leftovers."
+    },
+    {
+      "file": "compose.yml",
+      "line": 64,
+      "title": "Backend on Floci",
+      "description": "Floci stands in for LocalStack; `compose/floci/start.d/10-setup-resources.sh` creates the analytics SNS topic that `AnalyticsAuditEventProcessor__TopicArn` points at, with publishing on and a 1 s poll. `Development` matters: with no client secrets the auth handler trusts headers only in Development and fails closed elsewhere."
+    },
+    {
+      "file": "bruno/opencollection.yml",
+      "line": 28,
+      "title": "Bruno request signing",
+      "description": "A client-side copy of the BFF contract: `POST .../cases` goes as the Case Intake Processor, everything else as the frontend with `x-cdp-user-*` headers. When the env has a secret (`dev`) it HMAC-SHA256 signs a `v3` newline-joined payload with timestamp and nonce; `local` sends unsigned. Requests run in order: `submit-case.yml` saves `caseId`. Known issue: `cancel-case.yml` returns 502 locally because the callback URL `source-system.example` is unreachable."
+    },
+    {
+      "file": ".github/workflows/check-pull-request.yml",
+      "line": 49,
+      "title": "Hook, PR gate and publish",
+      "description": "PRs run `dotnet format style` and tests, fail below 92% line / 87% branch coverage (raise, never lower), post a sticky coverage comment, then SonarCloud. `.githooks/pre-commit` runs the same checks once enabled with `git config core.hooksPath .githooks`. Merges to `main` build and push the image via `DEFRA/cdp-build-action` (`publish.yml`); deploys happen in the CDP portal."
+    }
+  ]
+}
