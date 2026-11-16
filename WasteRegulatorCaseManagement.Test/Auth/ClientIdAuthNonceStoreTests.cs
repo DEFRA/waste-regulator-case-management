@@ -2,6 +2,7 @@ using WasteRegulatorCaseManagement.Auth;
 using WasteRegulatorCaseManagement.Test.TestSupport;
 using Microsoft.Extensions.Logging.Abstractions;
 using MongoDB.Driver;
+using AwesomeAssertions.Execution;
 
 namespace WasteRegulatorCaseManagement.Test.Auth;
 
@@ -38,7 +39,7 @@ public sealed class ClientIdAuthNonceStoreTests : IDisposable
 			TestContext.Current.CancellationToken
 		);
 
-		Assert.True(result);
+		result.Should().BeTrue();
 	}
 
 	[Fact]
@@ -48,8 +49,9 @@ public sealed class ClientIdAuthNonceStoreTests : IDisposable
 		var first = await _sut.TryConsumeAsync("nonce-2", Ttl, ct);
 		var second = await _sut.TryConsumeAsync("nonce-2", Ttl, ct);
 
-		Assert.True(first);
-		Assert.False(second);
+		using var scope = new AssertionScope();
+		first.Should().BeTrue();
+		second.Should().BeFalse();
 	}
 
 	// The actual point of this migration: replay protection shared across instances,
@@ -63,8 +65,9 @@ public sealed class ClientIdAuthNonceStoreTests : IDisposable
 		var first = await _sut.TryConsumeAsync("nonce-shared", Ttl, ct);
 		var second = await otherInstance.TryConsumeAsync("nonce-shared", Ttl, ct);
 
-		Assert.True(first);
-		Assert.False(second);
+		using var scope = new AssertionScope();
+		first.Should().BeTrue();
+		second.Should().BeFalse();
 	}
 
 	// Regression coverage for the concurrency guarantee the old IMemoryCache
@@ -81,7 +84,7 @@ public sealed class ClientIdAuthNonceStoreTests : IDisposable
 
 		var results = await Task.WhenAll(tasks);
 
-		Assert.Equal(1, results.Count(r => r));
+		results.Count(r => r).Should().Be(1);
 	}
 
 	[Fact]
@@ -93,6 +96,6 @@ public sealed class ClientIdAuthNonceStoreTests : IDisposable
 		).ToListAsync(TestContext.Current.CancellationToken);
 
 		var expiresAtIndex = indexes.Single(i => i["key"].AsBsonDocument.Contains("expiresAt"));
-		Assert.Equal(0L, expiresAtIndex.GetValue("expireAfterSeconds", -1).ToInt64());
+		expiresAtIndex.GetValue("expireAfterSeconds", -1).ToInt64().Should().Be(0L);
 	}
 }

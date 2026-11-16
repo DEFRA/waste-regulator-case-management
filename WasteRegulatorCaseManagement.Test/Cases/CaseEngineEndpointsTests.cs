@@ -1,6 +1,7 @@
 using WasteRegulatorCaseManagement.AuditEvents;
 using System.Net;
 using System.Net.Http.Json;
+using AwesomeAssertions.Execution;
 using WasteRegulatorCaseManagement.Test.TestSupport;
 using WasteRegulatorCaseManagement.Utils.Mongo;
 using WasteRegulatorCaseManagement.Cases;
@@ -54,9 +55,9 @@ public class CaseEngineEndpointsTests
 		var response = await client.PostAsync(
 			$"/cases/{caseId}/actions/approve", content: null, cancellationToken);
 
-		Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.OK);
 		var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
-		Assert.Equal("approved", body?.StateId);
+		body.Should().BeEquivalentTo(new { StateId = "approved" });
 	}
 
 	[Fact]
@@ -82,10 +83,13 @@ public class CaseEngineEndpointsTests
 		var response = await client.PostAsync(
 			$"/cases/{caseId}/actions/approve", content: null, cancellationToken);
 
-		Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.OK);
 		var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
-		Assert.Equal("approved", body?.StateId);
-		Assert.Empty(body!.AvailableActions);
+		body.Should().NotBeNull();
+
+		using var scope = new AssertionScope();
+		body!.StateId.Should().Be("approved");
+		body.AvailableActions.Should().BeEmpty();
 	}
 
 	[Fact]
@@ -98,7 +102,7 @@ public class CaseEngineEndpointsTests
 		var response = await client.PostAsync(
 			$"/cases/{Ulid.NewUlid().ToString()}/actions/approve", content: null, cancellationToken);
 
-		Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.NotFound);
 	}
 
 	[Fact]
@@ -124,7 +128,7 @@ public class CaseEngineEndpointsTests
 		var response = await client.PostAsync(
 			$"/cases/{caseId}/actions/teleport", content: null, cancellationToken);
 
-		Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
 	}
 
 	[Fact]
@@ -149,12 +153,12 @@ public class CaseEngineEndpointsTests
 
 		var body = await client.GetFromJsonAsync<CaseResponse>($"/cases/{caseId}", cancellationToken);
 
-		Assert.NotNull(body);
+		body.Should().NotBeNull();
 		// RA-410: "approve" used to be absent here because it was gated on
 		// an outstanding task. The task framework (and the gate) are gone,
 		// so the same seed now offers it — regression cover for the
 		// ungating.
-		Assert.Contains(body!.AvailableActions, a => a.ActionId == "approve");
+		body!.AvailableActions.Should().Contain(a => a.ActionId == "approve");
 	}
 
 	private sealed class EngineFactory : WebApplicationFactory<Program>

@@ -1,4 +1,5 @@
 using WasteRegulatorCaseManagement.Cases;
+using AwesomeAssertions.Execution;
 using MongoDB.Bson;
 
 namespace WasteRegulatorCaseManagement.Test.Cases;
@@ -36,9 +37,10 @@ public class CaseSortTests
 
 		var rank = CaseSort.StatusRank(registry);
 
-		Assert.Equal(0, rank["submitted"]);
-		Assert.Equal(1, rank["duly-made"]);
-		Assert.Equal(2, rank["approved"]);
+		using var scope = new AssertionScope();
+		rank["submitted"].Should().Be(0);
+		rank["duly-made"].Should().Be(1);
+		rank["approved"].Should().Be(2);
 	}
 
 	[Fact]
@@ -51,7 +53,7 @@ public class CaseSortTests
 
 		var rank = CaseSort.StatusRank(registry);
 
-		Assert.Equal(0, rank["SUBMITTED"]);
+		rank["SUBMITTED"].Should().Be(0);
 	}
 
 	[Fact]
@@ -73,14 +75,16 @@ public class CaseSortTests
 
 		// 'shared' keeps the rank from its first (t1) appearance, and 'other'
 		// continues the global counter rather than resetting per type.
-		Assert.Equal(1, rank["shared"]);
-		Assert.Equal(2, rank["other"]);
+		using var scope = new AssertionScope();
+		rank["shared"].Should().Be(1);
+		rank["other"].Should().Be(2);
 	}
 
 	[Fact]
 	public void StatusRank_throws_on_null_registry()
 	{
-		Assert.Throws<ArgumentNullException>(() => CaseSort.StatusRank(null!));
+		var act = () => CaseSort.StatusRank(null!);
+		act.Should().Throw<ArgumentNullException>();
 	}
 
 	// ─────────────────────────────── BuildStages ─────────────────────────────
@@ -93,7 +97,7 @@ public class CaseSortTests
 	[InlineData("nonsense")]
 	public void BuildStages_returns_null_for_default_or_unknown_sort(string? token)
 	{
-		Assert.Null(CaseSort.BuildStages(token, descendingOverride: null, s_rank));
+		CaseSort.BuildStages(token, descendingOverride: null, s_rank).Should().BeNull();
 	}
 
 	[Theory]
@@ -105,17 +109,16 @@ public class CaseSortTests
 		// column's $addFields stage, not merely that some stage came back.
 		var stages = CaseSort.BuildStages(token, descendingOverride: null, s_rank);
 
-		Assert.NotNull(stages);
-		Assert.True(
-			stages!.Value.AddFields!.Contains(expectedComputedField),
+		stages.Should().NotBeNull();
+		stages!.Value.AddFields!.Contains(expectedComputedField).Should().BeTrue(
 			$"Token '{token}' should resolve to the stage adding '{expectedComputedField}'.");
 	}
 
 	[Fact]
 	public void BuildStages_throws_on_null_status_rank()
 	{
-		Assert.Throws<ArgumentNullException>(() =>
-			CaseSort.BuildStages("status", descendingOverride: null, null!));
+		var act = () => CaseSort.BuildStages("status", descendingOverride: null, null!);
+		act.Should().Throw<ArgumentNullException>();
 	}
 
 	[Fact]
@@ -126,16 +129,17 @@ public class CaseSortTests
 		var (addFields, sort) = stages!.Value;
 		var switchDoc = addFields![CaseSort.RankField]["$switch"].AsBsonDocument;
 		var branches = switchDoc["branches"].AsBsonArray;
-		Assert.Equal(3, branches.Count);
+		branches.Count.Should().Be(3);
+		using var scope = new AssertionScope();
 		// Branches ordered by ascending rank: submitted(0), duly-made(1), approved(2).
-		Assert.Equal("$stateId", branches[0]["case"]["$eq"][0].AsString);
-		Assert.Equal("submitted", branches[0]["case"]["$eq"][1].AsString);
-		Assert.Equal(0, branches[0]["then"].AsInt32);
-		Assert.Equal("duly-made", branches[1]["case"]["$eq"][1].AsString);
-		Assert.Equal(2, branches[2]["then"].AsInt32);
+		branches[0]["case"]["$eq"][0].AsString.Should().Be("$stateId");
+		branches[0]["case"]["$eq"][1].AsString.Should().Be("submitted");
+		branches[0]["then"].AsInt32.Should().Be(0);
+		branches[1]["case"]["$eq"][1].AsString.Should().Be("duly-made");
+		branches[2]["then"].AsInt32.Should().Be(2);
 		// Unknown states fall to the far end.
-		Assert.Equal(int.MaxValue, switchDoc["default"].AsInt32);
-		Assert.Equal(1, sort[CaseSort.RankField].AsInt32);
+		switchDoc["default"].AsInt32.Should().Be(int.MaxValue);
+		sort[CaseSort.RankField].AsInt32.Should().Be(1);
 	}
 
 	[Fact]
@@ -144,7 +148,7 @@ public class CaseSortTests
 		var stages = CaseSort.BuildStages("status", descendingOverride: true, s_rank);
 
 		var (_, sort) = stages!.Value;
-		Assert.Equal(-1, sort[CaseSort.RankField].AsInt32);
+		sort[CaseSort.RankField].AsInt32.Should().Be(-1);
 	}
 
 }

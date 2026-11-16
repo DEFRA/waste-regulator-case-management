@@ -1,3 +1,4 @@
+using AwesomeAssertions.Execution;
 using Elastic.CommonSchema;
 using Elastic.CommonSchema.Serilog;
 using WasteRegulatorCaseManagement.Utils.Logging;
@@ -27,8 +28,11 @@ public class PiiRedactionEnricherTests
 
 		new PiiRedactionEnricher().Enrich(logEvent, new TestPropertyFactory());
 
-		Assert.Equal(PiiRedactionEnricher.RedactedValue, enrichments.Client!.Ip);
-		Assert.Equal(PiiRedactionEnricher.RedactedValue, enrichments.Client!.Address);
+		enrichments.Client.Should().BeEquivalentTo(new
+		{
+			Ip = PiiRedactionEnricher.RedactedValue,
+			Address = PiiRedactionEnricher.RedactedValue,
+		});
 	}
 
 	[Fact]
@@ -62,15 +66,21 @@ public class PiiRedactionEnricherTests
 
 		new PiiRedactionEnricher().Enrich(logEvent, new TestPropertyFactory());
 
-		Assert.Null(clientUser.Name);
-		Assert.Null(clientUser.FullName);
-		Assert.Null(clientUser.Email);
-		Assert.Null(clientUser.Hash);
-		Assert.Equal("user-1", clientUser.Id);
-
-		Assert.Null(topLevelUser.Name);
-		Assert.Null(topLevelUser.Email);
-		Assert.Equal("user-2", topLevelUser.Id);
+		using var scope = new AssertionScope();
+		clientUser.Should().BeEquivalentTo(new
+		{
+			Id = "user-1",
+			Name = (string?)null,
+			FullName = (string?)null,
+			Email = (string?)null,
+			Hash = (string?)null,
+		});
+		topLevelUser.Should().BeEquivalentTo(new
+		{
+			Id = "user-2",
+			Name = (string?)null,
+			Email = (string?)null,
+		});
 	}
 
 	[Fact]
@@ -82,7 +92,7 @@ public class PiiRedactionEnricherTests
 			new PiiRedactionEnricher().Enrich(logEvent, new TestPropertyFactory())
 		);
 
-		Assert.Null(exception);
+		exception.Should().BeNull();
 	}
 
 	[Fact]
@@ -100,7 +110,7 @@ public class PiiRedactionEnricherTests
 			new PiiRedactionEnricher().Enrich(logEvent, new TestPropertyFactory())
 		);
 
-		Assert.Null(exception);
+		exception.Should().BeNull();
 	}
 
 	[Fact]
@@ -112,9 +122,8 @@ public class PiiRedactionEnricherTests
 
 		new PiiRedactionEnricher().Enrich(logEvent, new TestPropertyFactory());
 
-		Assert.Equal(
-			new ScalarValue(PiiRedactionEnricher.RedactedValue),
-			logEvent.Properties["Email"]
+		logEvent.Properties["Email"].Should().Be(
+			new ScalarValue(PiiRedactionEnricher.RedactedValue)
 		);
 	}
 
@@ -133,7 +142,7 @@ public class PiiRedactionEnricherTests
 		new PiiRedactionEnricher().Enrich(logEvent, new TestPropertyFactory());
 
 		var redacted = (ScalarValue)logEvent.Properties["Body"];
-		Assert.Equal("{\"error\":\"Invalid contact email: [REDACTED]\"}", redacted.Value);
+		redacted.Value.Should().Be("{\"error\":\"Invalid contact email: [REDACTED]\"}");
 	}
 
 	[Fact]
@@ -147,9 +156,10 @@ public class PiiRedactionEnricherTests
 
 		new PiiRedactionEnricher().Enrich(logEvent, new TestPropertyFactory());
 
-		Assert.Equal(new ScalarValue("abc-123"), logEvent.Properties["CorrelationId"]);
-		Assert.Equal(new ScalarValue("wi-456"), logEvent.Properties["CaseId"]);
-		Assert.Equal(new ScalarValue("notify"), logEvent.Properties["event.category"]);
+		using var scope = new AssertionScope();
+		logEvent.Properties["CorrelationId"].Should().Be(new ScalarValue("abc-123"));
+		logEvent.Properties["CaseId"].Should().Be(new ScalarValue("wi-456"));
+		logEvent.Properties["event.category"].Should().Be(new ScalarValue("notify"));
 	}
 
 	private static LogEvent CreateLogEvent(params LogEventProperty[] properties) =>

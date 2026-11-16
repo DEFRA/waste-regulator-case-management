@@ -1,3 +1,4 @@
+using AwesomeAssertions.Execution;
 using WasteRegulatorCaseManagement.Config;
 using WasteRegulatorCaseManagement.Utils.Mongo;
 using Microsoft.Extensions.Options;
@@ -20,15 +21,16 @@ public class MongoDbClientFactoryParseTests
 		// re-throwing.
 		const string credentialedBadUri = "not-a-scheme://alice:s3cret@db.local:27017/mydb";
 
-		var ex = Assert.Throws<InvalidOperationException>(
-			() => MongoDbClientFactory.ParseSettings(credentialedBadUri));
+		var act = () => MongoDbClientFactory.ParseSettings(credentialedBadUri);
+		var ex = act.Should().ThrowExactly<InvalidOperationException>().Which;
 
-		Assert.DoesNotContain("s3cret", ex.Message);
-		Assert.DoesNotContain("alice", ex.Message);
-		Assert.Contains("***:***", ex.Message);
+		using var scope = new AssertionScope();
+		ex.Message.Should().NotContain("s3cret");
+		ex.Message.Should().NotContain("alice");
+		ex.Message.Should().Contain("***:***");
 		// The original exception is intentionally NOT chained because
 		// its own .Message also contains the unredacted URI.
-		Assert.Null(ex.InnerException);
+		ex.InnerException.Should().BeNull();
 	}
 
 	[Theory]
@@ -39,9 +41,10 @@ public class MongoDbClientFactoryParseTests
 	{
 		var config = Options.Create(new MongoConfig { DatabaseUri = uri!, DatabaseName = databaseName });
 
-		var ex = Assert.Throws<ArgumentException>(() => new MongoDbClientFactory(config));
+		var act = () => new MongoDbClientFactory(config);
 
-		Assert.Equal("MongoDB uri string cannot be empty", ex.Message);
+		act.Should().ThrowExactly<ArgumentException>()
+			.Which.Message.Should().Be("MongoDB uri string cannot be empty");
 	}
 
 	[Theory]
@@ -56,9 +59,10 @@ public class MongoDbClientFactoryParseTests
 			DatabaseName = databaseName!
 		});
 
-		var ex = Assert.Throws<ArgumentException>(() => new MongoDbClientFactory(config));
+		var act = () => new MongoDbClientFactory(config);
 
-		Assert.Equal("MongoDB database name cannot be empty", ex.Message);
+		act.Should().ThrowExactly<ArgumentException>()
+			.Which.Message.Should().Be("MongoDB database name cannot be empty");
 	}
 
 	[Fact]
@@ -72,7 +76,8 @@ public class MongoDbClientFactoryParseTests
 
 		var factory = new MongoDbClientFactory(config);
 
-		Assert.NotNull(factory.GetClient());
-		Assert.NotNull(factory.GetCollection<object>("my-collection"));
+		using var scope = new AssertionScope();
+		factory.GetClient().Should().NotBeNull();
+		factory.GetCollection<object>("my-collection").Should().NotBeNull();
 	}
 }

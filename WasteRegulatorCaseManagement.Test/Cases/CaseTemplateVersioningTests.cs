@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using AwesomeAssertions.Execution;
 using WasteRegulatorCaseManagement.Cases;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
@@ -40,9 +41,10 @@ public class CaseTemplateVersioningTests
 
 		var snapshot = CaseTemplateSnapshot.Capture(type);
 
-		Assert.Equal("v3", snapshot.TemplateVersion);
-		Assert.Equal(2, snapshot.States.Count);
-		Assert.Single(snapshot.Transitions);
+		using var scope = new AssertionScope();
+		snapshot.TemplateVersion.Should().Be("v3");
+		snapshot.States.Should().HaveCount(2);
+		snapshot.Transitions.Should().ContainSingle();
 	}
 
 	[Fact]
@@ -76,7 +78,7 @@ public class CaseTemplateVersioningTests
 
 		var projection = BuildService(liveType).Project(caseRecord);
 
-		Assert.Equal("v1", projection.TemplateVersion);
+		projection.TemplateVersion.Should().Be("v1");
 	}
 
 	[Fact]
@@ -116,8 +118,9 @@ public class CaseTemplateVersioningTests
 		var result = await BuildService(liveType).ApplyActionAsync(
 			caseRecord.Id, "approve", decision: null, User(), TestContext.Current.CancellationToken);
 
-		Assert.True(result.IsSuccess);
-		Assert.Equal("approved", caseRecord.StateId);
+		using var scope = new AssertionScope();
+		result.IsSuccess.Should().BeTrue();
+		caseRecord.StateId.Should().Be("approved");
 	}
 
 	[Fact]
@@ -143,7 +146,7 @@ public class CaseTemplateVersioningTests
 
 		var projection = BuildService(liveType).Project(legacy);
 
-		Assert.Equal("v1", projection.TemplateVersion);
+		projection.TemplateVersion.Should().Be("v1");
 	}
 
 	[Fact]
@@ -170,8 +173,9 @@ public class CaseTemplateVersioningTests
 		var projection = new CaseService(registry, _persistence, Substitute.For<ICaseCallbackClient>(), NullLogger<CaseService>.Instance)
 			.Project(orphan);
 
-		Assert.Equal("unknown", projection.TemplateVersion);
-		Assert.Empty(projection.AvailableActions);
+		using var scope = new AssertionScope();
+		projection.TemplateVersion.Should().Be("unknown");
+		projection.AvailableActions.Should().BeEmpty();
 	}
 
 	private CaseService BuildService(CaseModuleConfig type) =>

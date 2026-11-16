@@ -1,5 +1,6 @@
 using WasteRegulatorCaseManagement.Notifications;
 using Microsoft.Extensions.Configuration;
+using AwesomeAssertions.Execution;
 
 namespace WasteRegulatorCaseManagement.Test.Notifications;
 
@@ -22,9 +23,10 @@ public class NotifyConfigTests
 		var notifyConfig = new NotifyConfig();
 		config.GetSection("Notify").Bind(notifyConfig);
 
-		Assert.Equal("reply-to-england", notifyConfig.RegionToReplyToId["England"]);
-		Assert.Equal("reply-to-wales", notifyConfig.RegionToReplyToId["Wales"]);
-		Assert.Equal("reply-to-default", notifyConfig.DefaultReplyToId);
+		using var scope = new AssertionScope();
+		notifyConfig.RegionToReplyToId.Should().Contain("England", "reply-to-england");
+		notifyConfig.RegionToReplyToId.Should().Contain("Wales", "reply-to-wales");
+		notifyConfig.DefaultReplyToId.Should().Be("reply-to-default");
 	}
 
 	// RA102-okg: proves the mechanism that lets a real Notify GUID be
@@ -44,7 +46,7 @@ public class NotifyConfigTests
 		var notifyConfig = new NotifyConfig();
 		config.GetSection("Notify").Bind(notifyConfig);
 
-		Assert.Equal("11111111-1111-1111-1111-111111111111", notifyConfig.Templates["Queried"]);
+		notifyConfig.Templates.Should().Contain("Queried", "11111111-1111-1111-1111-111111111111");
 	}
 
 	[Fact]
@@ -53,8 +55,9 @@ public class NotifyConfigTests
 		var cfg = new NotifyConfig();
 		cfg.RegionToReplyToId["England"] = "reply-to-england";
 
-		Assert.Equal("reply-to-england", cfg.GetReplyToId("england"));
-		Assert.Equal("reply-to-england", cfg.GetReplyToId("ENGLAND"));
+		using var scope = new AssertionScope();
+		cfg.GetReplyToId("england").Should().Be("reply-to-england");
+		cfg.GetReplyToId("ENGLAND").Should().Be("reply-to-england");
 	}
 
 	[Fact]
@@ -63,7 +66,7 @@ public class NotifyConfigTests
 		var cfg = new NotifyConfig { DefaultReplyToId = "fallback-id" };
 		cfg.RegionToReplyToId["England"] = "reply-to-england";
 
-		Assert.Equal("fallback-id", cfg.GetReplyToId("Wales"));
+		cfg.GetReplyToId("Wales").Should().Be("fallback-id");
 	}
 
 	[Theory]
@@ -74,7 +77,7 @@ public class NotifyConfigTests
 	{
 		var cfg = new NotifyConfig { DefaultReplyToId = "fallback-id" };
 
-		Assert.Equal("fallback-id", cfg.GetReplyToId(region));
+		cfg.GetReplyToId(region).Should().Be("fallback-id");
 	}
 
 	[Fact]
@@ -84,8 +87,9 @@ public class NotifyConfigTests
 
 		var exception = Record.Exception(() => cfg.GetReplyToId("Wales"));
 
-		Assert.Null(exception);
-		Assert.Null(cfg.GetReplyToId("Wales"));
+		using var scope = new AssertionScope();
+		exception.Should().BeNull();
+		cfg.GetReplyToId("Wales").Should().BeNull();
 	}
 
 	// Guards against a JSON key typo in the shipped config silently failing
@@ -103,8 +107,9 @@ public class NotifyConfigTests
 
 		// Deliberately empty until Defra confirms shared vs. per-region
 		// sender addresses (RA-211) — see NotifyConfig.RegionToReplyToId doc.
-		Assert.Empty(notifyConfig.RegionToReplyToId);
-		Assert.Null(notifyConfig.DefaultReplyToId);
+		using var scope = new AssertionScope();
+		notifyConfig.RegionToReplyToId.Should().BeEmpty();
+		notifyConfig.DefaultReplyToId.Should().BeNull();
 	}
 
 	// Real regulator inboxes are set per environment in cdp-app-config (prod's
@@ -122,13 +127,12 @@ public class NotifyConfigTests
 		config.GetSection("Notify").Bind(notifyConfig);
 
 		// Keys stay declared so the shape is discoverable in the file.
-		Assert.NotEmpty(notifyConfig.RegulatorMailboxes);
-		Assert.All(
-			notifyConfig.RegulatorMailboxes,
-			mailbox => Assert.True(
-				string.IsNullOrWhiteSpace(mailbox.Value),
-				$"Notify:RegulatorMailboxes:{mailbox.Key} must be blank in appsettings.json"
-			)
+		using var scope = new AssertionScope();
+		notifyConfig.RegulatorMailboxes.Should().NotBeEmpty();
+		notifyConfig.RegulatorMailboxes.Should().AllSatisfy(mailbox =>
+			string.IsNullOrWhiteSpace(mailbox.Value)
+				.Should()
+				.BeTrue($"Notify:RegulatorMailboxes:{mailbox.Key} must be blank in appsettings.json")
 		);
 	}
 

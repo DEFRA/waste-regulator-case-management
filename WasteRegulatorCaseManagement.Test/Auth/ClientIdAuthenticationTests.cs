@@ -1,4 +1,5 @@
 using WasteRegulatorCaseManagement.Test.TestSupport;
+using AwesomeAssertions.Execution;
 using System.Net;
 using System.Net.Http.Headers;
 using WasteRegulatorCaseManagement.Auth;
@@ -29,7 +30,7 @@ public class ClientIdAuthenticationTests
 
 		var response = await client.GetAsync("/cases", cancellationToken);
 
-		Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 	}
 
 	[Fact]
@@ -42,7 +43,7 @@ public class ClientIdAuthenticationTests
 
 		var response = await client.GetAsync("/cases", cancellationToken);
 
-		Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 	}
 
 	[Fact]
@@ -60,7 +61,7 @@ public class ClientIdAuthenticationTests
 
 		var response = await client.GetAsync("/cases", cancellationToken);
 
-		Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.OK);
 	}
 
 	[Fact]
@@ -72,7 +73,7 @@ public class ClientIdAuthenticationTests
 
 		var response = await client.GetAsync("/health", cancellationToken);
 
-		Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.OK);
 	}
 
 	[Fact]
@@ -92,7 +93,7 @@ public class ClientIdAuthenticationTests
 
 		var response = await client.GetAsync("/cases", cancellationToken);
 
-		Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 	}
 
 	[Fact]
@@ -110,7 +111,7 @@ public class ClientIdAuthenticationTests
 
 		var response = await client.GetAsync("/cases", cancellationToken);
 
-		Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 	}
 
 	[Fact]
@@ -139,7 +140,7 @@ public class ClientIdAuthenticationTests
 
 		var response = await client.GetAsync("/cases", cancellationToken);
 
-		Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.OK);
 	}
 
 	[Fact]
@@ -173,7 +174,7 @@ public class ClientIdAuthenticationTests
 
 		var response = await client.GetAsync("/cases", cancellationToken);
 
-		Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 	}
 
 	[Fact]
@@ -200,7 +201,7 @@ public class ClientIdAuthenticationTests
 
 		var response = await client.GetAsync("/cases", cancellationToken);
 
-		Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 	}
 
 	[Fact]
@@ -246,7 +247,7 @@ public class ClientIdAuthenticationTests
 		// into a 500 ProblemDetails response rather than a bare 401 — the
 		// point is this fails LOUDLY and distinctly from ordinary auth
 		// failures, not that it 401s.
-		Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.InternalServerError);
 	}
 
 	[Fact]
@@ -294,8 +295,9 @@ public class ClientIdAuthenticationTests
 		var responseA = await clientA.GetAsync("/cases", cancellationToken);
 		var responseB = await clientB.GetAsync("/cases", cancellationToken);
 
-		Assert.Equal(HttpStatusCode.OK, responseA.StatusCode);
-		Assert.Equal(HttpStatusCode.OK, responseB.StatusCode);
+		using var scope = new AssertionScope();
+		responseA.StatusCode.Should().Be(HttpStatusCode.OK);
+		responseB.StatusCode.Should().Be(HttpStatusCode.OK);
 	}
 
 	[Fact]
@@ -324,7 +326,7 @@ public class ClientIdAuthenticationTests
 
 		var response = await client.GetAsync("/cases", cancellationToken);
 
-		Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 	}
 
 	[Fact]
@@ -350,7 +352,7 @@ public class ClientIdAuthenticationTests
 
 		var response = await client.GetAsync("/cases", cancellationToken);
 
-		Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 	}
 
 	[Fact]
@@ -376,7 +378,7 @@ public class ClientIdAuthenticationTests
 
 		var response = await client.GetAsync("/cases", cancellationToken);
 
-		Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 	}
 
 	[Fact]
@@ -400,7 +402,7 @@ public class ClientIdAuthenticationTests
 
 		var response = await client.GetAsync("/cases", cancellationToken);
 
-		Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 	}
 
 	[Fact]
@@ -430,8 +432,9 @@ public class ClientIdAuthenticationTests
 		var first = await client.GetAsync("/cases", cancellationToken);
 		var second = await client.GetAsync("/cases", cancellationToken);
 
-		Assert.Equal(HttpStatusCode.OK, first.StatusCode);
-		Assert.Equal(HttpStatusCode.Unauthorized, second.StatusCode);
+		using var scope = new AssertionScope();
+		first.StatusCode.Should().Be(HttpStatusCode.OK);
+		second.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 	}
 
 	[Fact]
@@ -447,7 +450,7 @@ public class ClientIdAuthenticationTests
 
 		var response = await client.GetAsync("/cases", cancellationToken);
 
-		Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 	}
 
 	[Fact]
@@ -467,7 +470,7 @@ public class ClientIdAuthenticationTests
 
 		var response = await client.GetAsync("/cases", cancellationToken);
 
-		Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.OK);
 	}
 
 	[Fact]
@@ -497,9 +500,9 @@ public class ClientIdAuthenticationTests
 
 		var response = await client.GetAsync("/cases", cancellationToken);
 
-		Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 		var challenge = response.Headers.WwwAuthenticate.ToString();
-		Assert.Contains("Malformed", challenge);
+		challenge.Should().Contain("Malformed");
 	}
 
 	[Fact]
@@ -517,9 +520,9 @@ public class ClientIdAuthenticationTests
 
 		var response = await client.GetAsync("/cases", cancellationToken);
 
-		Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 		var challenge = response.Headers.WwwAuthenticate.ToString();
-		Assert.Contains("Missing x-cdp-auth-signature", challenge);
+		challenge.Should().Contain("Missing x-cdp-auth-signature");
 	}
 
 	[Fact]
@@ -545,9 +548,9 @@ public class ClientIdAuthenticationTests
 
 		var response = await client.GetAsync("/cases", cancellationToken);
 
-		Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 		var challenge = response.Headers.WwwAuthenticate.ToString();
-		Assert.Contains("Missing x-cdp-auth-nonce", challenge);
+		challenge.Should().Contain("Missing x-cdp-auth-nonce");
 	}
 
 	[Fact]
@@ -572,9 +575,9 @@ public class ClientIdAuthenticationTests
 
 		var response = await client.GetAsync("/cases", cancellationToken);
 
-		Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 		var challenge = response.Headers.WwwAuthenticate.ToString();
-		Assert.Contains("Missing x-cdp-auth-timestamp", challenge);
+		challenge.Should().Contain("Missing x-cdp-auth-timestamp");
 	}
 
 	private static void AddTimestampAndNonce(HttpClient client, string timestamp, string nonce)
@@ -609,9 +612,9 @@ public class ClientIdAuthenticationTests
 
 		var response = await client.GetAsync("/cases", cancellationToken);
 
-		Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 		var challenge = response.Headers.WwwAuthenticate.ToString();
-		Assert.Contains($"{header} exceeds {cap} chars", challenge);
+		challenge.Should().Contain($"{header} exceeds {cap} chars");
 	}
 
 	[Theory]
@@ -654,9 +657,9 @@ public class ClientIdAuthenticationTests
 
 		var response = await client.GetAsync("/cases", cancellationToken);
 
-		Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 		var challenge = response.Headers.WwwAuthenticate.ToString();
-		Assert.Contains($"{header} exceeds {cap} chars", challenge);
+		challenge.Should().Contain($"{header} exceeds {cap} chars");
 	}
 
 	[Fact]
@@ -678,10 +681,11 @@ public class ClientIdAuthenticationTests
 
 		var response = await client.GetAsync("/cases", cancellationToken);
 
-		Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 		var challenge = response.Headers.WwwAuthenticate.ToString();
-		Assert.Contains("x-cdp-auth-signature exceeds 256 chars", challenge);
-		Assert.DoesNotContain("Invalid x-cdp-auth-signature", challenge);
+		using var scope = new AssertionScope();
+		challenge.Should().Contain("x-cdp-auth-signature exceeds 256 chars");
+		challenge.Should().NotContain("Invalid x-cdp-auth-signature");
 	}
 
 	[Theory]
@@ -711,7 +715,7 @@ public class ClientIdAuthenticationTests
 
 		var response = await client.GetAsync("/cases", cancellationToken);
 
-		Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.OK);
 	}
 
 	[Fact]
@@ -740,7 +744,7 @@ public class ClientIdAuthenticationTests
 
 		var response = await client.GetAsync("/cases", cancellationToken);
 
-		Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.OK);
 	}
 
 	[Theory]
@@ -761,9 +765,9 @@ public class ClientIdAuthenticationTests
 
 		var response = await client.GetAsync("/cases", cancellationToken);
 
-		Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 		var challenge = response.Headers.WwwAuthenticate.ToString();
-		Assert.Contains($"{header} exceeds {cap} chars", challenge);
+		challenge.Should().Contain($"{header} exceeds {cap} chars");
 	}
 
 	[Theory]
@@ -788,7 +792,7 @@ public class ClientIdAuthenticationTests
 
 		var response = await client.GetAsync("/cases", cancellationToken);
 
-		Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.OK);
 	}
 
 	[Fact]
@@ -815,7 +819,7 @@ public class ClientIdAuthenticationTests
 
 		var response = await client.GetAsync("/cases", cancellationToken);
 
-		Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.OK);
 	}
 
 	[Fact]
@@ -833,7 +837,7 @@ public class ClientIdAuthenticationTests
 		var response = await client.GetAsync("/cases", cancellationToken);
 
 		// Authenticated (not 401); case reads then need a nation claim.
-		Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
 	}
 
 	[Fact]
@@ -875,7 +879,7 @@ public class ClientIdAuthenticationTests
 
 		var response = await client.GetAsync("/cases", cancellationToken);
 
-		Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.OK);
 	}
 
 	[Fact]
@@ -918,7 +922,7 @@ public class ClientIdAuthenticationTests
 
 		var response = await client.GetAsync("/cases", cancellationToken);
 
-		Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 	}
 
 	[Fact]
@@ -955,7 +959,7 @@ public class ClientIdAuthenticationTests
 
 		var response = await client.GetAsync("/cases", cancellationToken);
 
-		Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 	}
 
 	[Fact]
@@ -1077,7 +1081,7 @@ public class ClientIdAuthenticationTests
 		var response = await client.GetAsync("/cases", cancellationToken);
 
 		// Authenticated (not 401); case reads then need a nation claim.
-		Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
 	}
 
 	[Fact]
@@ -1111,7 +1115,7 @@ public class ClientIdAuthenticationTests
 		var response = await client.GetAsync("/cases", cancellationToken);
 
 		// Authenticated (not 401); case reads then need a nation claim.
-		Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
 	}
 
 	[Fact]
@@ -1143,7 +1147,7 @@ public class ClientIdAuthenticationTests
 
 		var response = await client.GetAsync("/cases", cancellationToken);
 
-		Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 	}
 
 	[Fact]
@@ -1182,7 +1186,7 @@ public class ClientIdAuthenticationTests
 
 		var response = await client.GetAsync("/cases", cancellationToken);
 
-		Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 	}
 }
 
@@ -1257,7 +1261,7 @@ public class ClientIdAuthenticationEnvVarTests
 				TestContext.Current.CancellationToken
 			);
 
-			Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+			response.StatusCode.Should().Be(HttpStatusCode.OK);
 		}
 		finally
 		{

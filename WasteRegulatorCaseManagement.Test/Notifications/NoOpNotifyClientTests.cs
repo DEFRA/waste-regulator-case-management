@@ -20,9 +20,12 @@ public class NoOpNotifyClientTests
 			cancellationToken: TestContext.Current.CancellationToken
 		);
 
-		Assert.True(result.IsSuccess);
-		Assert.Null(result.ProviderMessageId);
-		Assert.Null(result.ErrorMessage);
+		result.Should().BeEquivalentTo(new
+		{
+			IsSuccess = true,
+			ProviderMessageId = (string?)null,
+			ErrorMessage = (string?)null,
+		});
 	}
 
 	[Fact]

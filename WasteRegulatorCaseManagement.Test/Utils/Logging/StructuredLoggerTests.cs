@@ -1,3 +1,4 @@
+using AwesomeAssertions.Execution;
 using WasteRegulatorCaseManagement.Test.TestSupport;
 using WasteRegulatorCaseManagement.Utils.Logging;
 using Microsoft.Extensions.Logging;
@@ -24,15 +25,16 @@ public class StructuredLoggerTests
 				["who"] = "world"
 			});
 
-		var record = Assert.Single(inner.Records);
-		Assert.Equal(LogLevel.Information, record.Level);
-		Assert.Null(record.Exception);
+		var record = inner.Records.Should().ContainSingle().Subject;
+		using var scope = new AssertionScope();
+		record.Level.Should().Be(LogLevel.Information);
+		record.Exception.Should().BeNull();
 		// Properties land via BeginScope-style capture and are visible
 		// to consumers of ILogger (Serilog flattens scope into
 		// LogEvent.Properties).
-		Assert.Equal("notify", record.Properties["event.category"]);
-		Assert.Equal("send_email", record.Properties["event.action"]);
-		Assert.Equal("world", record.Properties["who"]);
+		record.Properties.Should().Contain("event.category", "notify");
+		record.Properties.Should().Contain("event.action", "send_email");
+		record.Properties.Should().Contain("who", "world");
 	}
 
 	[Fact]
@@ -48,10 +50,11 @@ public class StructuredLoggerTests
 			new Dictionary<string, object?> { ["event.outcome"] = "failure" },
 			exception: boom);
 
-		var record = Assert.Single(inner.Records);
-		Assert.Equal(LogLevel.Error, record.Level);
-		Assert.Same(boom, record.Exception);
-		Assert.Equal("failure", record.Properties["event.outcome"]);
+		var record = inner.Records.Should().ContainSingle().Subject;
+		using var scope = new AssertionScope();
+		record.Level.Should().Be(LogLevel.Error);
+		record.Exception.Should().BeSameAs(boom);
+		record.Properties.Should().Contain("event.outcome", "failure");
 	}
 
 	[Fact]
@@ -65,8 +68,7 @@ public class StructuredLoggerTests
 			"hello",
 			new Dictionary<string, object?> { ["k"] = "v" });
 
-		Assert.Equal(0, inner.LogCalls);
-		Assert.Equal(0, inner.ScopesOpened);
+		inner.Should().BeEquivalentTo(new { LogCalls = 0, ScopesOpened = 0 });
 	}
 
 	[Fact]
@@ -74,10 +76,13 @@ public class StructuredLoggerTests
 	{
 		var sut = new StructuredLogger<Anchor>(new ListLogger<Anchor>());
 
-		Assert.Throws<ArgumentNullException>(() =>
-			sut.Log(LogLevel.Information, null!, new Dictionary<string, object?>()));
-		Assert.Throws<ArgumentNullException>(() =>
-			sut.Log(LogLevel.Information, "hi", null!));
+		var nullMessage = () =>
+			sut.Log(LogLevel.Information, null!, new Dictionary<string, object?>());
+		var nullProperties = () =>
+			sut.Log(LogLevel.Information, "hi", null!);
+		using var scope = new AssertionScope();
+		nullMessage.Should().ThrowExactly<ArgumentNullException>();
+		nullProperties.Should().ThrowExactly<ArgumentNullException>();
 	}
 
 	private sealed class DisabledLogger<T> : ILogger<T>

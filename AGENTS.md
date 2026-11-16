@@ -9,10 +9,10 @@ dotnet format style --verify-no-changes
 ```
 
 Tests run against an ephemeral MongoDB replica set and need no Docker. CI runs
-the format check and the tests on every pull request. New tests assert with
+the format check and the tests on every pull request. Tests assert with
 AwesomeAssertions (`.Should()`), comparing whole objects with
-`BeEquivalentTo` rather than serialised strings; older tests still use xUnit's
-`Assert`.
+`BeEquivalentTo` rather than serialised strings, and group a test's checks in
+an `AssertionScope` so one run reports every mismatch.
 
 ## Where to start
 

@@ -18,7 +18,7 @@ public class LivenessHealthCheckTests
 
 		var result = await check.CheckHealthAsync(new HealthCheckContext(), ct);
 
-		Assert.Equal(HealthStatus.Healthy, result.Status);
+		result.Status.Should().Be(HealthStatus.Healthy);
 	}
 
 	[Fact]
@@ -36,7 +36,7 @@ public class LivenessHealthCheckTests
 
 		var result = await check.CheckHealthAsync(new HealthCheckContext(), ct);
 
-		Assert.Equal(HealthStatus.Unhealthy, result.Status);
+		result.Status.Should().Be(HealthStatus.Unhealthy);
 	}
 
 	[Fact]
@@ -56,7 +56,7 @@ public class LivenessHealthCheckTests
 
 		var result = await check.CheckHealthAsync(new HealthCheckContext(), ct);
 
-		Assert.Equal(HealthStatus.Unhealthy, result.Status);
+		result.Status.Should().Be(HealthStatus.Unhealthy);
 	}
 
 	[Fact]
@@ -68,6 +68,6 @@ public class LivenessHealthCheckTests
 
 		var result = await check.CheckHealthAsync(new HealthCheckContext(), ct);
 
-		Assert.Equal(HealthStatus.Healthy, result.Status);
+		result.Status.Should().Be(HealthStatus.Healthy);
 	}
 }

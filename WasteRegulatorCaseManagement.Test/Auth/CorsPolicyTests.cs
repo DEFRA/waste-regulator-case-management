@@ -24,7 +24,7 @@ public class CorsPolicyTests
 
 		var response = await client.SendAsync(request, cancellationToken);
 
-		Assert.False(response.Headers.Contains("Access-Control-Allow-Origin"));
+		response.Headers.Contains("Access-Control-Allow-Origin").Should().BeFalse();
 	}
 
 	[Theory]
@@ -57,7 +57,7 @@ public class CorsPolicyTests
 		var allowed = response.Headers.TryGetValues("Access-Control-Allow-Headers", out var values)
 			? string.Join(',', values)
 			: string.Empty;
-		Assert.DoesNotContain(forbiddenHeader, allowed, StringComparison.OrdinalIgnoreCase);
+		allowed.Should().NotContainEquivalentOf(forbiddenHeader);
 	}
 
 	[Theory]
@@ -79,9 +79,9 @@ public class CorsPolicyTests
 
 		var response = await client.SendAsync(request, cancellationToken);
 
-		Assert.True(response.Headers.Contains("Access-Control-Allow-Headers"));
+		response.Headers.Contains("Access-Control-Allow-Headers").Should().BeTrue();
 		var allowed = string.Join(',', response.Headers.GetValues("Access-Control-Allow-Headers"));
-		Assert.Contains(allowedHeader, allowed, StringComparison.OrdinalIgnoreCase);
+		allowed.Should().ContainEquivalentOf(allowedHeader);
 	}
 
 	[Fact]
@@ -100,9 +100,9 @@ public class CorsPolicyTests
 
 		var response = await client.SendAsync(request, cancellationToken);
 
-		Assert.True(response.Headers.Contains("Access-Control-Allow-Headers"));
+		response.Headers.Contains("Access-Control-Allow-Headers").Should().BeTrue();
 		var allowed = string.Join(',', response.Headers.GetValues("Access-Control-Allow-Headers"));
-		Assert.Contains("x-cdp-request-id", allowed, StringComparison.OrdinalIgnoreCase);
+		allowed.Should().ContainEquivalentOf("x-cdp-request-id");
 	}
 
 	[Fact]
@@ -119,9 +119,9 @@ public class CorsPolicyTests
 
 		var response = await client.SendAsync(request, cancellationToken);
 
-		Assert.True(response.Headers.Contains("Access-Control-Allow-Headers"));
+		response.Headers.Contains("Access-Control-Allow-Headers").Should().BeTrue();
 		var allowed = string.Join(',', response.Headers.GetValues("Access-Control-Allow-Headers"));
-		Assert.Contains("Content-Type", allowed, StringComparison.OrdinalIgnoreCase);
+		allowed.Should().ContainEquivalentOf("Content-Type");
 	}
 
 	[Fact]
@@ -136,9 +136,10 @@ public class CorsPolicyTests
 
 		var response = await client.SendAsync(request, cancellationToken);
 
-		Assert.True(response.Headers.Contains("Access-Control-Allow-Origin"));
-		Assert.Equal("https://trusted.example.com",
-			string.Join(',', response.Headers.GetValues("Access-Control-Allow-Origin")));
+		response.Headers.Contains("Access-Control-Allow-Origin").Should().BeTrue();
+		string.Join(',', response.Headers.GetValues("Access-Control-Allow-Origin"))
+			.Should()
+			.Be("https://trusted.example.com");
 	}
 
 	private sealed class BareFactory(string? allowedOrigin = null, string? traceHeader = null) : WebApplicationFactory<Program>

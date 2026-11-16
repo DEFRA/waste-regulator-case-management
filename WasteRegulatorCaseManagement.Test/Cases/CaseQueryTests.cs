@@ -14,7 +14,7 @@ public class CaseQueryTests
 	{
 		var query = new CaseQuery(Page: 0);
 
-		Assert.Equal(1, query.NormalisedPage);
+		query.NormalisedPage.Should().Be(1);
 	}
 
 	[Fact]
@@ -22,7 +22,7 @@ public class CaseQueryTests
 	{
 		var query = new CaseQuery(Page: CaseQuery.MaxPage + 1);
 
-		Assert.Equal(CaseQuery.MaxPage, query.NormalisedPage);
+		query.NormalisedPage.Should().Be(CaseQuery.MaxPage);
 	}
 
 	[Fact]
@@ -30,7 +30,7 @@ public class CaseQueryTests
 	{
 		var query = new CaseQuery(Page: 5);
 
-		Assert.Equal(5, query.NormalisedPage);
+		query.NormalisedPage.Should().Be(5);
 	}
 
 	[Fact]
@@ -38,7 +38,7 @@ public class CaseQueryTests
 	{
 		var query = new CaseQuery(PageSize: CaseQuery.MinPageSize - 1);
 
-		Assert.Equal(CaseQuery.MinPageSize, query.NormalisedPageSize);
+		query.NormalisedPageSize.Should().Be(CaseQuery.MinPageSize);
 	}
 
 	[Fact]
@@ -46,7 +46,7 @@ public class CaseQueryTests
 	{
 		var query = new CaseQuery(PageSize: CaseQuery.MaxPageSize + 1);
 
-		Assert.Equal(CaseQuery.MaxPageSize, query.NormalisedPageSize);
+		query.NormalisedPageSize.Should().Be(CaseQuery.MaxPageSize);
 	}
 
 	[Fact]
@@ -54,6 +54,6 @@ public class CaseQueryTests
 	{
 		var query = new CaseQuery(PageSize: 50);
 
-		Assert.Equal(50, query.NormalisedPageSize);
+		query.NormalisedPageSize.Should().Be(50);
 	}
 }

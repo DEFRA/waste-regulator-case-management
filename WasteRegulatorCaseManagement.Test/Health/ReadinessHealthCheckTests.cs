@@ -24,7 +24,7 @@ public class ReadinessHealthCheckTests
 
 		var response = await client.GetAsync("/health", ct);
 
-		Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.OK);
 	}
 
 	[Fact]
@@ -36,7 +36,7 @@ public class ReadinessHealthCheckTests
 
 		var response = await client.GetAsync("/health/ready", ct);
 
-		Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
 	}
 
 	[Fact]
@@ -48,7 +48,7 @@ public class ReadinessHealthCheckTests
 
 		var response = await client.GetAsync("/health/ready", ct);
 
-		Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.OK);
 	}
 
 	[Fact]
@@ -63,7 +63,7 @@ public class ReadinessHealthCheckTests
 			ct
 		);
 
-		Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.OK);
 	}
 
 	[Fact]
@@ -78,7 +78,7 @@ public class ReadinessHealthCheckTests
 			ct
 		);
 
-		Assert.Equal(HttpStatusCode.MethodNotAllowed, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.MethodNotAllowed);
 	}
 
 	[Fact]
@@ -93,7 +93,7 @@ public class ReadinessHealthCheckTests
 			ct
 		);
 
-		Assert.Equal(HttpStatusCode.MethodNotAllowed, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.MethodNotAllowed);
 	}
 
 	[Theory]
@@ -111,7 +111,7 @@ public class ReadinessHealthCheckTests
 			ct
 		);
 
-		Assert.Equal(HttpStatusCode.MethodNotAllowed, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.MethodNotAllowed);
 	}
 
 	private sealed class HealthFactory(bool mongoHealthy) : WebApplicationFactory<Program>

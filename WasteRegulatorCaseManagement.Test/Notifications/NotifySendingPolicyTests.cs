@@ -17,13 +17,11 @@ public class NotifySendingPolicyTests
 	[InlineData(" dev ")]
 	public void Sending_is_off_for_non_sending_environments(string environment)
 	{
-		Assert.False(
-			NotifySendingPolicy.ShouldSendEmails(
-				explicitOverride: null,
-				cdpEnvironment: environment,
-				isDevelopmentHostEnvironment: false
-			)
-		);
+		NotifySendingPolicy.ShouldSendEmails(
+			explicitOverride: null,
+			cdpEnvironment: environment,
+			isDevelopmentHostEnvironment: false
+		).Should().BeFalse();
 	}
 
 	[Theory]
@@ -33,13 +31,11 @@ public class NotifySendingPolicyTests
 	[InlineData("prod")]
 	public void Sending_is_on_for_deployed_sending_environments(string environment)
 	{
-		Assert.True(
-			NotifySendingPolicy.ShouldSendEmails(
-				explicitOverride: null,
-				cdpEnvironment: environment,
-				isDevelopmentHostEnvironment: false
-			)
-		);
+		NotifySendingPolicy.ShouldSendEmails(
+			explicitOverride: null,
+			cdpEnvironment: environment,
+			isDevelopmentHostEnvironment: false
+		).Should().BeTrue();
 	}
 
 	// The Compose stack and `dotnet run` do not set ENVIRONMENT; the
@@ -47,13 +43,11 @@ public class NotifySendingPolicyTests
 	[Fact]
 	public void Sending_is_off_on_a_Development_host_with_no_ENVIRONMENT()
 	{
-		Assert.False(
-			NotifySendingPolicy.ShouldSendEmails(
-				explicitOverride: null,
-				cdpEnvironment: null,
-				isDevelopmentHostEnvironment: true
-			)
-		);
+		NotifySendingPolicy.ShouldSendEmails(
+			explicitOverride: null,
+			cdpEnvironment: null,
+			isDevelopmentHostEnvironment: true
+		).Should().BeFalse();
 	}
 
 	// Fail-open: a deployed environment whose ENVIRONMENT is unset or renamed
@@ -65,36 +59,30 @@ public class NotifySendingPolicyTests
 	[InlineData("something-new")]
 	public void Sending_is_on_when_ENVIRONMENT_is_unset_or_unrecognised(string? environment)
 	{
-		Assert.True(
-			NotifySendingPolicy.ShouldSendEmails(
-				explicitOverride: null,
-				cdpEnvironment: environment,
-				isDevelopmentHostEnvironment: false
-			)
-		);
+		NotifySendingPolicy.ShouldSendEmails(
+			explicitOverride: null,
+			cdpEnvironment: environment,
+			isDevelopmentHostEnvironment: false
+		).Should().BeTrue();
 	}
 
 	[Fact]
 	public void Explicit_override_can_force_sending_on_in_a_non_sending_environment()
 	{
-		Assert.True(
-			NotifySendingPolicy.ShouldSendEmails(
-				explicitOverride: true,
-				cdpEnvironment: "dev",
-				isDevelopmentHostEnvironment: true
-			)
-		);
+		NotifySendingPolicy.ShouldSendEmails(
+			explicitOverride: true,
+			cdpEnvironment: "dev",
+			isDevelopmentHostEnvironment: true
+		).Should().BeTrue();
 	}
 
 	[Fact]
 	public void Explicit_override_can_force_sending_off_in_a_sending_environment()
 	{
-		Assert.False(
-			NotifySendingPolicy.ShouldSendEmails(
-				explicitOverride: false,
-				cdpEnvironment: "prod",
-				isDevelopmentHostEnvironment: false
-			)
-		);
+		NotifySendingPolicy.ShouldSendEmails(
+			explicitOverride: false,
+			cdpEnvironment: "prod",
+			isDevelopmentHostEnvironment: false
+		).Should().BeFalse();
 	}
 }

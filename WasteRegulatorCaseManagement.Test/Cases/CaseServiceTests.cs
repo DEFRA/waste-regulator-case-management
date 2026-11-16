@@ -7,6 +7,7 @@ using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 using NSubstitute;
 using NUlid;
+using AwesomeAssertions.Execution;
 
 namespace WasteRegulatorCaseManagement.Test.Cases;
 
@@ -99,7 +100,7 @@ public class CaseServiceTests : IAsyncDisposable
 	private async Task<Case> GetAsync(string id)
 	{
 		var fetched = await _persistence.GetByIdAsync(id, TestContext.Current.CancellationToken);
-		Assert.NotNull(fetched);
+		fetched.Should().NotBeNull();
 		return fetched!;
 	}
 
@@ -158,11 +159,9 @@ public class CaseServiceTests : IAsyncDisposable
 				TestContext.Current.CancellationToken
 			);
 
-		Assert.True(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var fetched = await GetAsync(caseRecord.Id);
-		Assert.Equal("approved", fetched.StateId);
-		Assert.True(fetched.IsTerminal);
-		Assert.Equal(1, fetched.Version);
+		fetched.Should().BeEquivalentTo(new { StateId = "approved", IsTerminal = true, Version = 1 });
 	}
 
 	[Fact]
@@ -182,11 +181,9 @@ public class CaseServiceTests : IAsyncDisposable
 				TestContext.Current.CancellationToken
 			);
 
-		Assert.True(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var fetched = await GetAsync(caseRecord.Id);
-		Assert.Equal("approved", fetched.StateId);
-		Assert.Equal(TickedNow, fetched.LastModifiedAt);
-		Assert.Equal(1, fetched.Version);
+		fetched.Should().BeEquivalentTo(new { StateId = "approved", LastModifiedAt = TickedNow, Version = 1 });
 	}
 
 	[Fact]
@@ -206,9 +203,9 @@ public class CaseServiceTests : IAsyncDisposable
 				TestContext.Current.CancellationToken
 			);
 
-		Assert.True(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var fetched = await GetAsync(caseRecord.Id);
-		Assert.Equal("rejected", fetched.StateId);
+		fetched.StateId.Should().Be("rejected");
 	}
 
 	[Fact]
@@ -228,8 +225,7 @@ public class CaseServiceTests : IAsyncDisposable
 				TestContext.Current.CancellationToken
 			);
 
-		Assert.False(result.IsSuccess);
-		Assert.Equal(CaseActionFailureCode.TerminalState, result.FailureCode);
+		result.Should().BeEquivalentTo(new { IsSuccess = false, FailureCode = CaseActionFailureCode.TerminalState });
 	}
 
 	[Fact]
@@ -243,8 +239,7 @@ public class CaseServiceTests : IAsyncDisposable
 		var result = await BuildService(type)
 			.ApplyActionAsync(caseRecord.Id, "delete", decision: null, User(), TestContext.Current.CancellationToken);
 
-		Assert.False(result.IsSuccess);
-		Assert.Equal(CaseActionFailureCode.UnknownAction, result.FailureCode);
+		result.Should().BeEquivalentTo(new { IsSuccess = false, FailureCode = CaseActionFailureCode.UnknownAction });
 	}
 
 	// RA-351: an action id can be declared on more than one state (e.g.
@@ -277,9 +272,9 @@ public class CaseServiceTests : IAsyncDisposable
 		var result = await BuildService(type)
 			.ApplyActionAsync(caseRecord.Id, "ping", decision: null, User(), TestContext.Current.CancellationToken);
 
-		Assert.True(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var fetched = await GetAsync(caseRecord.Id);
-		Assert.Equal("state-b", fetched.StateId);
+		fetched.StateId.Should().Be("state-b");
 	}
 
 	// RA-351: the fallback must not swallow a genuinely invalid request — an
@@ -308,8 +303,7 @@ public class CaseServiceTests : IAsyncDisposable
 		var result = await BuildService(type)
 			.ApplyActionAsync(caseRecord.Id, "ping", decision: null, User(), TestContext.Current.CancellationToken);
 
-		Assert.False(result.IsSuccess);
-		Assert.Equal(CaseActionFailureCode.InvalidTransition, result.FailureCode);
+		result.Should().BeEquivalentTo(new { IsSuccess = false, FailureCode = CaseActionFailureCode.InvalidTransition });
 	}
 
 	[Fact]
@@ -329,8 +323,7 @@ public class CaseServiceTests : IAsyncDisposable
 			TestContext.Current.CancellationToken
 		);
 
-		Assert.False(result.IsSuccess);
-		Assert.Equal(CaseActionFailureCode.ConcurrencyConflict, result.FailureCode);
+		result.Should().BeEquivalentTo(new { IsSuccess = false, FailureCode = CaseActionFailureCode.ConcurrencyConflict });
 	}
 
 	[Fact]
@@ -404,10 +397,10 @@ public class CaseServiceTests : IAsyncDisposable
 				TestContext.Current.CancellationToken
 			);
 
-		Assert.True(result.IsSuccess, result.Message);
+		result.IsSuccess.Should().BeTrue(result.Message);
 		var fetched = await GetAsync(caseRecord.Id);
-		var noteEntry = Assert.Single(fetched.Timeline, a => a.Action == "note-added");
-		Assert.Equal("test-user", noteEntry.PerformedById);
+		var noteEntry = fetched.Timeline.Should().ContainSingle(a => a.Action == "note-added").Subject;
+		noteEntry.PerformedById.Should().Be("test-user");
 	}
 
 	[Fact]
@@ -445,10 +438,8 @@ public class CaseServiceTests : IAsyncDisposable
 
 		var projection = BuildService(type).Project(caseRecord);
 
-		Assert.Equal(
-			["approve", "reject", "withdraw"],
-			projection.AvailableActions.Select(a => a.ActionId).OrderBy(a => a).ToArray()
-		);
+		projection.AvailableActions.Select(a => a.ActionId).OrderBy(a => a).ToArray()
+			.Should().Equal(["approve", "reject", "withdraw"]);
 	}
 
 	[Fact]
@@ -479,10 +470,8 @@ public class CaseServiceTests : IAsyncDisposable
 
 		var projection = BuildService(type).Project(caseRecord);
 
-		Assert.Equal(
-			["approve", "reject"],
-			projection.AvailableActions.Select(a => a.ActionId).OrderBy(a => a).ToArray()
-		);
+		projection.AvailableActions.Select(a => a.ActionId).OrderBy(a => a).ToArray()
+			.Should().Equal(["approve", "reject"]);
 		await Task.CompletedTask;
 	}
 
@@ -508,7 +497,7 @@ public class CaseServiceTests : IAsyncDisposable
 
 		var projection = BuildService(type).Project(caseRecord);
 
-		Assert.Empty(projection.AvailableActions);
+		projection.AvailableActions.Should().BeEmpty();
 		await Task.CompletedTask;
 	}
 
@@ -548,9 +537,9 @@ public class CaseServiceTests : IAsyncDisposable
 				TestContext.Current.CancellationToken
 			);
 
-		Assert.False(result.IsSuccess);
-		Assert.Equal(CaseActionFailureCode.UnknownAction, result.FailureCode);
-		Assert.Contains(orphanTypeId, result.Message);
+		using var scope = new AssertionScope();
+		result.Should().BeEquivalentTo(new { IsSuccess = false, FailureCode = CaseActionFailureCode.UnknownAction });
+		result.Message.Should().Contain(orphanTypeId);
 	}
 
 	[Fact]
@@ -577,8 +566,7 @@ public class CaseServiceTests : IAsyncDisposable
 				TestContext.Current.CancellationToken
 			);
 
-		Assert.False(result.IsSuccess);
-		Assert.Equal(CaseActionFailureCode.MissingActorIdentity, result.FailureCode);
+		result.Should().BeEquivalentTo(new { IsSuccess = false, FailureCode = CaseActionFailureCode.MissingActorIdentity });
 	}
 
 	// ---------------------- Assignment ----------------------
@@ -599,14 +587,19 @@ public class CaseServiceTests : IAsyncDisposable
 				TestContext.Current.CancellationToken
 			);
 
-		Assert.True(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var fetched = await GetAsync(caseRecord.Id);
-		Assert.Equal("alice-1", fetched.AssignedToId);
-		Assert.Equal("Alice Example", fetched.AssignedToName);
-		Assert.Equal(TickedNow, fetched.AssignedAt);
-		Assert.Equal("actor-1", fetched.AssignedBy);
-		Assert.Equal(TickedNow, fetched.LastModifiedAt);
-		Assert.Equal(1, fetched.Version);
+		fetched.Should().BeEquivalentTo(
+			new
+			{
+				AssignedToId = "alice-1",
+				AssignedToName = "Alice Example",
+				AssignedAt = TickedNow,
+				AssignedBy = "actor-1",
+				LastModifiedAt = TickedNow,
+				Version = 1,
+			}
+		);
 	}
 
 	[Fact]
@@ -631,11 +624,9 @@ public class CaseServiceTests : IAsyncDisposable
 				TestContext.Current.CancellationToken
 			);
 
-		Assert.True(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var fetched = await GetAsync(caseRecord.Id);
-		Assert.Equal("carol-1", fetched.AssignedToId);
-		Assert.Equal("Carol", fetched.AssignedToName);
-		Assert.Equal("actor-1", fetched.AssignedBy);
+		fetched.Should().BeEquivalentTo(new { AssignedToId = "carol-1", AssignedToName = "Carol", AssignedBy = "actor-1" });
 	}
 
 	[Fact]
@@ -660,16 +651,15 @@ public class CaseServiceTests : IAsyncDisposable
 				TestContext.Current.CancellationToken
 			);
 
-		Assert.True(result.IsSuccess);
-		Assert.True(
-			result.IsIdempotentReplay,
-			"Re-assigning to the same user must be flagged as a replay so "
-				+ "the endpoint can set X-Idempotent-Replay: true."
-		);
+		result.IsSuccess.Should().BeTrue();
 		var fetched = await GetAsync(caseRecord.Id);
-		Assert.Equal(InitialNow, fetched.AssignedAt);
-		Assert.Equal("old-actor", fetched.AssignedBy);
-		Assert.Equal(0, fetched.Version);
+
+		using var scope = new AssertionScope();
+		result.IsIdempotentReplay.Should().BeTrue(
+			"re-assigning to the same user must be flagged as a replay so "
+				+ "the endpoint can set X-Idempotent-Replay: true"
+		);
+		fetched.Should().BeEquivalentTo(new { AssignedAt = InitialNow, AssignedBy = "old-actor", Version = 0 });
 	}
 
 	[Fact]
@@ -687,10 +677,9 @@ public class CaseServiceTests : IAsyncDisposable
 				TestContext.Current.CancellationToken
 			);
 
-		Assert.False(result.IsSuccess);
-		Assert.Equal(CaseActionFailureCode.MissingActorIdentity, result.FailureCode);
+		result.Should().BeEquivalentTo(new { IsSuccess = false, FailureCode = CaseActionFailureCode.MissingActorIdentity });
 		var fetched = await GetAsync(caseRecord.Id);
-		Assert.Null(fetched.AssignedToId);
+		fetched.AssignedToId.Should().BeNull();
 	}
 
 	[Fact]
@@ -712,10 +701,9 @@ public class CaseServiceTests : IAsyncDisposable
 				TestContext.Current.CancellationToken
 			);
 
-		Assert.False(result.IsSuccess);
-		Assert.Equal(CaseActionFailureCode.MissingActorIdentity, result.FailureCode);
+		result.Should().BeEquivalentTo(new { IsSuccess = false, FailureCode = CaseActionFailureCode.MissingActorIdentity });
 		var fetched = await GetAsync(caseRecord.Id);
-		Assert.Equal("alice-1", fetched.AssignedToId);
+		fetched.AssignedToId.Should().Be("alice-1");
 	}
 
 	// ---- RA-358: assignment is refused on a closed (terminal) case ----
@@ -756,18 +744,19 @@ public class CaseServiceTests : IAsyncDisposable
 				TestContext.Current.CancellationToken
 			);
 
-		Assert.False(result.IsSuccess);
-		Assert.Equal(CaseActionFailureCode.TerminalState, result.FailureCode);
-		Assert.Contains(stateId, result.Message);
+		var fetched = await GetAsync(caseRecord.Id);
+
+		using var scope = new AssertionScope();
+		result.Should().BeEquivalentTo(
+			new { IsSuccess = false, FailureCode = CaseActionFailureCode.TerminalState, IsIdempotentReplay = false }
+		);
+		result.Message.Should().Contain(stateId);
 		// RA-358: the message is rendered verbatim to the user, so it must
 		// never carry the system-generated case id.
-		Assert.DoesNotContain(caseRecord.Id.ToString(), result.Message);
-		Assert.False(result.IsIdempotentReplay);
+		result.Message.Should().NotContain(caseRecord.Id.ToString());
 
-		var fetched = await GetAsync(caseRecord.Id);
-		Assert.Null(fetched.AssignedToId);
-		Assert.Equal(0, fetched.Version);
-		Assert.Empty(fetched.Timeline);
+		fetched.Should().BeEquivalentTo(new { AssignedToId = (string?)null, Version = 0 });
+		fetched.Timeline.Should().BeEmpty();
 	}
 
 	[Theory]
@@ -792,15 +781,15 @@ public class CaseServiceTests : IAsyncDisposable
 		var result = await BuildService(type)
 			.UnassignAsync(caseRecord.Id, actor, TestContext.Current.CancellationToken);
 
-		Assert.False(result.IsSuccess);
-		Assert.Equal(CaseActionFailureCode.TerminalState, result.FailureCode);
-		Assert.Contains(stateId, result.Message);
-		Assert.DoesNotContain(caseRecord.Id.ToString(), result.Message);
-
 		var fetched = await GetAsync(caseRecord.Id);
-		Assert.Equal("alice-1", fetched.AssignedToId);
-		Assert.Equal(0, fetched.Version);
-		Assert.Empty(fetched.Timeline);
+
+		using var scope = new AssertionScope();
+		result.Should().BeEquivalentTo(new { IsSuccess = false, FailureCode = CaseActionFailureCode.TerminalState });
+		result.Message.Should().Contain(stateId);
+		result.Message.Should().NotContain(caseRecord.Id.ToString());
+
+		fetched.Should().BeEquivalentTo(new { AssignedToId = "alice-1", Version = 0 });
+		fetched.Timeline.Should().BeEmpty();
 	}
 
 	[Fact]
@@ -829,8 +818,7 @@ public class CaseServiceTests : IAsyncDisposable
 				TestContext.Current.CancellationToken
 			);
 
-		Assert.Equal(CaseActionFailureCode.TerminalState, result.FailureCode);
-		Assert.False(result.IsIdempotentReplay);
+		result.Should().BeEquivalentTo(new { FailureCode = CaseActionFailureCode.TerminalState, IsIdempotentReplay = false });
 	}
 
 	[Fact]
@@ -846,8 +834,7 @@ public class CaseServiceTests : IAsyncDisposable
 				TestContext.Current.CancellationToken
 			);
 
-		Assert.Equal(CaseActionFailureCode.TerminalState, result.FailureCode);
-		Assert.False(result.IsIdempotentReplay);
+		result.Should().BeEquivalentTo(new { FailureCode = CaseActionFailureCode.TerminalState, IsIdempotentReplay = false });
 	}
 
 	[Fact]
@@ -880,7 +867,7 @@ public class CaseServiceTests : IAsyncDisposable
 				TestContext.Current.CancellationToken
 			);
 
-		Assert.Equal(CaseActionFailureCode.TerminalState, result.FailureCode);
+		result.FailureCode.Should().Be(CaseActionFailureCode.TerminalState);
 	}
 
 	[Fact]
@@ -899,8 +886,8 @@ public class CaseServiceTests : IAsyncDisposable
 				TestContext.Current.CancellationToken
 			);
 
-		Assert.True(result.IsSuccess);
-		Assert.Equal("alice-1", (await GetAsync(caseRecord.Id)).AssignedToId);
+		result.IsSuccess.Should().BeTrue();
+		(await GetAsync(caseRecord.Id)).AssignedToId.Should().Be("alice-1");
 	}
 
 	/// <summary>
@@ -949,14 +936,14 @@ public class CaseServiceTests : IAsyncDisposable
 				TestContext.Current.CancellationToken
 			);
 
-		Assert.False(result.IsSuccess);
-		Assert.Equal(CaseActionFailureCode.UnknownAction, result.FailureCode);
-		Assert.DoesNotContain(caseRecord.Id.ToString(), result.Message);
-
 		var fetched = await GetAsync(caseRecord.Id);
-		Assert.Equal("bob-1", fetched.AssignedToId);
-		Assert.Equal(0, fetched.Version);
-		Assert.Empty(fetched.Timeline);
+
+		using var scope = new AssertionScope();
+		result.Should().BeEquivalentTo(new { IsSuccess = false, FailureCode = CaseActionFailureCode.UnknownAction });
+		result.Message.Should().NotContain(caseRecord.Id.ToString());
+
+		fetched.Should().BeEquivalentTo(new { AssignedToId = "bob-1", Version = 0 });
+		fetched.Timeline.Should().BeEmpty();
 	}
 
 	[Fact]
@@ -971,12 +958,10 @@ public class CaseServiceTests : IAsyncDisposable
 				TestContext.Current.CancellationToken
 			);
 
-		Assert.False(result.IsSuccess);
-		Assert.Equal(CaseActionFailureCode.UnknownAction, result.FailureCode);
+		result.Should().BeEquivalentTo(new { IsSuccess = false, FailureCode = CaseActionFailureCode.UnknownAction });
 
 		var fetched = await GetAsync(caseRecord.Id);
-		Assert.Equal("bob-1", fetched.AssignedToId);
-		Assert.Equal(0, fetched.Version);
+		fetched.Should().BeEquivalentTo(new { AssignedToId = "bob-1", Version = 0 });
 	}
 
 	[Fact]
@@ -989,8 +974,7 @@ public class CaseServiceTests : IAsyncDisposable
 		var result = await BuildService(type)
 			.AssignAsync(caseRecord.Id, "   ", null, actor, TestContext.Current.CancellationToken);
 
-		Assert.False(result.IsSuccess);
-		Assert.Equal(CaseActionFailureCode.InvalidAssignment, result.FailureCode);
+		result.Should().BeEquivalentTo(new { IsSuccess = false, FailureCode = CaseActionFailureCode.InvalidAssignment });
 	}
 
 	[Fact]
@@ -1007,8 +991,7 @@ public class CaseServiceTests : IAsyncDisposable
 				TestContext.Current.CancellationToken
 			);
 
-		Assert.False(result.IsSuccess);
-		Assert.Equal(CaseActionFailureCode.CaseNotFound, result.FailureCode);
+		result.Should().BeEquivalentTo(new { IsSuccess = false, FailureCode = CaseActionFailureCode.CaseNotFound });
 	}
 
 	[Fact]
@@ -1019,8 +1002,7 @@ public class CaseServiceTests : IAsyncDisposable
 		var result = await BuildService(type)
 			.UnassignAsync(Ulid.NewUlid().ToString(), actor, TestContext.Current.CancellationToken);
 
-		Assert.False(result.IsSuccess);
-		Assert.Equal(CaseActionFailureCode.CaseNotFound, result.FailureCode);
+		result.Should().BeEquivalentTo(new { IsSuccess = false, FailureCode = CaseActionFailureCode.CaseNotFound });
 	}
 
 	[Fact]
@@ -1039,9 +1021,9 @@ public class CaseServiceTests : IAsyncDisposable
 				TestContext.Current.CancellationToken
 			);
 
-		Assert.True(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var fetched = await GetAsync(caseRecord.Id);
-		Assert.Equal("alice-1", fetched.AssignedToId);
+		fetched.AssignedToId.Should().Be("alice-1");
 	}
 
 	[Fact]
@@ -1067,9 +1049,9 @@ public class CaseServiceTests : IAsyncDisposable
 				TestContext.Current.CancellationToken
 			);
 
-		Assert.True(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var fetched = await GetAsync(caseRecord.Id);
-		Assert.Equal("carol-1", fetched.AssignedToId);
+		fetched.AssignedToId.Should().Be("carol-1");
 	}
 
 	[Fact]
@@ -1088,14 +1070,19 @@ public class CaseServiceTests : IAsyncDisposable
 		var result = await BuildService(type)
 			.UnassignAsync(caseRecord.Id, actor, TestContext.Current.CancellationToken);
 
-		Assert.True(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var fetched = await GetAsync(caseRecord.Id);
-		Assert.Null(fetched.AssignedToId);
-		Assert.Null(fetched.AssignedToName);
-		Assert.Null(fetched.AssignedAt);
-		Assert.Null(fetched.AssignedBy);
-		Assert.Equal(TickedNow, fetched.LastModifiedAt);
-		Assert.Equal(1, fetched.Version);
+		fetched.Should().BeEquivalentTo(
+			new
+			{
+				AssignedToId = (string?)null,
+				AssignedToName = (string?)null,
+				AssignedAt = (DateTime?)null,
+				AssignedBy = (string?)null,
+				LastModifiedAt = TickedNow,
+				Version = 1,
+			}
+		);
 	}
 
 	[Fact]
@@ -1108,14 +1095,15 @@ public class CaseServiceTests : IAsyncDisposable
 		var result = await BuildService(type)
 			.UnassignAsync(caseRecord.Id, actor, TestContext.Current.CancellationToken);
 
-		Assert.True(result.IsSuccess);
-		Assert.True(
-			result.IsIdempotentReplay,
-			"Unassigning an already-unassigned item must be flagged as a replay so "
-				+ "the endpoint can set X-Idempotent-Replay: true."
-		);
+		result.IsSuccess.Should().BeTrue();
 		var fetched = await GetAsync(caseRecord.Id);
-		Assert.Equal(0, fetched.Version);
+
+		using var scope = new AssertionScope();
+		result.IsIdempotentReplay.Should().BeTrue(
+			"unassigning an already-unassigned item must be flagged as a replay so "
+				+ "the endpoint can set X-Idempotent-Replay: true"
+		);
+		fetched.Version.Should().Be(0);
 	}
 
 	[Fact]
@@ -1132,9 +1120,9 @@ public class CaseServiceTests : IAsyncDisposable
 		var result = await BuildService(type)
 			.UnassignAsync(caseRecord.Id, actor, TestContext.Current.CancellationToken);
 
-		Assert.True(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var fetched = await GetAsync(caseRecord.Id);
-		Assert.Null(fetched.AssignedToId);
+		fetched.AssignedToId.Should().BeNull();
 	}
 
 	[Fact]
@@ -1162,15 +1150,21 @@ public class CaseServiceTests : IAsyncDisposable
 				TestContext.Current.CancellationToken
 			);
 
-		Assert.True(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var fetched = await GetAsync(caseRecord.Id);
-		var note = Assert.Single(fetched.Timeline, e => e.Action == "note-added");
-		Assert.Equal("Spoke to applicant; awaiting evidence.", note.Details["text"]);
-		Assert.Equal("alice-1", note.PerformedById);
-		Assert.Equal("Alice Example", note.PerformedByName);
-		Assert.Equal(TickedNow, note.PerformedAt);
-		Assert.Equal(TickedNow, fetched.LastModifiedAt);
-		Assert.Equal(1, fetched.Version);
+		var note = fetched.Timeline.Should().ContainSingle(e => e.Action == "note-added").Subject;
+
+		using var scope = new AssertionScope();
+		note.Should().BeEquivalentTo(
+			new
+			{
+				Details = new Dictionary<string, string?> { ["text"] = "Spoke to applicant; awaiting evidence." },
+				PerformedById = "alice-1",
+				PerformedByName = "Alice Example",
+				PerformedAt = TickedNow,
+			}
+		);
+		fetched.Should().BeEquivalentTo(new { LastModifiedAt = TickedNow, Version = 1 });
 	}
 
 	[Fact]
@@ -1182,11 +1176,9 @@ public class CaseServiceTests : IAsyncDisposable
 		var result = await BuildService(type)
 			.AddNoteAsync(caseRecord.Id, "   ", User(), TestContext.Current.CancellationToken);
 
-		Assert.False(result.IsSuccess);
-		Assert.Equal(CaseActionFailureCode.InvalidNote, result.FailureCode);
+		result.Should().BeEquivalentTo(new { IsSuccess = false, FailureCode = CaseActionFailureCode.InvalidNote });
 		var fetched = await GetAsync(caseRecord.Id);
-		Assert.Empty(fetched.Timeline);
-		Assert.Equal(0, fetched.Version);
+		fetched.Should().BeEquivalentTo(new { Timeline = Array.Empty<CaseTimelineEntry>(), Version = 0 });
 	}
 
 	[Fact]
@@ -1199,10 +1191,9 @@ public class CaseServiceTests : IAsyncDisposable
 		var result = await BuildService(type)
 			.AddNoteAsync(caseRecord.Id, oversized, User(), TestContext.Current.CancellationToken);
 
-		Assert.False(result.IsSuccess);
-		Assert.Equal(CaseActionFailureCode.InvalidNote, result.FailureCode);
+		result.Should().BeEquivalentTo(new { IsSuccess = false, FailureCode = CaseActionFailureCode.InvalidNote });
 		var fetched = await GetAsync(caseRecord.Id);
-		Assert.Empty(fetched.Timeline);
+		fetched.Timeline.Should().BeEmpty();
 	}
 
 	[Fact]
@@ -1218,8 +1209,7 @@ public class CaseServiceTests : IAsyncDisposable
 				TestContext.Current.CancellationToken
 			);
 
-		Assert.False(result.IsSuccess);
-		Assert.Equal(CaseActionFailureCode.CaseNotFound, result.FailureCode);
+		result.Should().BeEquivalentTo(new { IsSuccess = false, FailureCode = CaseActionFailureCode.CaseNotFound });
 	}
 
 	[Fact]
@@ -1240,9 +1230,9 @@ public class CaseServiceTests : IAsyncDisposable
 				TestContext.Current.CancellationToken
 			);
 
-		Assert.True(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var fetched = await GetAsync(caseRecord.Id);
-		Assert.Single(fetched.Timeline, e => e.Action == "note-added");
+		fetched.Timeline.Should().ContainSingle(e => e.Action == "note-added");
 	}
 
 	private sealed class FakeTimeProvider(DateTime utcNow) : TimeProvider
@@ -1292,18 +1282,27 @@ public class CaseServiceTests : IAsyncDisposable
 			);
 
 		var fetched = await GetAsync(caseRecord.Id);
-		var entry = Assert.Single(fetched.Timeline);
-		Assert.Equal("state-changed", entry.Action);
-		Assert.Equal("Action applied", entry.ActionDisplayName);
-		Assert.Equal("withdraw", entry.Details["actionId"]);
-		Assert.Equal("Withdraw", entry.Details["actionDisplayName"]);
-		Assert.Equal("submitted", entry.Details["fromStateId"]);
-		Assert.Equal("rejected", entry.Details["toStateId"]);
-		Assert.Equal("alice-1", entry.PerformedById);
-		Assert.Equal(TickedNow, entry.PerformedAt);
-		// The entry snapshots the state AS OF the event — the
-		// resulting post-transition state, not the item's live state.
-		Assert.Equal("rejected", entry.StateId);
+		fetched.Timeline.Should().BeEquivalentTo(
+			[
+				new
+				{
+					Action = "state-changed",
+					ActionDisplayName = "Action applied",
+					Details = new Dictionary<string, string?>
+					{
+						["actionId"] = "withdraw",
+						["actionDisplayName"] = "Withdraw",
+						["fromStateId"] = "submitted",
+						["toStateId"] = "rejected",
+					},
+					PerformedById = "alice-1",
+					PerformedAt = TickedNow,
+					// The entry snapshots the state AS OF the event — the
+					// resulting post-transition state, not the item's live state.
+					StateId = "rejected",
+				},
+			]
+		);
 	}
 
 	[Fact]
@@ -1327,10 +1326,9 @@ public class CaseServiceTests : IAsyncDisposable
 				TestContext.Current.CancellationToken
 			);
 
-		Assert.False(result.IsSuccess);
-		Assert.Equal(CaseActionFailureCode.TerminalState, result.FailureCode);
+		result.Should().BeEquivalentTo(new { IsSuccess = false, FailureCode = CaseActionFailureCode.TerminalState });
 		var fetched = await GetAsync(caseRecord.Id);
-		Assert.Empty(fetched.Timeline);
+		fetched.Timeline.Should().BeEmpty();
 	}
 
 	[Fact]
@@ -1354,14 +1352,23 @@ public class CaseServiceTests : IAsyncDisposable
 			);
 
 		var fetched = await GetAsync(caseRecord.Id);
-		var entry = Assert.Single(fetched.Timeline);
-		Assert.Equal("assigned", entry.Action);
-		Assert.Equal("Assigned", entry.ActionDisplayName);
-		Assert.Equal("carol-1", entry.Details["assigneeId"]);
-		Assert.Equal("Carol Example", entry.Details["assigneeName"]);
-		Assert.Equal("bob-1", entry.Details["previousAssigneeId"]);
-		Assert.Equal("Bob Example", entry.Details["previousAssigneeName"]);
-		Assert.Equal("alice-1", entry.PerformedById);
+		fetched.Timeline.Should().BeEquivalentTo(
+			[
+				new
+				{
+					Action = "assigned",
+					ActionDisplayName = "Assigned",
+					Details = new Dictionary<string, string?>
+					{
+						["assigneeId"] = "carol-1",
+						["assigneeName"] = "Carol Example",
+						["previousAssigneeId"] = "bob-1",
+						["previousAssigneeName"] = "Bob Example",
+					},
+					PerformedById = "alice-1",
+				},
+			]
+		);
 	}
 
 	[Fact]
@@ -1385,7 +1392,7 @@ public class CaseServiceTests : IAsyncDisposable
 			);
 
 		var fetched = await GetAsync(caseRecord.Id);
-		Assert.Empty(fetched.Timeline);
+		fetched.Timeline.Should().BeEmpty();
 	}
 
 	[Fact]
@@ -1398,9 +1405,9 @@ public class CaseServiceTests : IAsyncDisposable
 		var result = await BuildService(type)
 			.AssignAsync(caseRecord.Id, "   ", "Bob", actor, TestContext.Current.CancellationToken);
 
-		Assert.False(result.IsSuccess);
+		result.IsSuccess.Should().BeFalse();
 		var fetched = await GetAsync(caseRecord.Id);
-		Assert.Empty(fetched.Timeline);
+		fetched.Timeline.Should().BeEmpty();
 	}
 
 	[Fact]
@@ -1418,12 +1425,21 @@ public class CaseServiceTests : IAsyncDisposable
 			.UnassignAsync(caseRecord.Id, actor, TestContext.Current.CancellationToken);
 
 		var fetched = await GetAsync(caseRecord.Id);
-		var entry = Assert.Single(fetched.Timeline);
-		Assert.Equal("unassigned", entry.Action);
-		Assert.Equal("Unassigned", entry.ActionDisplayName);
-		Assert.Equal("alice-1", entry.Details["previousAssigneeId"]);
-		Assert.Equal("Alice", entry.Details["previousAssigneeName"]);
-		Assert.Equal("actor-1", entry.PerformedById);
+		fetched.Timeline.Should().BeEquivalentTo(
+			[
+				new
+				{
+					Action = "unassigned",
+					ActionDisplayName = "Unassigned",
+					Details = new Dictionary<string, string?>
+					{
+						["previousAssigneeId"] = "alice-1",
+						["previousAssigneeName"] = "Alice",
+					},
+					PerformedById = "actor-1",
+				},
+			]
+		);
 	}
 
 	[Fact]
@@ -1437,7 +1453,7 @@ public class CaseServiceTests : IAsyncDisposable
 			.UnassignAsync(caseRecord.Id, actor, TestContext.Current.CancellationToken);
 
 		var fetched = await GetAsync(caseRecord.Id);
-		Assert.Empty(fetched.Timeline);
+		fetched.Timeline.Should().BeEmpty();
 	}
 
 	[Fact]
@@ -1455,14 +1471,20 @@ public class CaseServiceTests : IAsyncDisposable
 			);
 
 		var fetched = await GetAsync(caseRecord.Id);
-		var entry = Assert.Single(fetched.Timeline);
-		Assert.Equal("note-added", entry.Action);
-		Assert.Equal("Note added", entry.ActionDisplayName);
-		// The entry holds the trimmed note body.
-		Assert.Equal("A note.", entry.Details["text"]);
-		Assert.Equal("alice-1", entry.PerformedById);
-		Assert.Equal("Alice Example", entry.PerformedByName);
-		Assert.Equal(TickedNow, entry.PerformedAt);
+		fetched.Timeline.Should().BeEquivalentTo(
+			[
+				new
+				{
+					Action = "note-added",
+					ActionDisplayName = "Note added",
+					// The entry holds the trimmed note body.
+					Details = new Dictionary<string, string?> { ["text"] = "A note." },
+					PerformedById = "alice-1",
+					PerformedByName = "Alice Example",
+					PerformedAt = TickedNow,
+				},
+			]
+		);
 	}
 
 	[Fact]
@@ -1474,9 +1496,9 @@ public class CaseServiceTests : IAsyncDisposable
 		var result = await BuildService(type)
 			.AddNoteAsync(caseRecord.Id, "   ", AuditUser(), TestContext.Current.CancellationToken);
 
-		Assert.False(result.IsSuccess);
+		result.IsSuccess.Should().BeFalse();
 		var fetched = await GetAsync(caseRecord.Id);
-		Assert.Empty(fetched.Timeline);
+		fetched.Timeline.Should().BeEmpty();
 	}
 
 	[Fact]
@@ -1524,25 +1546,21 @@ public class CaseServiceTests : IAsyncDisposable
 		);
 
 		var fetched = await GetAsync(caseRecord.Id);
-		Assert.Equal(3, fetched.Timeline.Count);
-		Assert.Equal(
-			["note-added", "assigned", "state-changed"],
-			fetched.Timeline.Select(e => e.Action).ToArray()
-		);
+		fetched.Timeline.Should().HaveCount(3);
+
+		using var scope = new AssertionScope();
+		fetched.Timeline.Select(e => e.Action).Should().Equal(["note-added", "assigned", "state-changed"]);
 		// Strictly increasing timestamps — entries are appended in
 		// chronological (insertion) order on disk.
-		Assert.True(fetched.Timeline[0].PerformedAt < fetched.Timeline[1].PerformedAt);
-		Assert.True(fetched.Timeline[1].PerformedAt < fetched.Timeline[2].PerformedAt);
+		fetched.Timeline[0].PerformedAt.Should().BeBefore(fetched.Timeline[1].PerformedAt);
+		fetched.Timeline[1].PerformedAt.Should().BeBefore(fetched.Timeline[2].PerformedAt);
 		// Each entry snapshots the state AS OF its own event. The
 		// note + assign happened while the item was still 'submitted'; only
 		// the state-changed entry carries the post-transition 'approved'.
 		// This is the regression the bug was about: earlier entries must NOT
 		// inherit the live current state.
-		Assert.Equal("approved", fetched.StateId);
-		Assert.Equal(
-			["submitted", "submitted", "approved"],
-			fetched.Timeline.Select(e => e.StateId).ToArray()
-		);
+		fetched.StateId.Should().Be("approved");
+		fetched.Timeline.Select(e => e.StateId).Should().Equal(["submitted", "submitted", "approved"]);
 	}
 
 	private sealed class MutableTimeProvider(DateTime initial) : TimeProvider
@@ -1579,21 +1597,27 @@ public class CaseServiceTests : IAsyncDisposable
 				cancellationToken: TestContext.Current.CancellationToken
 			);
 
-		Assert.True(result.IsSuccess);
-		Assert.NotNull(result.Case);
+		result.IsSuccess.Should().BeTrue();
+		result.Case.Should().NotBeNull();
 		var fetched = await GetAsync(result.Case!.Id);
-		Assert.Equal(CaseType, fetched.CaseType);
-		Assert.Equal("submitted", fetched.StateId);
-		Assert.False(fetched.IsTerminal);
-		Assert.Equal("test-client", fetched.SubmittedBy);
-		Assert.Equal(TickedNow, fetched.SubmittedAt);
-		Assert.Equal(TickedNow, fetched.LastModifiedAt);
-		Assert.NotNull(fetched.TemplateSnapshot);
-		Assert.Equal("v1", fetched.TemplateVersion);
-		Assert.Equal("v1", fetched.TemplateSnapshot!.TemplateVersion);
-		Assert.Equal("csoc-2024-eng-00123", fetched.SourceSystemId);
-		Assert.Equal("COMPLIANCE_SCHEME", fetched.ProducerType);
-		Assert.Equal(new CaseDisplayField("Acme Packaging Ltd", "string"), fetched.DisplayData["organisationName"]);
+
+		using var scope = new AssertionScope();
+		fetched.Should().BeEquivalentTo(
+			new
+			{
+				CaseType,
+				StateId = "submitted",
+				IsTerminal = false,
+				SubmittedBy = "test-client",
+				SubmittedAt = TickedNow,
+				LastModifiedAt = TickedNow,
+				TemplateVersion = "v1",
+				TemplateSnapshot = new { TemplateVersion = "v1" },
+				SourceSystemId = "csoc-2024-eng-00123",
+				ProducerType = "COMPLIANCE_SCHEME",
+			}
+		);
+		fetched.DisplayData.Should().Contain("organisationName", new CaseDisplayField("Acme Packaging Ltd", "string"));
 	}
 
 	[Fact]
@@ -1610,24 +1634,41 @@ public class CaseServiceTests : IAsyncDisposable
 				cancellationToken: TestContext.Current.CancellationToken
 			);
 
-		Assert.True(result.IsSuccess);
-		Assert.NotNull(result.Case);
+		result.IsSuccess.Should().BeTrue();
+		result.Case.Should().NotBeNull();
 		var fetched = await GetAsync(result.Case!.Id);
-		// The audit entry must have been part of the original CreateAsync
-		// write (not a follow-up replace), so Version is still 0.
-		Assert.Equal(0, fetched.Version);
-		var entry = Assert.Single(fetched.Timeline);
-		Assert.Equal("case-created", entry.Action);
-		Assert.Equal("Case submitted", entry.ActionDisplayName);
-		Assert.Equal("service:test-client", entry.PerformedById);
-		Assert.Equal("test-client", entry.PerformedByName);
-		Assert.Equal(fetched.SubmittedAt, entry.PerformedAt);
-		Assert.Equal(TickedNow, entry.PerformedAt);
-		Assert.Equal(CaseType, entry.Details["caseType"]);
-		Assert.Equal("submitted", entry.Details["stateId"]);
-		Assert.Equal("v1", entry.Details["templateVersion"]);
-		// The birth entry snapshots the initial state.
-		Assert.Equal("submitted", entry.StateId);
+
+		using var scope = new AssertionScope();
+		fetched.SubmittedAt.Should().Be(TickedNow);
+		fetched.Should().BeEquivalentTo(
+			new
+			{
+				// The audit entry must have been part of the original CreateAsync
+				// write (not a follow-up replace), so Version is still 0.
+				Version = 0,
+				Timeline = new[]
+				{
+					new
+					{
+						Action = "case-created",
+						ActionDisplayName = "Case submitted",
+						PerformedById = "service:test-client",
+						PerformedByName = "test-client",
+						PerformedAt = TickedNow,
+						Details = new Dictionary<string, string?>
+						{
+							["caseType"] = CaseType,
+							["stateId"] = "submitted",
+							["templateVersion"] = "v1",
+							["source"] = null,
+							["clientId"] = "test-client",
+						},
+						// The birth entry snapshots the initial state.
+						StateId = "submitted",
+					},
+				},
+			}
+		);
 	}
 
 	[Fact]
@@ -1644,7 +1685,7 @@ public class CaseServiceTests : IAsyncDisposable
 				cancellationToken: TestContext.Current.CancellationToken
 			);
 
-		Assert.True(result.IsSuccess, result.Message);
+		result.IsSuccess.Should().BeTrue(result.Message);
 		var fetched = await GetAsync(result.Case!.Id);
 		var entry = fetched.Timeline.Should().ContainSingle().Subject;
 		entry.PerformedById.Should().Be("service:test-client");
@@ -1674,16 +1715,25 @@ public class CaseServiceTests : IAsyncDisposable
 				cancellationToken: TestContext.Current.CancellationToken
 			);
 
-		Assert.True(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var fetched = await GetAsync(result.Case!.Id);
-		var entry = Assert.Single(fetched.Timeline);
-		Assert.Equal("case-created", entry.Action);
-		Assert.Equal(TickedNow, entry.PerformedAt);
-		Assert.Equal(CaseType, entry.Details["caseType"]);
-		Assert.Equal("submitted", entry.Details["stateId"]);
-		Assert.Equal("v1", entry.Details["templateVersion"]);
-		Assert.Equal("operator-fe", entry.Details["source"]);
-		Assert.Equal("test-client", entry.Details["clientId"]);
+		fetched.Timeline.Should().BeEquivalentTo(
+			[
+				new
+				{
+					Action = "case-created",
+					PerformedAt = TickedNow,
+					Details = new Dictionary<string, string?>
+					{
+						["caseType"] = CaseType,
+						["stateId"] = "submitted",
+						["templateVersion"] = "v1",
+						["source"] = "operator-fe",
+						["clientId"] = "test-client",
+					},
+				},
+			]
+		);
 	}
 
 	[Fact]
@@ -1703,12 +1753,16 @@ public class CaseServiceTests : IAsyncDisposable
 				cancellationToken: TestContext.Current.CancellationToken
 			);
 
-		Assert.True(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var fetched = await GetAsync(result.Case!.Id);
-		var entry = Assert.Single(fetched.Timeline);
-		Assert.True(entry.Details.ContainsKey("source"));
-		Assert.Null(entry.Details["source"]);
-		Assert.Equal("test-client", entry.Details["clientId"]);
+		var entry = fetched.Timeline.Should().ContainSingle().Subject;
+		entry.Details.Should().Contain(
+			new Dictionary<string, string?>
+			{
+				["source"] = null,
+				["clientId"] = "test-client",
+			}
+		);
 	}
 
 	/// <summary>
