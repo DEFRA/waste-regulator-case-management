@@ -10,6 +10,11 @@ The first case type is CSoC, for compliance declarations held by the Waste
 Obligations API. Case types are configured in JSON, not code — see
 [docs/cases.md](docs/cases.md).
 
+New to the codebase? Click through the guided tour in
+[.tours/](.tours/waste-regulator-case-management.tour) with the
+[CodeTour](https://marketplace.visualstudio.com/items?itemName=vsls-contrib.codetour)
+VS Code extension.
+
 Built from
 [cdp-dotnet-backend-template](https://github.com/DEFRA/cdp-dotnet-backend-template).
 
