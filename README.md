@@ -1,10 +1,11 @@
 # Waste Regulator Case Management
 
 A .NET 10 API that holds the cases regulators work through. A source system's
-Case Intake Processor creates a case for each submission; caseworkers, through
-the regulator frontend, assign it, add notes and conclude it; the service then
-sends the decision back to the source system. Every change is recorded on the
-case's timeline and published to the platform's analytics topic.
+[Case Intake Processor](https://github.com/DEFRA/waste-case-intake-processor/) creates a case
+for each submission; caseworkers, through the regulator frontend, assign it,
+add notes and conclude it; the service then sends the decision back to the
+source system. Every change is recorded on the case's timeline and published
+to the platform's analytics topic.
 
 The first case type is CSoC, for compliance declarations held by the Waste
 Obligations API. Case types are configured in JSON, not code — see
@@ -137,7 +138,8 @@ registered for that client id (see
 [BFF signing contract](docs/cdp-deployment.md#bff-signing-contract)). Two
 callers are registered:
 
-- **The Case Intake Processor** is the only caller that can create cases.
+- **The [Case Intake Processor](https://github.com/DEFRA/waste-case-intake-processor/)**
+  is the only caller that can create cases.
 - **The regulator frontend** acts for a caseworker, forwarding the user's id,
   name, nation and email as signed headers. A caseworker sees and acts on the
   cases of their own nation only.
