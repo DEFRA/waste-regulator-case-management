@@ -1,3 +1,4 @@
+using AwesomeAssertions.Execution;
 using MongoDB.Bson;
 using WasteRegulatorCaseManagement.Cases;
 
@@ -13,8 +14,9 @@ public class CaseRegistryTests
 
 		var registry = new CaseRegistry([typeA, typeB]);
 
-		Assert.Same(typeA, registry.Find("alpha"));
-		Assert.Same(typeB, registry.Find("beta"));
+		using var scope = new AssertionScope();
+		registry.Find("alpha").Should().BeSameAs(typeA);
+		registry.Find("beta").Should().BeSameAs(typeB);
 	}
 
 	[Fact]
@@ -24,7 +26,7 @@ public class CaseRegistryTests
 
 		var registry = new CaseRegistry([typeA]);
 
-		Assert.Same(typeA, registry.Find("ALPHA"));
+		registry.Find("ALPHA").Should().BeSameAs(typeA);
 	}
 
 	[Fact]
@@ -32,7 +34,7 @@ public class CaseRegistryTests
 	{
 		var registry = new CaseRegistry([TestCaseType.Create("alpha", "Alpha")]);
 
-		Assert.Null(registry.Find("missing"));
+		registry.Find("missing").Should().BeNull();
 	}
 
 	[Fact]
@@ -43,9 +45,10 @@ public class CaseRegistryTests
 
 		var registry = new CaseRegistry([typeA, typeB]);
 
-		Assert.Equal(2, registry.Types.Count);
-		Assert.Contains(typeA, registry.Types);
-		Assert.Contains(typeB, registry.Types);
+		using var scope = new AssertionScope();
+		registry.Types.Should().HaveCount(2);
+		registry.Types.Should().Contain(typeA);
+		registry.Types.Should().Contain(typeB);
 	}
 
 	[Fact]

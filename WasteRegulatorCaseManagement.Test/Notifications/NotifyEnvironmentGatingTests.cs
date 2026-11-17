@@ -114,7 +114,7 @@ public class NotifyEnvironmentGatingTests : IClassFixture<MongoIntegrationFixtur
 				settings: settings
 			);
 
-			Assert.IsType<TExpected>(factory.Services.GetRequiredService<INotifyClient>());
+			factory.Services.GetRequiredService<INotifyClient>().Should().BeOfType<TExpected>();
 		}
 		finally
 		{

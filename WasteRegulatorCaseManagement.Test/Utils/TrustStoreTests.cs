@@ -1,3 +1,4 @@
+using AwesomeAssertions.Execution;
 using System.Collections;
 using System.Text;
 using WasteRegulatorCaseManagement.Utils;
@@ -28,9 +29,10 @@ public class TrustStoreTests
 
 		var entries = TrustStore.ReadTrustStoreEntries(env);
 
-		Assert.Equal(2, entries.Count);
-		Assert.Contains(entries, b => b.SequenceEqual(first));
-		Assert.Contains(entries, b => b.SequenceEqual(second));
+		using var scope = new AssertionScope();
+		entries.Should().HaveCount(2);
+		entries.Should().Contain(b => b.SequenceEqual(first));
+		entries.Should().Contain(b => b.SequenceEqual(second));
 	}
 
 	[Fact]
@@ -46,8 +48,8 @@ public class TrustStoreTests
 
 		var entries = TrustStore.ReadTrustStoreEntries(env);
 
-		var only = Assert.Single(entries);
-		Assert.Equal("ok", Encoding.UTF8.GetString(only));
+		var only = entries.Should().ContainSingle().Subject;
+		Encoding.UTF8.GetString(only).Should().Be("ok");
 	}
 
 	[Fact]
@@ -67,9 +69,10 @@ public class TrustStoreTests
 		// valid base64, so we expect three entries: the good one and
 		// the two empty ones. The "not-base-64!!" entry must be
 		// filtered out.
-		Assert.Equal(3, entries.Count);
-		Assert.Contains(entries, b => b.SequenceEqual(Encoding.UTF8.GetBytes("ok")));
-		Assert.Equal(2, entries.Count(b => b.Length == 0));
+		using var scope = new AssertionScope();
+		entries.Should().HaveCount(3);
+		entries.Should().Contain(b => b.SequenceEqual(Encoding.UTF8.GetBytes("ok")));
+		entries.Count(b => b.Length == 0).Should().Be(2);
 	}
 
 	[Fact]
@@ -81,6 +84,6 @@ public class TrustStoreTests
 			["HOME"] = "/home/test",
 		};
 
-		Assert.Empty(TrustStore.ReadTrustStoreEntries(env));
+		TrustStore.ReadTrustStoreEntries(env).Should().BeEmpty();
 	}
 }

@@ -1,5 +1,6 @@
 using WasteRegulatorCaseManagement.AuditEvents;
 using System.Security.Claims;
+using AwesomeAssertions.Execution;
 using WasteRegulatorCaseManagement.Test.TestSupport;
 using WasteRegulatorCaseManagement.Cases;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -76,7 +77,7 @@ public class CaseServiceTimestampTests
 	private async Task<Case> GetAsync(string id)
 	{
 		var fetched = await _persistence.GetByIdAsync(id, TestContext.Current.CancellationToken);
-		Assert.NotNull(fetched);
+		fetched.Should().NotBeNull();
 		return fetched!;
 	}
 
@@ -95,15 +96,18 @@ public class CaseServiceTimestampTests
 			submittedBy: "test-client",
 			User(), cancellationToken: TestContext.Current.CancellationToken);
 
-		Assert.True(result.IsSuccess, result.Message);
+		result.IsSuccess.Should().BeTrue(result.Message);
 
 		var fetched = await GetAsync(result.Case!.Id);
 		var expected = T.UtcDateTime;
-		Assert.Equal(expected, fetched.SubmittedAt);
-		Assert.Equal(expected, fetched.LastModifiedAt);
-		var birth = Assert.Single(fetched.Timeline);
-		Assert.Equal("case-created", birth.Action);
-		Assert.Equal(expected, birth.PerformedAt);
+		fetched.Should().BeEquivalentTo(
+			new
+			{
+				SubmittedAt = expected,
+				LastModifiedAt = expected,
+				Timeline = new[] { new { Action = "case-created", PerformedAt = expected } },
+			}
+		);
 	}
 
 	[Fact]
@@ -129,13 +133,16 @@ public class CaseServiceTimestampTests
 		var result = await BuildService(BuildType()).AddNoteAsync(
 			caseRecord.Id, "Reviewed evidence.", User(), TestContext.Current.CancellationToken);
 
-		Assert.True(result.IsSuccess, result.Message);
+		result.IsSuccess.Should().BeTrue(result.Message);
 
 		var fetched = await GetAsync(caseRecord.Id);
-		Assert.Equal(expected, fetched.LastModifiedAt);
-		var audit = Assert.Single(fetched.Timeline);
-		Assert.Equal("note-added", audit.Action);
-		Assert.Equal(expected, audit.PerformedAt);
+		fetched.Should().BeEquivalentTo(
+			new
+			{
+				LastModifiedAt = expected,
+				Timeline = new[] { new { Action = "note-added", PerformedAt = expected } },
+			}
+		);
 	}
 
 	[Fact]
@@ -150,10 +157,16 @@ public class CaseServiceTimestampTests
 			CaseType = CaseType,
 			StateId = "submitted",
 		};
-		Assert.Equal(default, caseRecord.SubmittedAt);
-		Assert.Equal(default, caseRecord.LastModifiedAt);
-
 		var entry = new CaseTimelineEntry { Action = "x", ActionDisplayName = "X" };
-		Assert.Equal(default, entry.PerformedAt);
+
+		using var scope = new AssertionScope();
+		caseRecord.Should().BeEquivalentTo(
+			new
+			{
+				SubmittedAt = default(DateTime),
+				LastModifiedAt = default(DateTime),
+			}
+		);
+		entry.PerformedAt.Should().Be(default(DateTime));
 	}
 }

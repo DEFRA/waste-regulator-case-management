@@ -8,6 +8,7 @@ using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 using Polly;
 using Polly.Retry;
+using AwesomeAssertions.Execution;
 
 namespace WasteRegulatorCaseManagement.Test.Notifications;
 
@@ -78,9 +79,12 @@ public class GovukNotifyClientTests
 			cancellationToken: TestContext.Current.CancellationToken
 		);
 
-		Assert.True(result.IsSuccess);
-		Assert.Equal("notify-msg-id-1", result.ProviderMessageId);
-		Assert.Null(result.ErrorMessage);
+		result.Should().BeEquivalentTo(new
+		{
+			IsSuccess = true,
+			ProviderMessageId = "notify-msg-id-1",
+			ErrorMessage = (string?)null,
+		});
 	}
 
 	[Fact]
@@ -247,8 +251,9 @@ public class GovukNotifyClientTests
 			cancellationToken: TestContext.Current.CancellationToken
 		);
 
-		Assert.False(result.IsSuccess);
-		Assert.Contains("MissingKey", result.ErrorMessage);
+		using var scope = new AssertionScope();
+		result.IsSuccess.Should().BeFalse();
+		result.ErrorMessage.Should().Contain("MissingKey");
 		await inner.DidNotReceiveWithAnyArgs().SendEmailAsync(default!, default!, default, default);
 	}
 
@@ -294,9 +299,9 @@ public class GovukNotifyClientTests
 
 		// ResiliencePipeline with zero delay retries just like production
 		// but without waiting — verifies the 3-attempt call-count.
-		Assert.True(result.IsSuccess);
-		Assert.Equal("retry-success-id", result.ProviderMessageId);
-		Assert.Equal(3, callCount);
+		using var scope = new AssertionScope();
+		result.Should().BeEquivalentTo(new { IsSuccess = true, ProviderMessageId = "retry-success-id" });
+		callCount.Should().Be(3);
 	}
 
 	[Fact]
@@ -329,8 +334,9 @@ public class GovukNotifyClientTests
 			cancellationToken: TestContext.Current.CancellationToken
 		);
 
-		Assert.False(result.IsSuccess);
-		Assert.Contains("persistent failure", result.ErrorMessage);
+		using var scope = new AssertionScope();
+		result.IsSuccess.Should().BeFalse();
+		result.ErrorMessage.Should().Contain("persistent failure");
 		// 3 total attempts (1 initial + 2 retries) with zero delay.
 		await inner
 			.Received(3)
@@ -565,7 +571,7 @@ public class GovukNotifyClientTests
 			cancellationToken: CancellationToken.None
 		);
 
-		Assert.False(result.IsSuccess);
+		result.IsSuccess.Should().BeFalse();
 	}
 
 	[Fact]
@@ -598,15 +604,15 @@ public class GovukNotifyClientTests
 		// The caller's own cancellationToken firing must still propagate
 		// as a cancellation rather than being swallowed into a
 		// NotifySendResult.Failure.
-		await Assert.ThrowsAsync<OperationCanceledException>(() =>
+		var act = () =>
 			sut.SendEmailAsync(
 				"DulyMade",
 				"op@ex.com",
 				new Dictionary<string, string>(),
 				"ref-caller-cancel",
 				cancellationToken: cts.Token
-			)
-		);
+			);
+		await act.Should().ThrowExactlyAsync<OperationCanceledException>();
 	}
 
 	[Fact]
@@ -627,8 +633,9 @@ public class GovukNotifyClientTests
 			cancellationToken: TestContext.Current.CancellationToken
 		);
 
-		Assert.False(result.IsSuccess);
-		Assert.Contains("DulyMade", result.ErrorMessage);
+		using var scope = new AssertionScope();
+		result.IsSuccess.Should().BeFalse();
+		result.ErrorMessage.Should().Contain("DulyMade");
 		await inner.DidNotReceiveWithAnyArgs().SendEmailAsync(default!, default!, default, default);
 	}
 
@@ -667,8 +674,7 @@ public class GovukNotifyClientTests
 			cancellationToken: TestContext.Current.CancellationToken
 		);
 
-		Assert.True(result.IsSuccess);
-		Assert.Equal("no-timeout-id", result.ProviderMessageId);
+		result.Should().BeEquivalentTo(new { IsSuccess = true, ProviderMessageId = "no-timeout-id" });
 	}
 
 	// ─────── ExtractEmailDomain branch coverage ───────

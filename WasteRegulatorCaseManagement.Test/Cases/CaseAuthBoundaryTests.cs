@@ -1,6 +1,7 @@
 using WasteRegulatorCaseManagement.AuditEvents;
 using System.Net;
 using System.Net.Http.Json;
+using AwesomeAssertions.Execution;
 using WasteRegulatorCaseManagement.Test.TestSupport;
 using WasteRegulatorCaseManagement.Utils.Mongo;
 using WasteRegulatorCaseManagement.Cases;
@@ -56,11 +57,13 @@ public class CaseAuthBoundaryTests
 			new { assigneeId = "bob-2", assigneeName = "Bob" },
 			cancellationToken);
 
-		Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.OK);
 		var persisted = await factory.Persistence.GetByIdAsync(id, cancellationToken);
-		Assert.Equal("bob-2", persisted!.AssignedToId);
-		Assert.Equal(1, persisted.Version);
-		Assert.Single(persisted.Timeline);
+		persisted.Should().NotBeNull();
+
+		using var scope = new AssertionScope();
+		persisted!.Should().BeEquivalentTo(new { AssignedToId = "bob-2", Version = 1 });
+		persisted.Timeline.Should().ContainSingle();
 	}
 
 	[Fact]
@@ -81,11 +84,13 @@ public class CaseAuthBoundaryTests
 			new { assigneeId = "alice-1", assigneeName = "Alice" },
 			cancellationToken);
 
-		Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.OK);
 		var persisted = await factory.Persistence.GetByIdAsync(id, cancellationToken);
-		Assert.Equal("alice-1", persisted!.AssignedToId);
-		Assert.Equal(1, persisted.Version);
-		Assert.Single(persisted.Timeline);
+		persisted.Should().NotBeNull();
+
+		using var scope = new AssertionScope();
+		persisted!.Should().BeEquivalentTo(new { AssignedToId = "alice-1", Version = 1 });
+		persisted.Timeline.Should().ContainSingle();
 	}
 
 	[Fact]
@@ -103,11 +108,13 @@ public class CaseAuthBoundaryTests
 
 		var response = await client.PostAsync($"/cases/{id}/unassign", content: null, cancellationToken);
 
-		Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.OK);
 		var persisted = await factory.Persistence.GetByIdAsync(id, cancellationToken);
-		Assert.Null(persisted!.AssignedToId);
-		Assert.Equal(1, persisted.Version);
-		Assert.Single(persisted.Timeline);
+		persisted.Should().NotBeNull();
+
+		using var scope = new AssertionScope();
+		persisted!.Should().BeEquivalentTo(new { AssignedToId = (string?)null, Version = 1 });
+		persisted.Timeline.Should().ContainSingle();
 	}
 
 	// Coverage for "RBAC lives in the frontend now" (no ownership gate on

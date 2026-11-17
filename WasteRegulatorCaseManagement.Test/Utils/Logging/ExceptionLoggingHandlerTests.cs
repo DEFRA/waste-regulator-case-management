@@ -1,3 +1,4 @@
+using AwesomeAssertions.Execution;
 using WasteRegulatorCaseManagement.Utils.Logging;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
@@ -25,9 +26,10 @@ public class ExceptionLoggingHandlerTests
 
 		await handler.TryHandleAsync(new DefaultHttpContext(), exception, CancellationToken.None);
 
-		var (level, logged) = Assert.Single(logger.Entries);
-		Assert.Equal(LogLevel.Error, level);
-		Assert.Same(exception, logged);
+		var (level, logged) = logger.Entries.Should().ContainSingle().Subject;
+		using var scope = new AssertionScope();
+		level.Should().Be(LogLevel.Error);
+		logged.Should().BeSameAs(exception);
 	}
 
 	[Fact]
@@ -42,7 +44,7 @@ public class ExceptionLoggingHandlerTests
 
 		await handler.TryHandleAsync(context, new Exception(), CancellationToken.None);
 
-		Assert.Equal(StatusCodes.Status500InternalServerError, context.Response.StatusCode);
+		context.Response.StatusCode.Should().Be(StatusCodes.Status500InternalServerError);
 	}
 
 	[Fact]
@@ -56,7 +58,7 @@ public class ExceptionLoggingHandlerTests
 
 		var result = await handler.TryHandleAsync(new DefaultHttpContext(), new Exception(), CancellationToken.None);
 
-		Assert.False(result);
+		result.Should().BeFalse();
 	}
 
 	private sealed class CapturingLogger<T> : ILogger<T>

@@ -1,3 +1,4 @@
+using AwesomeAssertions.Execution;
 using WasteRegulatorCaseManagement.Utils.Mongo;
 
 namespace WasteRegulatorCaseManagement.Test.Utils.Mongo;
@@ -23,9 +24,10 @@ public class MongoUriRedactorTests
 	{
 		var redacted = MongoUriRedactor.Redact(input);
 
-		Assert.Equal(expected, redacted);
-		Assert.DoesNotContain("alice", redacted);
-		Assert.DoesNotContain("s3cret", redacted);
+		using var scope = new AssertionScope();
+		redacted.Should().Be(expected);
+		redacted.Should().NotContain("alice");
+		redacted.Should().NotContain("s3cret");
 	}
 
 	[Theory]
@@ -34,13 +36,13 @@ public class MongoUriRedactorTests
 	[InlineData("")]
 	public void Redact_passes_through_uris_without_user_info(string input)
 	{
-		Assert.Equal(input, MongoUriRedactor.Redact(input));
+		MongoUriRedactor.Redact(input).Should().Be(input);
 	}
 
 	[Fact]
 	public void Redact_handles_null()
 	{
-		Assert.Equal(string.Empty, MongoUriRedactor.Redact(null));
+		MongoUriRedactor.Redact(null).Should().Be(string.Empty);
 	}
 
 	[Fact]
@@ -49,6 +51,6 @@ public class MongoUriRedactorTests
 		// '@' inside a query string must not be confused for the
 		// user-info separator.
 		const string input = "mongodb://db.local:27017/mydb?authMechanism=PLAIN&user=foo@bar";
-		Assert.Equal(input, MongoUriRedactor.Redact(input));
+		MongoUriRedactor.Redact(input).Should().Be(input);
 	}
 }

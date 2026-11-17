@@ -27,22 +27,22 @@ public class SwaggerUiGatingTests
 			.AddInMemoryCollection(settings)
 			.Build();
 
-		Assert.Equal(expected, SwaggerUiGating.ShouldEnableSwaggerUi(env, config));
+		SwaggerUiGating.ShouldEnableSwaggerUi(env, config).Should().Be(expected);
 	}
 
 	[Fact]
 	public void ShouldEnableSwaggerUi_throws_when_env_is_null()
 	{
 		var config = new ConfigurationBuilder().Build();
-		Assert.Throws<ArgumentNullException>(() =>
-			SwaggerUiGating.ShouldEnableSwaggerUi(null!, config));
+		var act = () => SwaggerUiGating.ShouldEnableSwaggerUi(null!, config);
+		act.Should().ThrowExactly<ArgumentNullException>();
 	}
 
 	[Fact]
 	public void ShouldEnableSwaggerUi_throws_when_config_is_null()
 	{
 		var env = Substitute.For<IHostEnvironment>();
-		Assert.Throws<ArgumentNullException>(() =>
-			SwaggerUiGating.ShouldEnableSwaggerUi(env, null!));
+		var act = () => SwaggerUiGating.ShouldEnableSwaggerUi(env, null!);
+		act.Should().ThrowExactly<ArgumentNullException>();
 	}
 }

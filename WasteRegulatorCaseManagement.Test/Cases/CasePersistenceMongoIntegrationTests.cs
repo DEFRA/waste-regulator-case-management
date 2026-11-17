@@ -2,6 +2,7 @@ using WasteRegulatorCaseManagement.AuditEvents;
 using WasteRegulatorCaseManagement.Test.TestSupport;
 using WasteRegulatorCaseManagement.Utils.Mongo;
 using WasteRegulatorCaseManagement.Cases;
+using AwesomeAssertions.Execution;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using MongoDB.Bson;
@@ -121,19 +122,27 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
 			caseRecord.Id,
 			TestContext.Current.CancellationToken
 		);
-		Assert.NotNull(fetched);
-		Assert.Equal("re-accreditation", fetched!.CaseType);
-		Assert.Equal("submitted", fetched.StateId);
-		Assert.Equal("client-1", fetched.SubmittedBy);
-		Assert.Equal("test-org", fetched.OrgId);
+		fetched.Should().BeEquivalentTo(
+			new
+			{
+				CaseType = "re-accreditation",
+				StateId = "submitted",
+				SubmittedBy = "client-1",
+				OrgId = "test-org",
+			}
+		);
 
 		var page = await _persistence.QueryAsync(
 			new CaseQuery(),
 			TestContext.Current.CancellationToken
 		);
-		Assert.Equal(1, page.TotalCount);
-		Assert.Single(page.Items);
-		Assert.Equal(caseRecord.Id, page.Items[0].Id);
+		page.Should().BeEquivalentTo(
+			new
+			{
+				TotalCount = 1L,
+				Items = new[] { new { caseRecord.Id } },
+			}
+		);
 	}
 
 	[Fact]
@@ -231,15 +240,14 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
 			caseRecord.Id,
 			TestContext.Current.CancellationToken
 		);
-		Assert.Single(full!.Timeline);
+		full!.Timeline.Should().ContainSingle();
 
 		// QueryAsync is the projected path; the timeline must be empty.
 		var page = await _persistence.QueryAsync(
 			new CaseQuery(),
 			TestContext.Current.CancellationToken
 		);
-		var item = Assert.Single(page.Items);
-		Assert.Empty(item.Timeline);
+		page.Items.Should().ContainSingle().Which.Timeline.Should().BeEmpty();
 	}
 
 	// ─────────────────────── RA-324 filter + sort (real Mongo) ───────────────────────
@@ -277,7 +285,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
 
 		var page = await _persistence.QueryAsync(new CaseQuery(), ct);
 
-		Assert.Equal(s_expectedNewestSubmittedFirst, OrgOrder(page));
+		OrgOrder(page).Should().Equal(s_expectedNewestSubmittedFirst);
 	}
 
 	[Fact]
@@ -294,10 +302,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
 
 		var page = await _persistence.QueryAsync(new CaseQuery(Sort: "status"), ct);
 
-		Assert.Equal(
-			s_expectedStatusRankAscending,
-			page.Items.Select(i => i.StateId).ToArray()
-		);
+		page.Items.Select(i => i.StateId).ToArray().Should().Equal(s_expectedStatusRankAscending);
 	}
 
 	[Fact]
@@ -318,7 +323,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
 
 		// Descending workflow rank: queried(4), assessment-in-progress(2), then
 		// the two submitted(0) items broken newest-first by the tiebreak.
-		Assert.Equal(s_expectedStatusRankDescending, OrgOrder(page));
+		OrgOrder(page).Should().Equal(s_expectedStatusRankDescending);
 	}
 
 	[Fact]
@@ -349,13 +354,12 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
 			ct
 		);
 
-		Assert.Equal(s_expectedFirstPage, OrgOrder(page1));
-		Assert.Equal(s_expectedSecondPage, OrgOrder(page2));
-		Assert.Equal(s_expectedThirdPage, OrgOrder(page3));
-		Assert.Equal(5, page1.TotalCount);
-		Assert.Equal(5, page2.TotalCount);
-		Assert.Equal(2, page1.PageSize);
-		Assert.Equal(2, page2.Page);
+		using var scope = new AssertionScope();
+		OrgOrder(page1).Should().Equal(s_expectedFirstPage);
+		OrgOrder(page2).Should().Equal(s_expectedSecondPage);
+		OrgOrder(page3).Should().Equal(s_expectedThirdPage);
+		page1.Should().BeEquivalentTo(new { TotalCount = 5L, PageSize = 2 });
+		page2.Should().BeEquivalentTo(new { TotalCount = 5L, Page = 2 });
 	}
 
 	[Fact]
@@ -389,11 +393,12 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
 
 		var page = await _persistence.QueryAsync(new CaseQuery(Sort: "status"), ct);
 
-		var got = Assert.Single(page.Items);
+		var got = page.Items.Should().ContainSingle().Subject;
+		using var scope = new AssertionScope();
 		// Projection preserved on the aggregation path, and the computed sort
 		// fields were $unset so the document still deserialises cleanly.
-		Assert.Empty(got.Timeline);
-		Assert.Equal("Acme", got.OrgId);
+		got.Timeline.Should().BeEmpty();
+		got.OrgId.Should().Be("Acme");
 	}
 
 	[Fact]
@@ -409,7 +414,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
 
 		var page = await persistence.QueryAsync(new CaseQuery(Sort: "status"), ct);
 
-		Assert.Equal("only", Assert.Single(page.Items).OrgId);
+		page.Items.Should().ContainSingle().Which.OrgId.Should().Be("only");
 	}
 
 	// RA-412 (self-review): a real-Mongo round trip for the applicant-type
@@ -444,9 +449,8 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
 		stale!.Timeline.Add(NoteEntry(now));
 
 		// Act
-		await Assert.ThrowsAsync<CaseConcurrencyException>(() =>
-			_persistence.ReplaceAsync(stale, cancellationToken)
-		);
+		var act = () => _persistence.ReplaceAsync(stale, cancellationToken);
+		await act.Should().ThrowExactlyAsync<CaseConcurrencyException>();
 
 		// Assert
 		var auditEvents = await _clientFactory
@@ -512,21 +516,20 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
 		await _persistence.ReplaceAsync(fresh, TestContext.Current.CancellationToken);
 
 		stale!.StateId = "approved";
-		var ex = await Assert.ThrowsAsync<CaseConcurrencyException>(() =>
-			_persistence.ReplaceAsync(stale, TestContext.Current.CancellationToken)
-		);
-		Assert.Equal(caseRecord.Id, ex.CaseId);
+		var act = () => _persistence.ReplaceAsync(stale, TestContext.Current.CancellationToken);
+		var ex = (await act.Should().ThrowExactlyAsync<CaseConcurrencyException>()).Which;
+		ex.CaseId.Should().Be(caseRecord.Id);
 
 		// The in-memory version on the failed attempt must roll back so
 		// a caller-side retry does not double-increment.
-		Assert.Equal(0, stale.Version);
+		stale.Version.Should().Be(0);
 
 		// The on-disk document is the winner's value, not the loser's.
 		var final = await _persistence.GetByIdAsync(
 			caseRecord.Id,
 			TestContext.Current.CancellationToken
 		);
-		Assert.Equal("in-progress", final!.StateId);
+		final!.StateId.Should().Be("in-progress");
 	}
 
 	// ------------------- RA-342 legacy snapshot tolerance -------------------
@@ -638,23 +641,27 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
 		// Projected worklist path (CasePersistence.QueryAsync) — the code
 		// path in the reported 500. Must not throw and must return the item.
 		var page = await _persistence.QueryAsync(new CaseQuery(), ct);
-		var listed = Assert.Single(page.Items);
-		Assert.Equal(id, listed.Id);
-		Assert.NotNull(listed.TemplateSnapshot);
 		// Everything else deserialized normally, the stray fields simply ignored.
-		var transition = Assert.Single(listed.TemplateSnapshot!.Transitions);
-		Assert.Equal("approve", transition.ActionId);
-		Assert.Equal("submitted", transition.FromStateId);
+		page.Items.Should().BeEquivalentTo(
+			[
+				new
+				{
+					Id = id,
+					TemplateSnapshot = new
+					{
+						Transitions = new[] { new { ActionId = "approve", FromStateId = "submitted" } },
+					},
+				},
+			]
+		);
 
 		// Single-item fetch path (CasePersistence.GetByIdAsync) must be
 		// equally tolerant.
 		var fetched = await _persistence.GetByIdAsync(id, ct);
-		Assert.NotNull(fetched);
-		Assert.Equal(id, fetched!.Id);
-		Assert.NotNull(fetched.TemplateSnapshot);
-		Assert.Equal(
-			"Submitted",
-			Assert.Single(fetched.TemplateSnapshot!.States, s => s.Id == "submitted").DisplayName
-		);
+		fetched.Should().NotBeNull();
+		fetched!.Id.Should().Be(id);
+		fetched.TemplateSnapshot.Should().NotBeNull();
+		fetched.TemplateSnapshot!.States.Should().ContainSingle(s => s.Id == "submitted")
+			.Which.DisplayName.Should().Be("Submitted");
 	}
 }

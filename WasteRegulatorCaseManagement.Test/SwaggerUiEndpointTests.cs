@@ -1,3 +1,4 @@
+using AwesomeAssertions.Execution;
 using WasteRegulatorCaseManagement.Test.TestSupport;
 using System.Net;
 using WasteRegulatorCaseManagement.Utils.Mongo;
@@ -20,7 +21,7 @@ public class SwaggerUiEndpointTests
 
 		var response = await client.GetAsync("/swagger/index.html", ct);
 
-		Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.OK);
 	}
 
 	[Fact]
@@ -32,16 +33,17 @@ public class SwaggerUiEndpointTests
 
 		var response = await client.GetAsync("/swagger-ui-stub-users.js", ct);
 
-		Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-		Assert.Equal("application/javascript",
-			response.Content.Headers.ContentType?.MediaType);
+		response.StatusCode.Should().Be(HttpStatusCode.OK);
+		response.Content.Headers.ContentType.Should().NotBeNull();
+		response.Content.Headers.ContentType!.MediaType.Should().Be("application/javascript");
 
 		var body = await response.Content.ReadAsStringAsync(ct);
 		// Sanity: contains the dropdown-mount marker and one of the stub
 		// user ids embedded in the JS bundle, confirming the asset that
 		// monkey-patches window.fetch with CDP trust headers is wired up.
-		Assert.Contains("stub-user-picker", body, StringComparison.Ordinal);
-		Assert.Contains("stub-caseworker-1", body, StringComparison.Ordinal);
+		using var scope = new AssertionScope();
+		body.Should().Contain("stub-user-picker");
+		body.Should().Contain("stub-caseworker-1");
 	}
 
 	[Fact]
@@ -55,10 +57,10 @@ public class SwaggerUiEndpointTests
 		// unless an operator explicitly opts in via Swagger:Enabled. Both
 		// the explorer page and the stub-user picker JS asset must 404.
 		var ui = await client.GetAsync("/swagger/index.html", ct);
-		Assert.Equal(HttpStatusCode.NotFound, ui.StatusCode);
+		ui.StatusCode.Should().Be(HttpStatusCode.NotFound);
 
 		var script = await client.GetAsync("/swagger-ui-stub-users.js", ct);
-		Assert.Equal(HttpStatusCode.NotFound, script.StatusCode);
+		script.StatusCode.Should().Be(HttpStatusCode.NotFound);
 	}
 
 	[Fact]
@@ -69,7 +71,7 @@ public class SwaggerUiEndpointTests
 		using var client = factory.CreateClient();
 
 		var ui = await client.GetAsync("/swagger/index.html", ct);
-		Assert.Equal(HttpStatusCode.OK, ui.StatusCode);
+		ui.StatusCode.Should().Be(HttpStatusCode.OK);
 	}
 
 	private class SwaggerFactory : WebApplicationFactory<Program>

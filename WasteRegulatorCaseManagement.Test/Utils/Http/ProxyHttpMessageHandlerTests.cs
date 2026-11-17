@@ -1,4 +1,5 @@
 using System.Net;
+using AwesomeAssertions.Execution;
 using WasteRegulatorCaseManagement.Utils.Http;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -21,15 +22,19 @@ public class ProxyHttpMessageHandlerTests
 		var (address, credentials) = ProxyHttpMessageHandler.ParseProxyUri(
 			"http://alice:s3cret@proxy.local:3128");
 
-		Assert.Empty(address.UserInfo);
-		Assert.DoesNotContain("alice", address.ToString());
-		Assert.DoesNotContain("s3cret", address.ToString());
-		Assert.Equal("proxy.local", address.Host);
-		Assert.Equal(3128, address.Port);
+		credentials.Should().NotBeNull();
 
-		Assert.NotNull(credentials);
-		Assert.Equal("alice", credentials!.UserName);
-		Assert.Equal("s3cret", credentials.Password);
+		using var scope = new AssertionScope();
+		address.Should().BeEquivalentTo(new
+		{
+			UserInfo = "",
+			Host = "proxy.local",
+			Port = 3128,
+		});
+		address.ToString().Should().NotContain("alice").And.NotContain("s3cret");
+
+		credentials!.UserName.Should().Be("alice");
+		credentials.Password.Should().Be("s3cret");
 	}
 
 	[Fact]
@@ -40,10 +45,12 @@ public class ProxyHttpMessageHandlerTests
 		var (address, credentials) = ProxyHttpMessageHandler.ParseProxyUri(
 			"http://alice%40corp:p%40ss%2Fw%3Ard@proxy.local:3128");
 
-		Assert.Empty(address.UserInfo);
-		Assert.NotNull(credentials);
-		Assert.Equal("alice@corp", credentials!.UserName);
-		Assert.Equal("p@ss/w:rd", credentials.Password);
+		credentials.Should().NotBeNull();
+
+		using var scope = new AssertionScope();
+		address.UserInfo.Should().BeEmpty();
+		credentials!.UserName.Should().Be("alice@corp");
+		credentials.Password.Should().Be("p@ss/w:rd");
 	}
 
 	[Fact]
@@ -52,10 +59,14 @@ public class ProxyHttpMessageHandlerTests
 		var (address, credentials) = ProxyHttpMessageHandler.ParseProxyUri(
 			"http://proxy.local:3128");
 
-		Assert.Empty(address.UserInfo);
-		Assert.Equal("proxy.local", address.Host);
-		Assert.Equal(3128, address.Port);
-		Assert.Null(credentials);
+		using var scope = new AssertionScope();
+		address.Should().BeEquivalentTo(new
+		{
+			UserInfo = "",
+			Host = "proxy.local",
+			Port = 3128,
+		});
+		credentials.Should().BeNull();
 	}
 
 	[Fact]
@@ -70,15 +81,17 @@ public class ProxyHttpMessageHandlerTests
 			Microsoft.Extensions.Logging.Abstractions.NullLogger<ProxyHttpMessageHandler>.Instance,
 			"http://alice:s3cret@proxy.local:3128");
 
-		var webProxy = Assert.IsType<WebProxy>(handler.Proxy);
-		Assert.NotNull(webProxy.Address);
-		Assert.Empty(webProxy.Address!.UserInfo);
-		Assert.DoesNotContain("s3cret", webProxy.Address.ToString());
+		var webProxy = handler.Proxy.Should().BeOfType<WebProxy>().Subject;
+		webProxy.Address.Should().NotBeNull();
+		var credentials = webProxy.Credentials.Should().BeOfType<NetworkCredential>().Subject;
 
-		var credentials = Assert.IsType<NetworkCredential>(webProxy.Credentials);
-		Assert.Equal("alice", credentials.UserName);
-		Assert.Equal("s3cret", credentials.Password);
-		Assert.True(handler.UseProxy);
+		using var scope = new AssertionScope();
+		webProxy.Address!.UserInfo.Should().BeEmpty();
+		webProxy.Address.ToString().Should().NotContain("s3cret");
+
+		credentials.UserName.Should().Be("alice");
+		credentials.Password.Should().Be("s3cret");
+		handler.UseProxy.Should().BeTrue();
 	}
 
 	[Fact]
@@ -88,7 +101,7 @@ public class ProxyHttpMessageHandlerTests
 			Microsoft.Extensions.Logging.Abstractions.NullLogger<ProxyHttpMessageHandler>.Instance,
 			proxyUri: null);
 
-		Assert.False(handler.UseProxy);
+		handler.UseProxy.Should().BeFalse();
 	}
 
 	// ---------------------- HTTPS_PROXY / NO_PROXY ----------------------
@@ -106,7 +119,7 @@ public class ProxyHttpMessageHandlerTests
 		using var _h = new ScopedEnvironmentVariable("HTTPS_PROXY", "http://https-proxy.local:8443");
 		using var _l = new ScopedEnvironmentVariable("HTTP_PROXY", "http://http-proxy.local:3128");
 
-		Assert.Equal("http://https-proxy.local:8443", ProxyHttpMessageHandler.ResolveProxyEnvironmentValue());
+		ProxyHttpMessageHandler.ResolveProxyEnvironmentValue().Should().Be("http://https-proxy.local:8443");
 	}
 
 	[Fact]
@@ -117,7 +130,7 @@ public class ProxyHttpMessageHandlerTests
 		using var _l2 = new ScopedEnvironmentVariable("http_proxy", null);
 		using var _l = new ScopedEnvironmentVariable("HTTP_PROXY", "http://http-proxy.local:3128");
 
-		Assert.Equal("http://http-proxy.local:3128", ProxyHttpMessageHandler.ResolveProxyEnvironmentValue());
+		ProxyHttpMessageHandler.ResolveProxyEnvironmentValue().Should().Be("http://http-proxy.local:3128");
 	}
 
 	[Fact]
@@ -130,7 +143,7 @@ public class ProxyHttpMessageHandlerTests
 		using var _l = new ScopedEnvironmentVariable("HTTP_PROXY", null);
 		using var _l2 = new ScopedEnvironmentVariable("http_proxy", null);
 
-		Assert.Equal("http://lower-https.local:8443", ProxyHttpMessageHandler.ResolveProxyEnvironmentValue());
+		ProxyHttpMessageHandler.ResolveProxyEnvironmentValue().Should().Be("http://lower-https.local:8443");
 	}
 
 	[Fact]
@@ -141,7 +154,7 @@ public class ProxyHttpMessageHandlerTests
 		using var _l = new ScopedEnvironmentVariable("HTTP_PROXY", null);
 		using var _l2 = new ScopedEnvironmentVariable("http_proxy", null);
 
-		Assert.Null(ProxyHttpMessageHandler.ResolveProxyEnvironmentValue());
+		ProxyHttpMessageHandler.ResolveProxyEnvironmentValue().Should().BeNull();
 	}
 
 	[Fact]
@@ -154,7 +167,7 @@ public class ProxyHttpMessageHandlerTests
 		using var _h = new ScopedEnvironmentVariable("HTTPS_PROXY", "");
 		using var _l = new ScopedEnvironmentVariable("HTTP_PROXY", "http://http-proxy.local:3128");
 
-		Assert.Equal("http://http-proxy.local:3128", ProxyHttpMessageHandler.ResolveProxyEnvironmentValue());
+		ProxyHttpMessageHandler.ResolveProxyEnvironmentValue().Should().Be("http://http-proxy.local:3128");
 	}
 
 	[Fact]
@@ -165,14 +178,15 @@ public class ProxyHttpMessageHandlerTests
 			"http://proxy.local:3128",
 			noProxy: "internal.example, .corp.example, localhost");
 
-		var webProxy = Assert.IsType<WebProxy>(handler.Proxy);
+		var webProxy = handler.Proxy.Should().BeOfType<WebProxy>().Subject;
 		// BypassList is built; concrete pattern strings are an
 		// implementation detail, but the bypass behaviour is observable
 		// via WebProxy.IsBypassed.
-		Assert.True(webProxy.IsBypassed(new Uri("https://api.internal.example/v1")));
-		Assert.True(webProxy.IsBypassed(new Uri("https://corp.example/")));
-		Assert.True(webProxy.IsBypassed(new Uri("https://anything.corp.example/")));
-		Assert.False(webProxy.IsBypassed(new Uri("https://api.elsewhere.example/")));
+		using var scope = new AssertionScope();
+		webProxy.IsBypassed(new Uri("https://api.internal.example/v1")).Should().BeTrue();
+		webProxy.IsBypassed(new Uri("https://corp.example/")).Should().BeTrue();
+		webProxy.IsBypassed(new Uri("https://anything.corp.example/")).Should().BeTrue();
+		webProxy.IsBypassed(new Uri("https://api.elsewhere.example/")).Should().BeFalse();
 	}
 
 	[Fact]
@@ -183,9 +197,10 @@ public class ProxyHttpMessageHandlerTests
 			"http://proxy.local:3128",
 			noProxy: "*");
 
-		var webProxy = Assert.IsType<WebProxy>(handler.Proxy);
-		Assert.True(webProxy.IsBypassed(new Uri("https://api.elsewhere.example/")));
-		Assert.True(webProxy.IsBypassed(new Uri("https://internal.corp/")));
+		var webProxy = handler.Proxy.Should().BeOfType<WebProxy>().Subject;
+		using var scope = new AssertionScope();
+		webProxy.IsBypassed(new Uri("https://api.elsewhere.example/")).Should().BeTrue();
+		webProxy.IsBypassed(new Uri("https://internal.corp/")).Should().BeTrue();
 	}
 
 	[Fact]
@@ -196,8 +211,8 @@ public class ProxyHttpMessageHandlerTests
 			"http://proxy.local:3128",
 			noProxy: null);
 
-		var webProxy = Assert.IsType<WebProxy>(handler.Proxy);
-		Assert.False(webProxy.IsBypassed(new Uri("https://api.elsewhere.example/")));
+		var webProxy = handler.Proxy.Should().BeOfType<WebProxy>().Subject;
+		webProxy.IsBypassed(new Uri("https://api.elsewhere.example/")).Should().BeFalse();
 	}
 
 	// ---------------------- fail-closed in non-Development ----------------------
@@ -220,14 +235,16 @@ public class ProxyHttpMessageHandlerTests
 		using var _l2 = new ScopedEnvironmentVariable("http_proxy", null);
 		var env = HostEnvironment("Production");
 
-		var ex = Assert.Throws<InvalidOperationException>(() =>
-			new ProxyHttpMessageHandler(NullLogger<ProxyHttpMessageHandler>.Instance, env));
+		var act = () =>
+			new ProxyHttpMessageHandler(NullLogger<ProxyHttpMessageHandler>.Instance, env);
+		var ex = act.Should().ThrowExactly<InvalidOperationException>().Which;
 
 		// Message must name the missing env vars and the offending
 		// environment so the failure is actionable in CDP logs.
-		Assert.Contains("HTTPS_PROXY", ex.Message);
-		Assert.Contains("HTTP_PROXY", ex.Message);
-		Assert.Contains("Production", ex.Message);
+		using var scope = new AssertionScope();
+		ex.Message.Should().Contain("HTTPS_PROXY");
+		ex.Message.Should().Contain("HTTP_PROXY");
+		ex.Message.Should().Contain("Production");
 	}
 
 	[Theory]
@@ -246,8 +263,9 @@ public class ProxyHttpMessageHandlerTests
 		using var _l2 = new ScopedEnvironmentVariable("http_proxy", null);
 		var env = HostEnvironment(envName);
 
-		Assert.Throws<InvalidOperationException>(() =>
-			new ProxyHttpMessageHandler(NullLogger<ProxyHttpMessageHandler>.Instance, env));
+		var act = () =>
+			new ProxyHttpMessageHandler(NullLogger<ProxyHttpMessageHandler>.Instance, env);
+		act.Should().ThrowExactly<InvalidOperationException>();
 	}
 
 	[Fact]
@@ -263,7 +281,7 @@ public class ProxyHttpMessageHandlerTests
 		using var handler = new ProxyHttpMessageHandler(
 			NullLogger<ProxyHttpMessageHandler>.Instance, env);
 
-		Assert.False(handler.UseProxy);
+		handler.UseProxy.Should().BeFalse();
 	}
 
 	[Fact]
@@ -278,9 +296,9 @@ public class ProxyHttpMessageHandlerTests
 		using var handler = new ProxyHttpMessageHandler(
 			NullLogger<ProxyHttpMessageHandler>.Instance, env);
 
-		Assert.True(handler.UseProxy);
-		var webProxy = Assert.IsType<WebProxy>(handler.Proxy);
-		Assert.Equal("proxy.local", webProxy.Address!.Host);
+		handler.UseProxy.Should().BeTrue();
+		var webProxy = handler.Proxy.Should().BeOfType<WebProxy>().Subject;
+		webProxy.Address!.Host.Should().Be("proxy.local");
 	}
 
 	private static IHostEnvironment HostEnvironment(string envName)
@@ -306,8 +324,8 @@ public class ProxyHttpMessageHandlerTests
 		const string secret = "s3cret";
 		var malformed = $"http://{user}:{secret}@proxy.local:port-not-a-number";
 
-		var ex = Assert.Throws<InvalidOperationException>(
-			() => ProxyHttpMessageHandler.ParseProxyUri(malformed));
+		var act = () => ProxyHttpMessageHandler.ParseProxyUri(malformed);
+		var ex = act.Should().ThrowExactly<InvalidOperationException>().Which;
 
 		AssertNoCredentialLeak(ex, user, secret);
 	}
@@ -315,17 +333,15 @@ public class ProxyHttpMessageHandlerTests
 	[Fact]
 	public void RedactProxyUri_replaces_user_info_with_asterisks()
 	{
-		Assert.Equal(
-			"http://***:***@proxy.local:3128/path",
-			ProxyHttpMessageHandler.RedactProxyUri("http://alice:s3cret@proxy.local:3128/path"));
+		ProxyHttpMessageHandler.RedactProxyUri("http://alice:s3cret@proxy.local:3128/path")
+			.Should().Be("http://***:***@proxy.local:3128/path");
 	}
 
 	[Fact]
 	public void RedactProxyUri_leaves_uri_without_credentials_unchanged()
 	{
-		Assert.Equal(
-			"http://proxy.local:3128/",
-			ProxyHttpMessageHandler.RedactProxyUri("http://proxy.local:3128/"));
+		ProxyHttpMessageHandler.RedactProxyUri("http://proxy.local:3128/")
+			.Should().Be("http://proxy.local:3128/");
 	}
 
 	[Fact]
@@ -333,20 +349,19 @@ public class ProxyHttpMessageHandlerTests
 	{
 		// The '@' here is in the path, not in the authority. The
 		// redactor must not over-redact and turn this into "***:***@".
-		Assert.Equal(
-			"http://proxy.local:3128/dir@thing",
-			ProxyHttpMessageHandler.RedactProxyUri("http://proxy.local:3128/dir@thing"));
+		ProxyHttpMessageHandler.RedactProxyUri("http://proxy.local:3128/dir@thing")
+			.Should().Be("http://proxy.local:3128/dir@thing");
 	}
 
 	private static void AssertNoCredentialLeak(Exception ex, string user, string secret)
 	{
 		for (var current = ex; current is not null; current = current.InnerException)
 		{
-			Assert.DoesNotContain(secret, current.Message);
-			Assert.DoesNotContain(user, current.Message);
+			current.Message.Should().NotContain(secret);
+			current.Message.Should().NotContain(user);
 			if (current.StackTrace is { } stack)
 			{
-				Assert.DoesNotContain(secret, stack);
+				stack.Should().NotContain(secret);
 			}
 		}
 	}
@@ -363,9 +378,10 @@ public class ProxyHttpMessageHandlerTests
 	[Fact]
 	public void BuildDefaultProxy_returns_null_when_no_proxy_uri_provided()
 	{
-		Assert.Null(ProxyHttpMessageHandler.BuildDefaultProxy(proxyUri: null, noProxy: null));
-		Assert.Null(ProxyHttpMessageHandler.BuildDefaultProxy(proxyUri: "", noProxy: null));
-		Assert.Null(ProxyHttpMessageHandler.BuildDefaultProxy(proxyUri: "   ", noProxy: null));
+		using var scope = new AssertionScope();
+		ProxyHttpMessageHandler.BuildDefaultProxy(proxyUri: null, noProxy: null).Should().BeNull();
+		ProxyHttpMessageHandler.BuildDefaultProxy(proxyUri: "", noProxy: null).Should().BeNull();
+		ProxyHttpMessageHandler.BuildDefaultProxy(proxyUri: "   ", noProxy: null).Should().BeNull();
 	}
 
 	[Fact]
@@ -374,10 +390,16 @@ public class ProxyHttpMessageHandlerTests
 		var proxy = ProxyHttpMessageHandler.BuildDefaultProxy(
 			proxyUri: "http://proxy.local:3128", noProxy: null);
 
-		var webProxy = Assert.IsType<WebProxy>(proxy);
-		Assert.Equal("proxy.local", webProxy.Address!.Host);
-		Assert.Equal(3128, webProxy.Address.Port);
-		Assert.True(webProxy.BypassProxyOnLocal);
+		var webProxy = proxy.Should().BeOfType<WebProxy>().Subject;
+		webProxy.Address.Should().NotBeNull();
+
+		using var scope = new AssertionScope();
+		webProxy.Address!.Should().BeEquivalentTo(new
+		{
+			Host = "proxy.local",
+			Port = 3128,
+		});
+		webProxy.BypassProxyOnLocal.Should().BeTrue();
 	}
 
 	[Fact]
@@ -389,13 +411,16 @@ public class ProxyHttpMessageHandlerTests
 		var proxy = ProxyHttpMessageHandler.BuildDefaultProxy(
 			proxyUri: "http://alice:s3cret@proxy.local:3128", noProxy: null);
 
-		var webProxy = Assert.IsType<WebProxy>(proxy);
-		Assert.Empty(webProxy.Address!.UserInfo);
-		Assert.DoesNotContain("s3cret", webProxy.Address.ToString());
+		var webProxy = proxy.Should().BeOfType<WebProxy>().Subject;
+		webProxy.Address.Should().NotBeNull();
+		var credentials = webProxy.Credentials.Should().BeOfType<NetworkCredential>().Subject;
 
-		var credentials = Assert.IsType<NetworkCredential>(webProxy.Credentials);
-		Assert.Equal("alice", credentials.UserName);
-		Assert.Equal("s3cret", credentials.Password);
+		using var scope = new AssertionScope();
+		webProxy.Address!.UserInfo.Should().BeEmpty();
+		webProxy.Address.ToString().Should().NotContain("s3cret");
+
+		credentials.UserName.Should().Be("alice");
+		credentials.Password.Should().Be("s3cret");
 	}
 
 	[Fact]
@@ -405,10 +430,11 @@ public class ProxyHttpMessageHandlerTests
 			proxyUri: "http://proxy.local:3128",
 			noProxy: "internal.example, .corp.example");
 
-		var webProxy = Assert.IsType<WebProxy>(proxy);
-		Assert.True(webProxy.IsBypassed(new Uri("https://api.internal.example/v1")));
-		Assert.True(webProxy.IsBypassed(new Uri("https://anything.corp.example/")));
-		Assert.False(webProxy.IsBypassed(new Uri("https://api.notifications.service.gov.uk/")));
+		var webProxy = proxy.Should().BeOfType<WebProxy>().Subject;
+		using var scope = new AssertionScope();
+		webProxy.IsBypassed(new Uri("https://api.internal.example/v1")).Should().BeTrue();
+		webProxy.IsBypassed(new Uri("https://anything.corp.example/")).Should().BeTrue();
+		webProxy.IsBypassed(new Uri("https://api.notifications.service.gov.uk/")).Should().BeFalse();
 	}
 
 	[Fact]
@@ -417,8 +443,8 @@ public class ProxyHttpMessageHandlerTests
 		var proxy = ProxyHttpMessageHandler.BuildDefaultProxy(
 			proxyUri: "http://proxy.local:3128", noProxy: null);
 
-		var webProxy = Assert.IsType<WebProxy>(proxy);
-		Assert.False(webProxy.IsBypassed(new Uri("https://api.notifications.service.gov.uk/")));
+		var webProxy = proxy.Should().BeOfType<WebProxy>().Subject;
+		webProxy.IsBypassed(new Uri("https://api.notifications.service.gov.uk/")).Should().BeFalse();
 	}
 
 	[Fact]
@@ -433,9 +459,12 @@ public class ProxyHttpMessageHandlerTests
 
 		var proxy = ProxyHttpMessageHandler.BuildDefaultProxy();
 
-		var webProxy = Assert.IsType<WebProxy>(proxy);
-		Assert.Equal("proxy.local", webProxy.Address!.Host);
-		Assert.True(webProxy.IsBypassed(new Uri("https://internal.example/")));
+		var webProxy = proxy.Should().BeOfType<WebProxy>().Subject;
+		webProxy.Address.Should().NotBeNull();
+
+		using var scope = new AssertionScope();
+		webProxy.Address!.Host.Should().Be("proxy.local");
+		webProxy.IsBypassed(new Uri("https://internal.example/")).Should().BeTrue();
 	}
 
 	[Fact]
@@ -446,7 +475,7 @@ public class ProxyHttpMessageHandlerTests
 		using var _l = new ScopedEnvironmentVariable("HTTP_PROXY", null);
 		using var _l2 = new ScopedEnvironmentVariable("http_proxy", null);
 
-		Assert.Null(ProxyHttpMessageHandler.BuildDefaultProxy());
+		ProxyHttpMessageHandler.BuildDefaultProxy().Should().BeNull();
 	}
 }
 

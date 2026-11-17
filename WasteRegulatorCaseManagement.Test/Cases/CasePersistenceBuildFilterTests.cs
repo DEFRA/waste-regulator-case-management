@@ -1,4 +1,5 @@
 using WasteRegulatorCaseManagement.Cases;
+using AwesomeAssertions.Execution;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 using MongoDB.Driver;
@@ -40,7 +41,7 @@ public class CasePersistenceBuildFilterTests
 		// kept withdrawn applications off the regulator's worklist.
 		var doc = Render(new CaseQuery());
 
-		Assert.Equal(new BsonDocument(), doc);
+		doc.Should().BeEmpty();
 	}
 
 	[Theory]
@@ -53,7 +54,7 @@ public class CasePersistenceBuildFilterTests
 		// filter may exclude a terminal state.
 		var doc = Render(new CaseQuery());
 
-		Assert.DoesNotContain(terminalStateId, doc.ToJson());
+		doc.ToJson().Should().NotContain(terminalStateId);
 	}
 
 	[Fact]
@@ -63,7 +64,7 @@ public class CasePersistenceBuildFilterTests
 
 		var expected = new BsonDocument("caseType", new BsonDocument("$in",
 			new BsonArray { "re-accreditation", "registration" }));
-		Assert.Equal(expected, doc);
+		doc.Should().BeEquivalentTo(expected);
 	}
 
 	[Fact]
@@ -75,7 +76,7 @@ public class CasePersistenceBuildFilterTests
 
 		var expected = new BsonDocument("stateId", new BsonDocument("$in",
 			new BsonArray { "submitted", "in-review" }));
-		Assert.Equal(expected, doc);
+		doc.Should().BeEquivalentTo(expected);
 	}
 
 	[Theory]
@@ -91,8 +92,9 @@ public class CasePersistenceBuildFilterTests
 		var doc = Render(new CaseQuery(StateIds: new[] { terminalStateId }));
 
 		var stateDoc = doc["stateId"].AsBsonDocument;
-		Assert.Equal(terminalStateId, stateDoc["$in"].AsBsonArray[0].AsString);
-		Assert.False(stateDoc.Contains("$nin"), "RA-313: no terminal-state exclusion.");
+		using var scope = new AssertionScope();
+		stateDoc["$in"].AsBsonArray[0].AsString.Should().Be(terminalStateId);
+		stateDoc.Contains("$nin").Should().BeFalse("RA-313: no terminal-state exclusion.");
 	}
 
 	[Fact]
@@ -101,8 +103,9 @@ public class CasePersistenceBuildFilterTests
 		var doc = Render(new CaseQuery(StateIds: s_stateIdsWithdrawnAndSubmitted));
 
 		var selected = doc["stateId"]["$in"].AsBsonArray.Select(v => v.AsString).ToList();
-		Assert.Equal(s_stateIdsWithdrawnAndSubmitted, selected);
-		Assert.False(doc["stateId"].AsBsonDocument.Contains("$nin"), "RA-313: no terminal-state exclusion.");
+		using var scope = new AssertionScope();
+		selected.Should().Equal(s_stateIdsWithdrawnAndSubmitted);
+		doc["stateId"].AsBsonDocument.Contains("$nin").Should().BeFalse("RA-313: no terminal-state exclusion.");
 	}
 
 	[Fact]
@@ -121,8 +124,9 @@ public class CasePersistenceBuildFilterTests
 		var rendered = doc["_id"].AsBsonRegularExpression.Pattern;
 		// Regex.Escape backslash-escapes the metacharacters; the literal
 		// dot must not be interpreted as "any char".
-		Assert.Contains(@"\.", rendered);
-		Assert.Contains(@"\*", rendered);
+		using var scope = new AssertionScope();
+		rendered.Should().Contain(@"\.");
+		rendered.Should().Contain(@"\*");
 	}
 
 	[Fact]
@@ -130,7 +134,7 @@ public class CasePersistenceBuildFilterTests
 	{
 		var doc = Render(new CaseQuery(Search: "   "));
 
-		Assert.Equal(new BsonDocument(), doc);
+		doc.Should().BeEmpty();
 	}
 
 	[Fact]
@@ -138,7 +142,7 @@ public class CasePersistenceBuildFilterTests
 	{
 		var doc = Render(new CaseQuery(AssigneeId: " user-1 "));
 
-		Assert.Equal("user-1", doc["assignedToId"].AsString);
+		doc["assignedToId"].AsString.Should().Be("user-1");
 	}
 
 	[Fact]
@@ -146,7 +150,7 @@ public class CasePersistenceBuildFilterTests
 	{
 		var doc = Render(new CaseQuery(UnassignedOnly: true));
 
-		Assert.Equal(BsonNull.Value, doc["assignedToId"]);
+		doc["assignedToId"].Should().Be(BsonNull.Value);
 	}
 
 	[Fact]
@@ -155,9 +159,10 @@ public class CasePersistenceBuildFilterTests
 		var doc = Render(new CaseQuery(AssigneeId: "user-1", UnassignedOnly: true));
 
 		var or = doc["$or"].AsBsonArray;
-		Assert.Equal(2, or.Count);
-		Assert.Equal("user-1", or[0]["assignedToId"].AsString);
-		Assert.Equal(BsonNull.Value, or[1]["assignedToId"]);
+		or.Count.Should().Be(2);
+		using var scope = new AssertionScope();
+		or[0]["assignedToId"].AsString.Should().Be("user-1");
+		or[1]["assignedToId"].Should().Be(BsonNull.Value);
 	}
 
 	[Fact]
@@ -165,7 +170,7 @@ public class CasePersistenceBuildFilterTests
 	{
 		var doc = Render(new CaseQuery(AssigneeId: "   "));
 
-		Assert.Equal(new BsonDocument(), doc);
+		doc.Should().BeEmpty();
 	}
 
 	[Fact]
@@ -176,8 +181,9 @@ public class CasePersistenceBuildFilterTests
 			StateIds: s_stateIdsSubmitted,
 			AssigneeId: "user-1"));
 
-		Assert.Equal("re-accreditation", doc["caseType"]["$in"].AsBsonArray[0].AsString);
-		Assert.Equal("submitted", doc["stateId"]["$in"].AsBsonArray[0].AsString);
-		Assert.Equal("user-1", doc["assignedToId"].AsString);
+		using var scope = new AssertionScope();
+		doc["caseType"]["$in"].AsBsonArray[0].AsString.Should().Be("re-accreditation");
+		doc["stateId"]["$in"].AsBsonArray[0].AsString.Should().Be("submitted");
+		doc["assignedToId"].AsString.Should().Be("user-1");
 	}
 }

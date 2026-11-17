@@ -45,12 +45,12 @@ public class ProblemDetailsExceptionHandlerTests
 
 		var response = await client.GetAsync("/cases", ct);
 
-		Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
-		Assert.Equal("application/problem+json",
-			response.Content.Headers.ContentType?.MediaType);
+		response.StatusCode.Should().Be(HttpStatusCode.InternalServerError);
+		response.Content.Headers.ContentType.Should().NotBeNull();
+		response.Content.Headers.ContentType!.MediaType.Should().Be("application/problem+json");
 		var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(ct);
-		Assert.NotNull(problem);
-		Assert.Equal(StatusCodes.Status500InternalServerError, problem!.Status);
+		problem.Should().NotBeNull();
+		problem!.Status.Should().Be(StatusCodes.Status500InternalServerError);
 	}
 
 	private sealed class ThrowingFactory(MongoIntegrationFixture fixture) : WebApplicationFactory<Program>

@@ -1,3 +1,4 @@
+using AwesomeAssertions.Execution;
 using System.Security.Claims;
 using WasteRegulatorCaseManagement.Utils.Logging;
 using Microsoft.AspNetCore.Http;
@@ -35,7 +36,7 @@ public class CdpLoggingTests
 
 		CdpLogging.Configuration(ctx, provider, new LoggerConfiguration());
 
-		Assert.Contains(typeof(IHttpContextAccessor), provider.RequestedServices);
+		provider.RequestedServices.Should().Contain(typeof(IHttpContextAccessor));
 	}
 
 	[Fact]
@@ -49,9 +50,9 @@ public class CdpLoggingTests
 		var emptyProvider = new ServiceCollection().BuildServiceProvider();
 		var ctx = NewHostBuilderContext();
 
-		Assert.Throws<InvalidOperationException>(() =>
-			CdpLogging.Configuration(ctx, emptyProvider, new LoggerConfiguration())
-		);
+		var act = () =>
+			CdpLogging.Configuration(ctx, emptyProvider, new LoggerConfiguration());
+		act.Should().ThrowExactly<InvalidOperationException>();
 	}
 
 	/// <summary>
@@ -94,8 +95,9 @@ public class CdpLoggingTests
 		}
 
 		var output = capturedOutput.ToString();
-		Assert.Contains(PiiRedactionEnricher.RedactedValue, output);
-		Assert.DoesNotContain("person@example.com", output);
+		using var scope = new AssertionScope();
+		output.Should().Contain(PiiRedactionEnricher.RedactedValue);
+		output.Should().NotContain("person@example.com");
 	}
 
 	private static HostBuilderContext NewHostBuilderContext(bool withConsoleSink = false) =>

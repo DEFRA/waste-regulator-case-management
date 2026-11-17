@@ -1,3 +1,4 @@
+using AwesomeAssertions.Execution;
 using WasteRegulatorCaseManagement.Health;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -15,8 +16,9 @@ public class RequiredConfigHealthCheckTests
 
 		var result = await CheckHealth(check);
 
-		Assert.Equal(HealthStatus.Healthy, result.Status);
-		Assert.True(string.IsNullOrEmpty(result.Description));
+		using var scope = new AssertionScope();
+		result.Status.Should().Be(HealthStatus.Healthy);
+		result.Description.Should().BeNullOrEmpty();
 	}
 
 	[Fact]
@@ -28,7 +30,7 @@ public class RequiredConfigHealthCheckTests
 
 		var result = await CheckHealth(check);
 
-		Assert.Equal(HealthStatus.Healthy, result.Status);
+		result.Status.Should().Be(HealthStatus.Healthy);
 	}
 
 	[Theory]
@@ -45,8 +47,9 @@ public class RequiredConfigHealthCheckTests
 
 		var result = await CheckHealth(check);
 
-		Assert.Equal(HealthStatus.Unhealthy, result.Status);
-		Assert.Contains(expectedReportedKey, result.Description);
+		using var scope = new AssertionScope();
+		result.Status.Should().Be(HealthStatus.Unhealthy);
+		result.Description.Should().Contain(expectedReportedKey);
 	}
 
 	[Theory]
@@ -60,7 +63,7 @@ public class RequiredConfigHealthCheckTests
 
 		var result = await CheckHealth(check);
 
-		Assert.Equal(HealthStatus.Healthy, result.Status);
+		result.Status.Should().Be(HealthStatus.Healthy);
 	}
 
 	[Fact]
@@ -75,9 +78,10 @@ public class RequiredConfigHealthCheckTests
 
 		var result = await CheckHealth(check);
 
-		Assert.Equal(HealthStatus.Unhealthy, result.Status);
-		Assert.Contains("AUTH_SHARED_SECRET__MANAGEMENT_FE", result.Description);
-		Assert.Contains("AUTH_SHARED_SECRET__CASE_INTAKE", result.Description);
+		using var scope = new AssertionScope();
+		result.Status.Should().Be(HealthStatus.Unhealthy);
+		result.Description.Should().Contain("AUTH_SHARED_SECRET__MANAGEMENT_FE");
+		result.Description.Should().Contain("AUTH_SHARED_SECRET__CASE_INTAKE");
 	}
 
 	private static Dictionary<string, string?> CompleteConfig() =>

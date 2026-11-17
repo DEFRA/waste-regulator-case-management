@@ -52,7 +52,7 @@ public class HeaderPropagationAllowListTests
 		var options = factory.Services
 			.GetRequiredService<IOptions<HeaderPropagationOptions>>().Value;
 
-		Assert.DoesNotContain(options.Headers,
+		options.Headers.Should().NotContain(
 			h => string.Equals(h.CapturedHeaderName, header, StringComparison.OrdinalIgnoreCase));
 	}
 }

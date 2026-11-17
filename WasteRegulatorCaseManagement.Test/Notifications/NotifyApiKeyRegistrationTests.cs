@@ -45,7 +45,7 @@ public class NotifyApiKeyRegistrationTests
 				["NOTIFY_API_KEY"] = NotifyTestConstants.FakeApiKey,
 			});
 
-		Assert.IsType<NoOpNotifyClient>(factory.Services.GetRequiredService<INotifyClient>());
+		factory.Services.GetRequiredService<INotifyClient>().Should().BeOfType<NoOpNotifyClient>();
 	}
 
 	[Fact]
@@ -53,7 +53,7 @@ public class NotifyApiKeyRegistrationTests
 	{
 		using var factory = NewFactory(NotifyTestConstants.FakeApiKey, enabled: false);
 
-		Assert.IsType<NoOpNotifyClient>(factory.Services.GetRequiredService<INotifyClient>());
+		factory.Services.GetRequiredService<INotifyClient>().Should().BeOfType<NoOpNotifyClient>();
 	}
 
 	[Fact]
@@ -61,7 +61,7 @@ public class NotifyApiKeyRegistrationTests
 	{
 		using var factory = NewFactory(NotifyTestConstants.FakeApiKey, enabled: true);
 
-		Assert.IsType<GovukNotifyClient>(factory.Services.GetRequiredService<INotifyClient>());
+		factory.Services.GetRequiredService<INotifyClient>().Should().BeOfType<GovukNotifyClient>();
 	}
 
 	[Fact]
@@ -69,7 +69,7 @@ public class NotifyApiKeyRegistrationTests
 	{
 		using var factory = NewFactory(apiKey: null, enabled: true);
 
-		Assert.IsType<NoOpNotifyClient>(factory.Services.GetRequiredService<INotifyClient>());
+		factory.Services.GetRequiredService<INotifyClient>().Should().BeOfType<NoOpNotifyClient>();
 	}
 
 	// Always set NOTIFY_API_KEY and Notify:Enabled explicitly so an ambient
@@ -120,7 +120,7 @@ public class NotifyApiKeyEnvVarRegistrationTests
 			Environment.SetEnvironmentVariable("NOTIFY_API_KEY", NotifyTestConstants.FakeApiKey);
 
 			using var factory = EnabledFactory("notify-key-env");
-			Assert.IsType<GovukNotifyClient>(factory.Services.GetRequiredService<INotifyClient>());
+			factory.Services.GetRequiredService<INotifyClient>().Should().BeOfType<GovukNotifyClient>();
 		}
 		finally
 		{
@@ -137,7 +137,7 @@ public class NotifyApiKeyEnvVarRegistrationTests
 			Environment.SetEnvironmentVariable("NOTIFY_API_KEY", null);
 
 			using var factory = EnabledFactory("notify-key-env");
-			Assert.IsType<NoOpNotifyClient>(factory.Services.GetRequiredService<INotifyClient>());
+			factory.Services.GetRequiredService<INotifyClient>().Should().BeOfType<NoOpNotifyClient>();
 		}
 		finally
 		{

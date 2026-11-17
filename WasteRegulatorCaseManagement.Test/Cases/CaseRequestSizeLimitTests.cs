@@ -54,8 +54,8 @@ public class CaseRequestSizeLimitTests
 		var sizeLimit = endpoint.Metadata
 			.OfType<Microsoft.AspNetCore.Http.Metadata.IRequestSizeLimitMetadata>()
 			.FirstOrDefault();
-		Assert.NotNull(sizeLimit);
-		Assert.Equal(expectedBytes, sizeLimit!.MaxRequestBodySize);
+		sizeLimit.Should().NotBeNull();
+		sizeLimit!.MaxRequestBodySize.Should().Be(expectedBytes);
 	}
 
 	/// <summary>
@@ -79,8 +79,7 @@ public class CaseRequestSizeLimitTests
 			.Select(e => e.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName ?? e.DisplayName ?? "<unnamed>")
 			.ToArray();
 
-		Assert.True(
-			offenders.Length == 0,
+		offenders.Should().BeEmpty(
 			$"The following endpoints call .DisableValidation() without pairing it with a RequestSizeLimitAttribute: {string.Join(", ", offenders)}");
 	}
 

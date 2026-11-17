@@ -18,6 +18,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using NSubstitute;
 using WasteRegulatorCaseManagement.Auth;
 using NUlid;
+using AwesomeAssertions.Execution;
 
 namespace WasteRegulatorCaseManagement.Test.Cases;
 
@@ -70,7 +71,7 @@ public class CaseEndpointsTests
 			cancellationToken
 		);
 
-		Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 	}
 
 	[Fact]
@@ -86,7 +87,7 @@ public class CaseEndpointsTests
 			cancellationToken
 		);
 
-		Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
 	}
 
 	[Fact]
@@ -102,7 +103,7 @@ public class CaseEndpointsTests
 			cancellationToken
 		);
 
-		Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
 	}
 
 	[Fact]
@@ -118,9 +119,9 @@ public class CaseEndpointsTests
 			cancellationToken
 		);
 
-		Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
 		var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken);
-		Assert.Equal("Unknown case type", problem?.Title);
+		problem!.Title.Should().Be("Unknown case type");
 	}
 
 	[Fact]
@@ -149,43 +150,53 @@ public class CaseEndpointsTests
 			cancellationToken
 		);
 
-		Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.Created);
+		response.Headers.Location.Should().NotBeNull();
+		response.Headers.Location!.AbsolutePath.Should().StartWith("/cases/");
 		var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
-		Assert.NotNull(body);
-
 		var persisted = await factory.Persistence.GetByIdAsync(body!.Id, cancellationToken);
-		Assert.NotNull(persisted);
-		Assert.Equal(CaseType, persisted!.CaseType);
-		Assert.Equal("submitted", persisted.StateId);
-		Assert.Equal("test-client", persisted.SubmittedBy);
-		Assert.Equal("csoc-2024-eng-00123", persisted.SourceSystemId);
-		Assert.Equal("https://source-system.test/declarations/00123", persisted.CallbackUrl);
-		Assert.Equal("ENGLAND", persisted.Nation);
-		Assert.Equal("org-00456", persisted.OrgId);
-		Assert.Equal("DIRECT_PRODUCER", persisted.ProducerType);
-		Assert.Equal(new CaseDisplayField("Acme Packaging Ltd", "string"), persisted.DisplayData["organisationName"]);
+		var expectedDisplayData = new Dictionary<string, CaseDisplayField>
+		{
+			["organisationName"] = new("Acme Packaging Ltd", "string"),
+			["percentageMet"] = new("87.3", "number"),
+		};
 
+		using var scope = new AssertionScope();
 		// Snapshot of the type's template (states, transitions, version)
 		// is frozen onto the case at submission for faithful historical
 		// rendering after the case type's configuration changes.
-		Assert.NotNull(persisted.TemplateSnapshot);
-		Assert.Equal("v1", persisted.TemplateVersion);
-		Assert.Equal("v1", persisted.TemplateSnapshot!.TemplateVersion);
-
-		Assert.NotNull(response.Headers.Location);
-		Assert.StartsWith("/cases/", response.Headers.Location!.AbsolutePath);
-
-		Assert.True(Ulid.TryParse(body.Id, out _), $"'{body.Id}' is not a ULID");
-		Assert.Equal(CaseType, body.CaseType);
-		Assert.Equal("submitted", body.StateId);
-		Assert.False(body.IsTerminal);
-		Assert.Equal("test-client", body.SubmittedBy);
-		Assert.Equal("v1", body.TemplateVersion);
-		Assert.Equal("csoc-2024-eng-00123", body.SourceSystemId);
-		Assert.Equal("ENGLAND", body.Nation);
-		Assert.Equal("org-00456", body.OrgId);
-		Assert.Equal("DIRECT_PRODUCER", body.ProducerType);
-		Assert.Equal(new CaseDisplayField("87.3", "number"), body.DisplayData["percentageMet"]);
+		persisted.Should().BeEquivalentTo(
+			new
+			{
+				CaseType,
+				StateId = "submitted",
+				SubmittedBy = "test-client",
+				SourceSystemId = "csoc-2024-eng-00123",
+				CallbackUrl = "https://source-system.test/declarations/00123",
+				Nation = "ENGLAND",
+				OrgId = "org-00456",
+				ProducerType = "DIRECT_PRODUCER",
+				DisplayData = expectedDisplayData,
+				TemplateVersion = "v1",
+				TemplateSnapshot = new { TemplateVersion = "v1" },
+			}
+		);
+		body.Should().BeEquivalentTo(
+			new
+			{
+				CaseType,
+				StateId = "submitted",
+				IsTerminal = false,
+				SubmittedBy = "test-client",
+				TemplateVersion = "v1",
+				SourceSystemId = "csoc-2024-eng-00123",
+				Nation = "ENGLAND",
+				OrgId = "org-00456",
+				ProducerType = "DIRECT_PRODUCER",
+				DisplayData = expectedDisplayData,
+			}
+		);
+		Ulid.TryParse(body.Id, out _).Should().BeTrue($"'{body.Id}' should be a ULID");
 	}
 
 	[Fact]
@@ -241,29 +252,42 @@ public class CaseEndpointsTests
 			cancellationToken
 		);
 
-		Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.Created);
 		var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
 		var persisted = await factory.Persistence.GetByIdAsync(body!.Id, cancellationToken);
-		Assert.NotNull(persisted);
-		var entry = Assert.Single(persisted!.Timeline);
-		Assert.Equal("case-created", entry.Action);
-		Assert.Equal("Case submitted", entry.ActionDisplayName);
-		Assert.Equal("service:test-client", entry.PerformedById);
-		Assert.Equal("test-client", entry.PerformedByName);
-		Assert.Equal(persisted.SubmittedAt, entry.PerformedAt);
-		Assert.Equal(CaseType, entry.Details["caseType"]);
-		Assert.Equal("submitted", entry.Details["stateId"]);
-		Assert.Equal("submitted", entry.StateId);
+
+		using var scope = new AssertionScope();
 		// Birth event was part of the original CreateAsync (no follow-up
 		// ReplaceAsync), so Version is still 0.
-		Assert.Equal(0, persisted.Version);
-
+		persisted.Should().BeEquivalentTo(
+			new
+			{
+				Version = 0,
+				Timeline = new[]
+				{
+					new
+					{
+						Action = "case-created",
+						ActionDisplayName = "Case submitted",
+						PerformedById = "service:test-client",
+						PerformedByName = "test-client",
+						PerformedAt = persisted?.SubmittedAt,
+						Details = new Dictionary<string, string?>
+						{
+							["caseType"] = CaseType,
+							["stateId"] = "submitted",
+							["templateVersion"] = "v1",
+							["source"] = null,
+							["clientId"] = "test-client",
+						},
+						StateId = "submitted",
+					},
+				},
+			}
+		);
 		// The per-event state snapshot must also survive the wire
 		// projection so the FE can render each entry against its own state.
-		Assert.NotNull(body.Timeline);
-		var wireEntry = Assert.Single(body.Timeline!);
-		Assert.Equal("case-created", wireEntry.Action);
-		Assert.Equal("submitted", wireEntry.StateId);
+		body.Timeline.Should().BeEquivalentTo([new { Action = "case-created", StateId = "submitted" }]);
 	}
 
 	[Fact]
@@ -342,17 +366,25 @@ public class CaseEndpointsTests
 			cancellationToken
 		);
 
-		Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.Created);
 		var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
 		var persisted = await factory.Persistence.GetByIdAsync(body!.Id, cancellationToken);
-		Assert.NotNull(persisted);
-		var entry = Assert.Single(persisted!.Timeline);
-		Assert.Equal("case-created", entry.Action);
-		Assert.Equal(CaseType, entry.Details["caseType"]);
-		Assert.Equal("submitted", entry.Details["stateId"]);
-		Assert.Equal("v1", entry.Details["templateVersion"]);
-		Assert.Equal("operator-fe", entry.Details["source"]);
-		Assert.Equal("test-client", entry.Details["clientId"]);
+		persisted.Should().NotBeNull();
+		var entry = persisted!.Timeline.Should().ContainSingle().Subject;
+		entry.Should().BeEquivalentTo(
+			new
+			{
+				Action = "case-created",
+				Details = new Dictionary<string, string?>
+				{
+					["caseType"] = CaseType,
+					["stateId"] = "submitted",
+					["templateVersion"] = "v1",
+					["source"] = "operator-fe",
+					["clientId"] = "test-client",
+				},
+			}
+		);
 	}
 
 	[Fact]
@@ -377,13 +409,20 @@ public class CaseEndpointsTests
 			cancellationToken
 		);
 
-		Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.Created);
 		var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
 		var persisted = await factory.Persistence.GetByIdAsync(body!.Id, cancellationToken);
-		var entry = Assert.Single(persisted!.Timeline);
-		Assert.True(entry.Details.ContainsKey("source"));
-		Assert.Null(entry.Details["source"]);
-		Assert.Equal("test-client", entry.Details["clientId"]);
+		var entry = persisted!.Timeline.Should().ContainSingle().Subject;
+		entry.Details.Should().BeEquivalentTo(
+			new Dictionary<string, string?>
+			{
+				["caseType"] = CaseType,
+				["stateId"] = "submitted",
+				["templateVersion"] = "v1",
+				["source"] = null,
+				["clientId"] = "test-client",
+			}
+		);
 	}
 
 	[Theory]
@@ -442,11 +481,11 @@ public class CaseEndpointsTests
 			cancellationToken
 		);
 
-		Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.Created);
 		var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
 		var persisted = await factory.Persistence.GetByIdAsync(body!.Id, cancellationToken);
-		Assert.NotNull(persisted);
-		Assert.Empty(persisted!.DisplayData);
+		persisted.Should().NotBeNull();
+		persisted!.DisplayData.Should().BeEmpty();
 	}
 
 	[Fact]
@@ -1098,11 +1137,10 @@ public class CaseEndpointsTests
 		);
 
 		var response = await client.GetAsync($"/cases/{id}", cancellationToken);
-		Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.OK);
 
 		var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
-		Assert.Equal(id, body?.Id);
-		Assert.Equal(CaseType, body?.CaseType);
+		body.Should().BeEquivalentTo(new { Id = id, CaseType });
 	}
 
 	[Fact]
@@ -1113,7 +1151,7 @@ public class CaseEndpointsTests
 		using var client = factory.CreateClient();
 
 		var response = await client.GetAsync($"/cases/{Ulid.NewUlid().ToString()}", cancellationToken);
-		Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.NotFound);
 	}
 
 	[Fact]
@@ -1143,7 +1181,7 @@ public class CaseEndpointsTests
 		);
 
 		var response = await client.GetAsync($"/cases/{id}", cancellationToken);
-		Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.OK);
 	}
 
 	[Fact]
@@ -1340,8 +1378,8 @@ public class CaseEndpointsTests
 			"/cases",
 			cancellationToken
 		);
-		Assert.NotNull(body);
-		Assert.Equal(2, body!.Items.Count);
+		body.Should().NotBeNull();
+		body!.Items.Should().HaveCount(2);
 	}
 
 	[Fact]
@@ -1443,7 +1481,7 @@ public class CaseEndpointsTests
 			),
 		};
 
-		await Assert.ThrowsAsync<InvalidOperationException>(() =>
+		var act = () =>
 			CaseEndpoints.Submit(
 				body,
 				httpContext,
@@ -1451,7 +1489,8 @@ public class CaseEndpointsTests
 				engine,
 				Substitute.For<IStructuredLogger<CaseEndpointsLogger>>(),
 				cancellationToken
-			));
+			);
+		await act.Should().ThrowExactlyAsync<InvalidOperationException>();
 	}
 
 	[Fact]
@@ -1493,11 +1532,8 @@ public class CaseEndpointsTests
 		var result = await CaseEndpoints.Assign(
 			caseId, body, httpContext, engine, cancellationToken);
 
-		var problem = Assert.IsType<ProblemHttpResult>(result.Result);
-		Assert.Equal(
-			Microsoft.AspNetCore.Http.StatusCodes.Status409Conflict,
-			problem.StatusCode
-		);
+		var problem = result.Result.Should().BeOfType<ProblemHttpResult>().Subject;
+		problem.StatusCode.Should().Be(Microsoft.AspNetCore.Http.StatusCodes.Status409Conflict);
 	}
 
 	[Fact]
@@ -1549,12 +1585,14 @@ public class CaseEndpointsTests
 			cancellationToken
 		);
 
-		var problem = Assert.IsType<ProblemHttpResult>(result.Result);
-		Assert.Equal(
-			Microsoft.AspNetCore.Http.StatusCodes.Status400BadRequest,
-			problem.StatusCode
+		var problem = result.Result.Should().BeOfType<ProblemHttpResult>().Subject;
+		problem.Should().BeEquivalentTo(
+			new
+			{
+				StatusCode = Microsoft.AspNetCore.Http.StatusCodes.Status400BadRequest,
+				ProblemDetails = new { Title = "Invalid request" },
+			}
 		);
-		Assert.Equal("Invalid request", problem.ProblemDetails.Title);
 	}
 
 	[Fact]
@@ -1569,10 +1607,10 @@ public class CaseEndpointsTests
 			cancellationToken
 		);
 
-		Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
 		// Persistence must never be hit for an out-of-range page — that's the
 		// whole point of the cap.
-		Assert.Null(factory.Recording.LastQuery);
+		factory.Recording.LastQuery.Should().BeNull();
 	}
 
 	[Fact]
@@ -1615,11 +1653,18 @@ public class CaseEndpointsTests
 			"/cases",
 			cancellationToken
 		);
-		Assert.NotNull(body);
-		Assert.Equal(2, body!.Items.Count);
-		Assert.Equal(2, body.TotalCount);
-		Assert.Equal(1, body.Page);
-		Assert.Equal(CaseQuery.DefaultPageSize, body.PageSize);
+		body.Should().NotBeNull();
+
+		using var scope = new AssertionScope();
+		body!.Items.Should().HaveCount(2);
+		body.Should().BeEquivalentTo(
+			new
+			{
+				TotalCount = 2L,
+				Page = 1,
+				PageSize = CaseQuery.DefaultPageSize,
+			}
+		);
 	}
 
 	[Fact]
@@ -1661,15 +1706,15 @@ public class CaseEndpointsTests
 		await factory.SeedAsync(caseRecord, cancellationToken);
 
 		var response = await client.GetAsync("/cases", cancellationToken);
-		Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.OK);
 
 		// Property-level assertion: the JSON must not even mention
 		// 'timeline' on a list item.
 		var rawJson = await response.Content.ReadAsStringAsync(cancellationToken);
 		var root = System.Text.Json.Nodes.JsonNode.Parse(rawJson);
-		Assert.NotNull(root);
+		root.Should().NotBeNull();
 		var firstItem = root!["items"]!.AsArray()[0]!.AsObject();
-		Assert.False(firstItem.ContainsKey("timeline"), "list item must not include 'timeline'");
+		firstItem.ContainsKey("timeline").Should().BeFalse("list item must not include 'timeline'");
 
 		var body = System.Text.Json.JsonSerializer.Deserialize<CaseListResponse>(
 			rawJson,
@@ -1678,13 +1723,18 @@ public class CaseEndpointsTests
 				PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
 			}
 		);
-		Assert.NotNull(body);
-		var item = Assert.Single(body!.Items);
-		Assert.Equal("alice-1", item.AssignedToId);
-		Assert.Equal("Alice Example", item.AssignedToName);
-		Assert.Equal(assignedAt, item.AssignedAt);
-		Assert.Equal("manager-1", item.AssignedBy);
-		Assert.Equal("submitted", item.StateId);
+		body.Should().NotBeNull();
+		var item = body!.Items.Should().ContainSingle().Subject;
+		item.Should().BeEquivalentTo(
+			new
+			{
+				AssignedToId = "alice-1",
+				AssignedToName = "Alice Example",
+				AssignedAt = assignedAt,
+				AssignedBy = "manager-1",
+				StateId = "submitted",
+			}
+		);
 	}
 
 	[Fact]
@@ -1698,18 +1748,24 @@ public class CaseEndpointsTests
 			"/cases?caseType=re-accreditation&caseType=other-type&stateId=submitted&search=acme&assigneeId=alice-1&unassigned=true&page=2&pageSize=5",
 			cancellationToken
 		);
-		Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.OK);
 
 		var captured = factory.Recording.LastQuery;
-		Assert.NotNull(captured);
-		Assert.NotNull(captured!.CaseTypes);
-		Assert.Equal(s_expectedCapturedTypeIds, captured.CaseTypes);
-		Assert.Equal(s_expectedCapturedStateIds, captured.StateIds);
-		Assert.Equal("acme", captured.Search);
-		Assert.Equal("alice-1", captured.AssigneeId);
-		Assert.True(captured.UnassignedOnly);
-		Assert.Equal(2, captured.Page);
-		Assert.Equal(5, captured.PageSize);
+		captured.Should().NotBeNull();
+
+		using var scope = new AssertionScope();
+		captured!.CaseTypes.Should().Equal(s_expectedCapturedTypeIds);
+		captured.StateIds.Should().Equal(s_expectedCapturedStateIds);
+		captured.Should().BeEquivalentTo(
+			new
+			{
+				Search = "acme",
+				AssigneeId = "alice-1",
+				UnassignedOnly = true,
+				Page = 2,
+				PageSize = 5,
+			}
+		);
 	}
 
 	[Fact]
@@ -1741,16 +1797,22 @@ public class CaseEndpointsTests
 			cancellationToken
 		);
 
-		Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.OK);
 		var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
-		Assert.Equal("alice-1", body?.AssignedToId);
-		Assert.Equal("Alice Example", body?.AssignedToName);
-		Assert.Equal("actor-1", body?.AssignedBy);
-		Assert.NotNull(body?.AssignedAt);
-
+		body.Should().NotBeNull();
 		var persisted = await factory.Persistence.GetByIdAsync(id, cancellationToken);
-		Assert.Equal("alice-1", persisted!.AssignedToId);
-		Assert.Equal(1, persisted.Version);
+
+		using var scope = new AssertionScope();
+		body.Should().BeEquivalentTo(
+			new
+			{
+				AssignedToId = "alice-1",
+				AssignedToName = "Alice Example",
+				AssignedBy = "actor-1",
+			}
+		);
+		body!.AssignedAt.Should().NotBeNull();
+		persisted.Should().BeEquivalentTo(new { AssignedToId = "alice-1", Version = 1 });
 	}
 
 	[Fact]
@@ -1782,7 +1844,7 @@ public class CaseEndpointsTests
 			cancellationToken
 		);
 
-		Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
 	}
 
 	[Fact]
@@ -1811,7 +1873,7 @@ public class CaseEndpointsTests
 		var content = new StringContent("[1,2,3]", System.Text.Encoding.UTF8, "application/json");
 		var response = await client.PostAsync($"/cases/{id}/assign", content, cancellationToken);
 
-		Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
 	}
 
 	[Fact]
@@ -1876,7 +1938,7 @@ public class CaseEndpointsTests
 			cancellationToken
 		);
 
-		Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.OK);
 	}
 
 	[Fact]
@@ -1892,7 +1954,7 @@ public class CaseEndpointsTests
 			cancellationToken
 		);
 
-		Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.NotFound);
 	}
 
 	[Fact]
@@ -1928,12 +1990,17 @@ public class CaseEndpointsTests
 			cancellationToken
 		);
 
-		Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.OK);
 		var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
-		Assert.Null(body?.AssignedToId);
-		Assert.Null(body?.AssignedToName);
-		Assert.Null(body?.AssignedAt);
-		Assert.Null(body?.AssignedBy);
+		body.Should().BeEquivalentTo(
+			new
+			{
+				AssignedToId = (string?)null,
+				AssignedToName = (string?)null,
+				AssignedAt = (DateTime?)null,
+				AssignedBy = (string?)null,
+			}
+		);
 	}
 
 	[Fact]
@@ -1967,7 +2034,7 @@ public class CaseEndpointsTests
 			cancellationToken
 		);
 
-		Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.OK);
 	}
 
 	[Fact]
@@ -2003,11 +2070,13 @@ public class CaseEndpointsTests
 			cancellationToken
 		);
 
-		Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-		Assert.True(response.Headers.TryGetValues("X-Idempotent-Replay", out var values));
-		Assert.Equal("true", Assert.Single(values!));
+		response.StatusCode.Should().Be(HttpStatusCode.OK);
+		response.Headers.TryGetValues("X-Idempotent-Replay", out var values).Should().BeTrue();
 		var persisted = await factory.Persistence.GetByIdAsync(id, cancellationToken);
-		Assert.Equal(0, persisted!.Version);
+
+		using var scope = new AssertionScope();
+		values.Should().Equal("true");
+		persisted.Should().BeEquivalentTo(new { Version = 0 });
 	}
 
 	[Fact]
@@ -2039,11 +2108,13 @@ public class CaseEndpointsTests
 			cancellationToken
 		);
 
-		Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-		Assert.True(response.Headers.TryGetValues("X-Idempotent-Replay", out var values));
-		Assert.Equal("true", Assert.Single(values!));
+		response.StatusCode.Should().Be(HttpStatusCode.OK);
+		response.Headers.TryGetValues("X-Idempotent-Replay", out var values).Should().BeTrue();
 		var persisted = await factory.Persistence.GetByIdAsync(id, cancellationToken);
-		Assert.Equal(0, persisted!.Version);
+
+		using var scope = new AssertionScope();
+		values.Should().Equal("true");
+		persisted.Should().BeEquivalentTo(new { Version = 0 });
 	}
 
 	// ---- RA-358: assignment endpoints refuse a closed (terminal) case ----
@@ -2093,18 +2164,23 @@ public class CaseEndpointsTests
 			cancellationToken
 		);
 
-		Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
-		Assert.False(response.Headers.Contains("X-Idempotent-Replay"));
+		response.StatusCode.Should().Be(HttpStatusCode.Conflict);
 		var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken);
-		Assert.Equal("Action not allowed", problem?.Title);
-		Assert.Equal(409, problem?.Status);
-		Assert.Contains(stateId, problem?.Detail);
-		Assert.DoesNotContain(id.ToString(), problem?.Detail);
-
+		problem.Should().NotBeNull();
 		var persisted = await factory.Persistence.GetByIdAsync(id, cancellationToken);
-		Assert.Null(persisted!.AssignedToId);
-		Assert.Equal(0, persisted.Version);
-		Assert.Empty(persisted.Timeline);
+
+		using var scope = new AssertionScope();
+		response.Headers.Contains("X-Idempotent-Replay").Should().BeFalse();
+		problem.Should().BeEquivalentTo(new { Title = "Action not allowed", Status = 409 });
+		problem!.Detail.Should().Contain(stateId).And.NotContain(id.ToString());
+		persisted.Should().BeEquivalentTo(
+			new
+			{
+				AssignedToId = (string?)null,
+				Version = 0,
+				Timeline = Array.Empty<CaseTimelineEntry>(),
+			}
+		);
 	}
 
 	[Theory]
@@ -2143,17 +2219,23 @@ public class CaseEndpointsTests
 			cancellationToken
 		);
 
-		Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
-		Assert.False(response.Headers.Contains("X-Idempotent-Replay"));
+		response.StatusCode.Should().Be(HttpStatusCode.Conflict);
 		var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken);
-		Assert.Equal("Action not allowed", problem?.Title);
-		Assert.Equal(409, problem?.Status);
-		Assert.DoesNotContain(id.ToString(), problem?.Detail);
-
+		problem.Should().NotBeNull();
 		var persisted = await factory.Persistence.GetByIdAsync(id, cancellationToken);
-		Assert.Equal("alice-1", persisted!.AssignedToId);
-		Assert.Equal(0, persisted.Version);
-		Assert.Empty(persisted.Timeline);
+
+		using var scope = new AssertionScope();
+		response.Headers.Contains("X-Idempotent-Replay").Should().BeFalse();
+		problem.Should().BeEquivalentTo(new { Title = "Action not allowed", Status = 409 });
+		problem!.Detail.Should().NotContain(id.ToString());
+		persisted.Should().BeEquivalentTo(
+			new
+			{
+				AssignedToId = "alice-1",
+				Version = 0,
+				Timeline = Array.Empty<CaseTimelineEntry>(),
+			}
+		);
 	}
 
 	[Fact]
@@ -2186,17 +2268,17 @@ public class CaseEndpointsTests
 			new { assigneeId = "alice-1", assigneeName = "Alice Example" },
 			cancellationToken
 		);
-		Assert.Equal(HttpStatusCode.OK, assign.StatusCode);
+		assign.StatusCode.Should().Be(HttpStatusCode.OK);
 
 		var unassign = await client.PostAsync(
 			$"/cases/{id}/unassign",
 			content: null,
 			cancellationToken
 		);
-		Assert.Equal(HttpStatusCode.OK, unassign.StatusCode);
+		unassign.StatusCode.Should().Be(HttpStatusCode.OK);
 
 		var persisted = await factory.Persistence.GetByIdAsync(id, cancellationToken);
-		Assert.Null(persisted!.AssignedToId);
+		persisted!.AssignedToId.Should().BeNull();
 	}
 
 	[Fact]
@@ -2225,7 +2307,7 @@ public class CaseEndpointsTests
 		var content = new StringContent("[1,2,3]", System.Text.Encoding.UTF8, "application/json");
 		var response = await client.PostAsync($"/cases/{id}/notes", content, cancellationToken);
 
-		Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
 	}
 
 	[Fact]
@@ -2257,17 +2339,18 @@ public class CaseEndpointsTests
 			cancellationToken
 		);
 
-		Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.OK);
 		var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
-		Assert.NotNull(body?.Timeline);
-		var note = Assert.Single(body!.Timeline!, a => a.Action == "note-added");
-		Assert.Equal("Reviewed evidence; awaiting confirmation.", note.Details["text"]);
-		Assert.Equal("alice-1", note.PerformedById);
-		Assert.Equal("Alice Example", note.PerformedByName);
-
+		body!.Timeline.Should().NotBeNull();
+		var note = body.Timeline!.Should().ContainSingle(a => a.Action == "note-added").Subject;
 		var persisted = await factory.Persistence.GetByIdAsync(id, cancellationToken);
-		Assert.Single(persisted!.Timeline, a => a.Action == "note-added");
-		Assert.Equal(1, persisted.Version);
+		persisted.Should().NotBeNull();
+
+		using var scope = new AssertionScope();
+		note.Should().BeEquivalentTo(new { PerformedById = "alice-1", PerformedByName = "Alice Example" });
+		note.Details.Should().Contain("text", "Reviewed evidence; awaiting confirmation.");
+		persisted!.Timeline.Should().ContainSingle(a => a.Action == "note-added");
+		persisted.Version.Should().Be(1);
 	}
 
 	[Fact]
@@ -2299,7 +2382,7 @@ public class CaseEndpointsTests
 			cancellationToken
 		);
 
-		Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
 	}
 
 	[Fact]
@@ -2315,7 +2398,7 @@ public class CaseEndpointsTests
 			cancellationToken
 		);
 
-		Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.NotFound);
 	}
 
 	[Fact]
@@ -2331,7 +2414,7 @@ public class CaseEndpointsTests
 			cancellationToken
 		);
 
-		Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 	}
 
 	[Fact]
@@ -2383,23 +2466,23 @@ public class CaseEndpointsTests
 		);
 
 		var response = await client.GetAsync($"/cases/{id}", cancellationToken);
-		Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.OK);
 
 		var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
-		Assert.NotNull(body?.Timeline);
-		Assert.Collection(
-			body!.Timeline!,
-			first =>
-			{
-				Assert.Equal("note-added", first.Action);
-				Assert.Equal(newer, first.PerformedAt);
-			},
+		body!.Timeline.Should().NotBeNull();
+		body.Timeline!.Should().SatisfyRespectively(
+			first => first.Should().BeEquivalentTo(new { Action = "note-added", PerformedAt = newer }),
 			second =>
 			{
-				Assert.Equal("task-completed", second.Action);
-				Assert.Equal("Task completed", second.ActionDisplayName);
-				Assert.Equal("check-eligibility", second.Details["taskId"]);
-				Assert.Equal(older, second.PerformedAt);
+				second.Should().BeEquivalentTo(
+					new
+					{
+						Action = "task-completed",
+						ActionDisplayName = "Task completed",
+						PerformedAt = older,
+					}
+				);
+				second.Details.Should().Contain("taskId", "check-eligibility");
 			}
 		);
 	}
@@ -2459,16 +2542,11 @@ public class CaseEndpointsTests
 		);
 
 		var response = await client.GetAsync($"/cases/{id}", cancellationToken);
-		Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.OK);
 
 		var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
-		Assert.NotNull(body?.Timeline);
-		Assert.Collection(
-			body!.Timeline!,
-			first => Assert.Equal("3", first.Details["sequence"]),
-			second => Assert.Equal("2", second.Details["sequence"]),
-			third => Assert.Equal("1", third.Details["sequence"])
-		);
+		body!.Timeline.Should().NotBeNull();
+		body.Timeline!.Select(e => e.Details["sequence"]).Should().Equal("3", "2", "1");
 	}
 
 	// ----------------------------------------------------------------
@@ -2546,7 +2624,7 @@ public class CaseEndpointsTests
 		// Anything but 404 means the request reached the engine — that's
 		// the contract for this test (individual engine-level outcomes,
 		// e.g. invalid transitions, are covered by other tests).
-		Assert.NotEqual(HttpStatusCode.NotFound, response.StatusCode);
+		response.StatusCode.Should().NotBe(HttpStatusCode.NotFound);
 	}
 
 	/// <summary>

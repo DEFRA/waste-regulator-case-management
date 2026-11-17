@@ -1,3 +1,4 @@
+using AwesomeAssertions.Execution;
 using WasteRegulatorCaseManagement.Test.TestSupport;
 using System.Net;
 using System.Text.Json;
@@ -21,7 +22,7 @@ public class OpenApiEndpointTests
 
 		var response = await client.GetAsync("/openapi/v1.json", ct);
 
-		Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+		response.StatusCode.Should().Be(HttpStatusCode.OK);
 
 		var body = await response.Content.ReadAsStringAsync(ct);
 		using var document = JsonDocument.Parse(body);
@@ -29,12 +30,13 @@ public class OpenApiEndpointTests
 		// Document must be a valid OpenAPI doc and include at least one
 		// of the existing endpoints (a case framework route under
 		// /cases is registered by MapCaseFrameworkEndpoints).
-		Assert.True(document.RootElement.TryGetProperty("openapi", out _));
-		Assert.True(document.RootElement.TryGetProperty("paths", out var paths));
-		Assert.Equal(JsonValueKind.Object, paths.ValueKind);
+		document.RootElement.TryGetProperty("openapi", out _).Should().BeTrue();
+		document.RootElement.TryGetProperty("paths", out var paths).Should().BeTrue();
+		paths.ValueKind.Should().Be(JsonValueKind.Object);
 		var pathNames = paths.EnumerateObject().Select(p => p.Name).ToArray();
-		Assert.NotEmpty(pathNames);
-		Assert.Contains(pathNames, p => p.StartsWith("/cases", StringComparison.Ordinal));
+		using var scope = new AssertionScope();
+		pathNames.Should().NotBeEmpty();
+		pathNames.Should().Contain(p => p.StartsWith("/cases", StringComparison.Ordinal));
 	}
 
 	[Theory]
@@ -67,19 +69,17 @@ public class OpenApiEndpointTests
 					continue;
 				}
 
-				Assert.True(
-					op.Value.TryGetProperty("requestBody", out var requestBody),
-					$"Operation '{operationId}' must declare a requestBody.");
+				op.Value.TryGetProperty("requestBody", out var requestBody).Should().BeTrue(
+					$"Operation '{operationId}' must declare a requestBody");
 				var json = requestBody.GetProperty("content").GetProperty("application/json");
-				Assert.True(
-					json.TryGetProperty("example", out _),
+				json.TryGetProperty("example", out _).Should().BeTrue(
 					$"Operation '{operationId}' must have a request-body example wired " +
-					"in CaseOpenApiExampleTransformer.");
+					"in CaseOpenApiExampleTransformer");
 				found = true;
 			}
 		}
 
-		Assert.True(found, $"Operation id '{operationId}' was not found in the OpenAPI document. " +
+		found.Should().BeTrue($"Operation id '{operationId}' was not found in the OpenAPI document. " +
 			"Either the endpoint was renamed or removed — update CaseOpenApiExampleTransformer " +
 			"to match.");
 	}

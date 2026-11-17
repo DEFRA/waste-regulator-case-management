@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using WasteRegulatorCaseManagement.Auth;
+using AwesomeAssertions.Execution;
 
 namespace WasteRegulatorCaseManagement.Test.Auth;
 
@@ -30,8 +31,9 @@ public class ClientIdSignaturePayloadFormatTests
 	{
 		var actual = ClientIdAuthenticationHandler.ComputeSignature(Secret, WithoutRoleOrNation);
 
-		Assert.Equal(WireFormatReference.LegacyV3(Secret, WithoutRoleOrNation), actual);
-		Assert.NotEqual(WireFormatReference.ExtendedV3(Secret, WithoutRoleOrNation), actual);
+		using var scope = new AssertionScope();
+		actual.Should().Be(WireFormatReference.LegacyV3(Secret, WithoutRoleOrNation));
+		actual.Should().NotBe(WireFormatReference.ExtendedV3(Secret, WithoutRoleOrNation));
 	}
 
 	[Theory]
@@ -57,29 +59,25 @@ public class ClientIdSignaturePayloadFormatTests
 	{
 		// A legacy string has six lines, an extended one nine — they can
 		// never collide, which is what makes dual acceptance safe.
-		Assert.NotEqual(
-			ClientIdAuthenticationHandler.ComputeLegacySignature(Secret, WithoutRoleOrNation),
-			ClientIdAuthenticationHandler.ComputeExtendedSignature(Secret, WithoutRoleOrNation)
-		);
+		ClientIdAuthenticationHandler.ComputeLegacySignature(Secret, WithoutRoleOrNation)
+			.Should()
+			.NotBe(ClientIdAuthenticationHandler.ComputeExtendedSignature(Secret, WithoutRoleOrNation));
 	}
 
 	[Fact]
 	public void VerifySignature_accepts_both_forms_when_no_role_or_nation_is_present()
 	{
-		Assert.True(
-			ClientIdAuthenticationHandler.VerifySignature(
-				Secret,
-				WithoutRoleOrNation,
-				WireFormatReference.LegacyV3(Secret, WithoutRoleOrNation)
-			)
-		);
-		Assert.True(
-			ClientIdAuthenticationHandler.VerifySignature(
-				Secret,
-				WithoutRoleOrNation,
-				WireFormatReference.ExtendedV3(Secret, WithoutRoleOrNation)
-			)
-		);
+		using var scope = new AssertionScope();
+		ClientIdAuthenticationHandler.VerifySignature(
+			Secret,
+			WithoutRoleOrNation,
+			WireFormatReference.LegacyV3(Secret, WithoutRoleOrNation)
+		).Should().BeTrue();
+		ClientIdAuthenticationHandler.VerifySignature(
+			Secret,
+			WithoutRoleOrNation,
+			WireFormatReference.ExtendedV3(Secret, WithoutRoleOrNation)
+		).Should().BeTrue();
 	}
 
 	[Fact]
@@ -87,22 +85,19 @@ public class ClientIdSignaturePayloadFormatTests
 	{
 		var payload = WithoutRoleOrNation with { Role = "standard", Nation = "Wales" };
 
-		Assert.True(
-			ClientIdAuthenticationHandler.VerifySignature(
-				Secret,
-				payload,
-				WireFormatReference.ExtendedV3(Secret, payload)
-			)
-		);
+		using var scope = new AssertionScope();
+		ClientIdAuthenticationHandler.VerifySignature(
+			Secret,
+			payload,
+			WireFormatReference.ExtendedV3(Secret, payload)
+		).Should().BeTrue();
 		// A legacy signature over the same identity (role/nation simply not
 		// signed) must not be accepted once either header is present.
-		Assert.False(
-			ClientIdAuthenticationHandler.VerifySignature(
-				Secret,
-				payload,
-				WireFormatReference.LegacyV3(Secret, payload)
-			)
-		);
+		ClientIdAuthenticationHandler.VerifySignature(
+			Secret,
+			payload,
+			WireFormatReference.LegacyV3(Secret, payload)
+		).Should().BeFalse();
 	}
 
 	[Fact]
@@ -117,32 +112,27 @@ public class ClientIdSignaturePayloadFormatTests
 			}
 		);
 
-		Assert.False(
-			ClientIdAuthenticationHandler.VerifySignature(
-				Secret,
-				WithoutRoleOrNation,
-				signedWithRole
-			)
-		);
+		ClientIdAuthenticationHandler.VerifySignature(
+			Secret,
+			WithoutRoleOrNation,
+			signedWithRole
+		).Should().BeFalse();
 	}
 
 	[Fact]
 	public void VerifySignature_rejects_a_signature_made_with_another_secret_in_either_form()
 	{
-		Assert.False(
-			ClientIdAuthenticationHandler.VerifySignature(
-				Secret,
-				WithoutRoleOrNation,
-				WireFormatReference.LegacyV3("other-secret", WithoutRoleOrNation)
-			)
-		);
-		Assert.False(
-			ClientIdAuthenticationHandler.VerifySignature(
-				Secret,
-				WithoutRoleOrNation,
-				WireFormatReference.ExtendedV3("other-secret", WithoutRoleOrNation)
-			)
-		);
+		using var scope = new AssertionScope();
+		ClientIdAuthenticationHandler.VerifySignature(
+			Secret,
+			WithoutRoleOrNation,
+			WireFormatReference.LegacyV3("other-secret", WithoutRoleOrNation)
+		).Should().BeFalse();
+		ClientIdAuthenticationHandler.VerifySignature(
+			Secret,
+			WithoutRoleOrNation,
+			WireFormatReference.ExtendedV3("other-secret", WithoutRoleOrNation)
+		).Should().BeFalse();
 	}
 }
 
