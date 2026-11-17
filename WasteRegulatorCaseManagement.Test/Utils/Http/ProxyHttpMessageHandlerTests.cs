@@ -237,7 +237,7 @@ public class ProxyHttpMessageHandlerTests
 
 		var act = () =>
 			new ProxyHttpMessageHandler(NullLogger<ProxyHttpMessageHandler>.Instance, env);
-		var ex = act.Should().Throw<InvalidOperationException>().Which;
+		var ex = act.Should().ThrowExactly<InvalidOperationException>().Which;
 
 		// Message must name the missing env vars and the offending
 		// environment so the failure is actionable in CDP logs.
@@ -265,7 +265,7 @@ public class ProxyHttpMessageHandlerTests
 
 		var act = () =>
 			new ProxyHttpMessageHandler(NullLogger<ProxyHttpMessageHandler>.Instance, env);
-		act.Should().Throw<InvalidOperationException>();
+		act.Should().ThrowExactly<InvalidOperationException>();
 	}
 
 	[Fact]
@@ -325,7 +325,7 @@ public class ProxyHttpMessageHandlerTests
 		var malformed = $"http://{user}:{secret}@proxy.local:port-not-a-number";
 
 		var act = () => ProxyHttpMessageHandler.ParseProxyUri(malformed);
-		var ex = act.Should().Throw<InvalidOperationException>().Which;
+		var ex = act.Should().ThrowExactly<InvalidOperationException>().Which;
 
 		AssertNoCredentialLeak(ex, user, secret);
 	}

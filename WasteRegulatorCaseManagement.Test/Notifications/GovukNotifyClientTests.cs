@@ -612,7 +612,7 @@ public class GovukNotifyClientTests
 				"ref-caller-cancel",
 				cancellationToken: cts.Token
 			);
-		await act.Should().ThrowAsync<OperationCanceledException>();
+		await act.Should().ThrowExactlyAsync<OperationCanceledException>();
 	}
 
 	[Fact]

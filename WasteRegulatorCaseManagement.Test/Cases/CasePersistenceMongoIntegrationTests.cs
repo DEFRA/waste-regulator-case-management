@@ -450,7 +450,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
 
 		// Act
 		var act = () => _persistence.ReplaceAsync(stale, cancellationToken);
-		await act.Should().ThrowAsync<CaseConcurrencyException>();
+		await act.Should().ThrowExactlyAsync<CaseConcurrencyException>();
 
 		// Assert
 		var auditEvents = await _clientFactory
@@ -517,7 +517,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
 
 		stale!.StateId = "approved";
 		var act = () => _persistence.ReplaceAsync(stale, TestContext.Current.CancellationToken);
-		var ex = (await act.Should().ThrowAsync<CaseConcurrencyException>()).Which;
+		var ex = (await act.Should().ThrowExactlyAsync<CaseConcurrencyException>()).Which;
 		ex.CaseId.Should().Be(caseRecord.Id);
 
 		// The in-memory version on the failed attempt must roll back so

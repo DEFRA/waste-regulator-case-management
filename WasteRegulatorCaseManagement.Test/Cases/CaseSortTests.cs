@@ -84,7 +84,7 @@ public class CaseSortTests
 	public void StatusRank_throws_on_null_registry()
 	{
 		var act = () => CaseSort.StatusRank(null!);
-		act.Should().Throw<ArgumentNullException>();
+		act.Should().ThrowExactly<ArgumentNullException>();
 	}
 
 	// ─────────────────────────────── BuildStages ─────────────────────────────
@@ -118,7 +118,7 @@ public class CaseSortTests
 	public void BuildStages_throws_on_null_status_rank()
 	{
 		var act = () => CaseSort.BuildStages("status", descendingOverride: null, null!);
-		act.Should().Throw<ArgumentNullException>();
+		act.Should().ThrowExactly<ArgumentNullException>();
 	}
 
 	[Fact]

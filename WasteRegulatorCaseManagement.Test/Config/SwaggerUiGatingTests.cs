@@ -35,7 +35,7 @@ public class SwaggerUiGatingTests
 	{
 		var config = new ConfigurationBuilder().Build();
 		var act = () => SwaggerUiGating.ShouldEnableSwaggerUi(null!, config);
-		act.Should().Throw<ArgumentNullException>();
+		act.Should().ThrowExactly<ArgumentNullException>();
 	}
 
 	[Fact]
@@ -43,6 +43,6 @@ public class SwaggerUiGatingTests
 	{
 		var env = Substitute.For<IHostEnvironment>();
 		var act = () => SwaggerUiGating.ShouldEnableSwaggerUi(env, null!);
-		act.Should().Throw<ArgumentNullException>();
+		act.Should().ThrowExactly<ArgumentNullException>();
 	}
 }
