@@ -59,7 +59,7 @@ Only the Case Intake Processor may create cases: `POST /cases` requires the
 | `nation` | Yes | `ENGLAND`, `WALES`, `SCOTLAND` or `N_IRELAND`. |
 | `orgId` | Yes | The submitting organisation's id in the source system. |
 | `producerType` | No | Stored and returned uninterpreted (for CSoC, `DIRECT_PRODUCER` or `COMPLIANCE_SCHEME`). |
-| `displayData` | No | Map of field name to `{ "value": string, "type": "string" \| "number" \| "date" \| "boolean" }`, rendered by the caseworker dashboard. Stored and returned without interpretation. |
+| `displayData` | No | Map of field name to `{ "value": string, "type": "string" \| "number" \| "date" \| "boolean" }`, rendered by the caseworker dashboard. Names are letters, digits, `_` or `-`, so the case list can filter on them. Stored and returned without interpretation. |
 | `initialState` | No | Bulk load of existing submissions only: start the case in this state of its case type instead of the initial state, so already-decided cases arrive decided. |
 | `createdAt` | No | Bulk load only: ISO 8601 submission time to keep as `submittedAt`, preserving queue order. |
 
@@ -244,11 +244,13 @@ The Mongo collection has an `assigneeAndSubmitted` index for the common
 | Param | Effect |
 | --- | --- |
 | `assigneeId=<userId>` | only items currently assigned to that user |
-| `unassigned=true` | only items with no current assignee |
+| `unassigned=true` | only items with no current assignee; with `assigneeId`, the items assigned to that user or to no one |
 | `orgId=<orgId>` | only cases of that organisation |
+| `displayData=<name>:<value>` | only cases whose display field `<name>` has exactly that value (a case-sensitive string match, whatever the field's `type`), such as `producerType:DIRECT_PRODUCER`; repeat a name to match any of several values, give several names to match all of them |
 | `isTerminal=true` | only concluded cases (`false`: only open ones) |
 
-If both are supplied, the list holds the cases assigned to that user or to no one.
+A `displayData` name must be letters, digits, `_` or `-`, and its value
+non-empty; anything else is a `400`. Blank `displayData` entries are ignored.
 
 ### Endpoints
 

@@ -390,6 +390,8 @@ public static class CaseEndpoints
 		bool? unassigned,
 		[FromQuery(Name = "orgId"), Description("Only cases of this organisation.")]
 		string? orgId,
+		[FromQuery(Name = "displayData"), Description("Only cases whose display field has exactly this value (a case-sensitive string match), given as `name:value`, such as `producerType:DIRECT_PRODUCER`. Repeat a name to match any of several values; give several names to match all of them. A name must be letters, digits, `_` or `-` and the value non-empty, or the request is a 400.")]
+		string[]? displayData,
 		[FromQuery(Name = "isTerminal"), Description("`true` for only concluded cases, `false` for only open ones.")]
 		bool? isTerminal,
 		[FromQuery(Name = "sort"), Description("`status` orders the cases by their case type's states, in the order the case type declares them.")]
@@ -418,6 +420,7 @@ public static class CaseEndpoints
 			assigneeId,
 			unassigned,
 			orgId,
+			displayData,
 			isTerminal,
 			sort,
 			dir,

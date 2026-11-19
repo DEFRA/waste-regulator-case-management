@@ -259,6 +259,11 @@ public sealed class CasePersistence
 			clauses.Add(builder.Eq(w => w.OrgId, orgId));
 		}
 
+		foreach (var (name, values) in query.DisplayData ?? new Dictionary<string, IReadOnlyCollection<string>>())
+		{
+			clauses.Add(builder.In($"displayData.{name}.value", values));
+		}
+
 		if (query.IsTerminal is { } isTerminal)
 		{
 			clauses.Add(builder.Eq(w => w.IsTerminal, isTerminal));

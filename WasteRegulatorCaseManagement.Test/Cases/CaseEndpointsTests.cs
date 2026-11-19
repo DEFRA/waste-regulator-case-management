@@ -600,6 +600,78 @@ public class CaseEndpointsTests
 	}
 
 	[Theory]
+	[InlineData("producer.type")]
+	[InlineData("$where")]
+	[InlineData("producer type")]
+	public async Task Post_returns_problem_when_a_display_data_name_cannot_be_filtered_on(string name)
+	{
+		// Arrange
+		var cancellationToken = TestContext.Current.CancellationToken;
+		await using var factory = NewFactory();
+		using var client = factory.CreateClient();
+		var body = new System.Text.Json.Nodes.JsonObject
+		{
+			["caseType"] = CaseType,
+			["sourceSystemId"] = Ulid.NewUlid().ToString(),
+			["callbackUrl"] = "https://source-system.test/callback",
+			["nation"] = "ENGLAND",
+			["orgId"] = "test-org",
+			["displayData"] = new System.Text.Json.Nodes.JsonObject
+			{
+				[name] = System.Text.Json.Nodes.JsonNode.Parse("""{ "value": "Acme", "type": "string" }"""),
+			},
+		};
+
+		// Act
+		var response = await client.PostAsync(
+			"/cases",
+			new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json"),
+			cancellationToken
+		);
+
+		// Assert
+		response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+		var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken);
+		problem!.Detail.Should().Contain($"'{name}'");
+	}
+
+	[Theory]
+	[InlineData("producer-type")]
+	[InlineData("line_2")]
+	[InlineData("Field3")]
+	public async Task Post_accepts_display_data_names_of_letters_digits_underscores_and_hyphens(string name)
+	{
+		// Arrange
+		var cancellationToken = TestContext.Current.CancellationToken;
+		await using var factory = NewFactory();
+		using var client = factory.CreateClient();
+		var body = new System.Text.Json.Nodes.JsonObject
+		{
+			["caseType"] = CaseType,
+			["sourceSystemId"] = Ulid.NewUlid().ToString(),
+			["callbackUrl"] = "https://source-system.test/callback",
+			["nation"] = "ENGLAND",
+			["orgId"] = "test-org",
+			["displayData"] = new System.Text.Json.Nodes.JsonObject
+			{
+				[name] = System.Text.Json.Nodes.JsonNode.Parse("""{ "value": "Acme", "type": "string" }"""),
+			},
+		};
+
+		// Act
+		var response = await client.PostAsync(
+			"/cases",
+			new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json"),
+			cancellationToken
+		);
+
+		// Assert
+		response.StatusCode.Should().Be(HttpStatusCode.Created);
+		var created = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
+		created!.DisplayData.Should().ContainKey(name);
+	}
+
+	[Theory]
 	[InlineData("callbackUrl", "null", "'callbackUrl' is required and must be a non-empty string.")]
 	[InlineData("callbackUrl", "\"ftp://source-system.test/callback\"", "'callbackUrl' must be an absolute http or https URL.")]
 	[InlineData("callbackUrl", "\"source-system.test/callback\"", "'callbackUrl' must be an absolute http or https URL.")]
@@ -1401,6 +1473,59 @@ public class CaseEndpointsTests
 	}
 
 	[Fact]
+	public async Task Get_list_filters_by_display_data()
+	{
+		// Arrange
+		var cancellationToken = TestContext.Current.CancellationToken;
+		await using var factory = NewFactory();
+		using var client = factory.CreateClient();
+		await factory.SeedAsync(DisplayedCase(orgId: "org-00456", producerType: "DIRECT_PRODUCER"), cancellationToken);
+		await factory.SeedAsync(DisplayedCase(orgId: "org-00789", producerType: "COMPLIANCE_SCHEME"), cancellationToken);
+
+		// Act
+		var body = await client.GetFromJsonAsync<CaseListResponse>("/cases?displayData=producerType:DIRECT_PRODUCER", cancellationToken);
+
+		// Assert
+		var item = body!.Items.Should().ContainSingle().Subject;
+		item.OrgId.Should().Be("org-00456");
+	}
+
+	[Fact]
+	public async Task Get_list_rejects_a_malformed_display_data_filter()
+	{
+		// Arrange
+		var cancellationToken = TestContext.Current.CancellationToken;
+		await using var factory = NewFactory();
+		using var client = factory.CreateClient();
+
+		// Act
+		var response = await client.GetAsync("/cases?displayData=producerType", cancellationToken);
+
+		// Assert
+		response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+		var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken);
+		using var scope = new AssertionScope();
+		problem!.Title.Should().Be("Invalid case list filter");
+		problem.Detail.Should().Contain("'producerType'");
+	}
+
+	[Fact]
+	public async Task Get_list_ignores_a_blank_display_data_filter()
+	{
+		// Arrange
+		var cancellationToken = TestContext.Current.CancellationToken;
+		await using var factory = NewFactory();
+		using var client = factory.CreateClient();
+		await factory.SeedAsync(DisplayedCase(orgId: "org-00456", producerType: "DIRECT_PRODUCER"), cancellationToken);
+
+		// Act
+		var body = await client.GetFromJsonAsync<CaseListResponse>("/cases?displayData=", cancellationToken);
+
+		// Assert
+		body!.Items.Should().ContainSingle();
+	}
+
+	[Fact]
 	public async Task Get_list_filters_to_concluded_cases()
 	{
 		// Arrange
@@ -1417,6 +1542,20 @@ public class CaseEndpointsTests
 		var item = body!.Items.Should().ContainSingle().Subject;
 		item.StateId.Should().Be("approved");
 	}
+
+	private static Case DisplayedCase(string orgId, string producerType) =>
+		new()
+		{
+			SourceSystemId = Ulid.NewUlid().ToString(),
+			CallbackUrl = "https://source-system.test/callback",
+			Nation = "ENGLAND",
+			OrgId = orgId,
+			Id = Ulid.NewUlid().ToString(),
+			CaseType = CaseType,
+			StateId = "submitted",
+			SubmittedBy = "test-client",
+			DisplayData = new() { ["producerType"] = new CaseDisplayField(producerType, "string") },
+		};
 
 	private static Case ListedCase(string orgId, string stateId, bool isTerminal) =>
 		new()

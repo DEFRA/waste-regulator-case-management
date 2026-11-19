@@ -11,6 +11,7 @@ public class CaseQueryBindingTests
 		AssigneeId: null,
 		Unassigned: null,
 		OrgId: null,
+		DisplayData: null,
 		IsTerminal: null,
 		Sort: null,
 		Dir: null,
@@ -24,6 +25,62 @@ public class CaseQueryBindingTests
 		var query = CaseQueryBinding.FromRequest(s_noFilters with { OrgId = "   " });
 
 		query.OrgId.Should().BeNull();
+	}
+
+	[Fact]
+	public void DisplayDataFiltersAreGroupedByName()
+	{
+		var query = CaseQueryBinding.FromRequest(s_noFilters with
+		{
+			DisplayData = ["producerType:DIRECT_PRODUCER", "producerType:COMPLIANCE_SCHEME", "size:large"],
+		});
+
+		query.DisplayData.Should().BeEquivalentTo(new Dictionary<string, IReadOnlyCollection<string>>
+		{
+			["producerType"] = ["DIRECT_PRODUCER", "COMPLIANCE_SCHEME"],
+			["size"] = ["large"],
+		});
+	}
+
+	[Fact]
+	public void BlankDisplayDataEntriesAreDropped()
+	{
+		var query = CaseQueryBinding.FromRequest(s_noFilters with { DisplayData = ["", "   "] });
+
+		query.DisplayData.Should().BeNull();
+	}
+
+	[Fact]
+	public void DisplayDataValueIsKeptExactly()
+	{
+		var query = CaseQueryBinding.FromRequest(s_noFilters with { DisplayData = ["producerType: DIRECT_PRODUCER:x "] });
+
+		query.DisplayData!["producerType"].Should().Equal(" DIRECT_PRODUCER:x ");
+	}
+
+	[Theory]
+	[InlineData("producerType")]
+	[InlineData("producerType:")]
+	[InlineData(":DIRECT_PRODUCER")]
+	[InlineData(" producerType:DIRECT_PRODUCER")]
+	[InlineData("producer.type:DIRECT_PRODUCER")]
+	[InlineData("$where:DIRECT_PRODUCER")]
+	public void MalformedDisplayDataFilterIsReported(string entry)
+	{
+		var bind = () => CaseQueryBinding.FromRequest(s_noFilters with { DisplayData = ["producerType:DIRECT_PRODUCER", entry] });
+
+		bind.Should().Throw<InvalidCaseQueryException>().Which.Message.Should().Contain($"'{entry}'");
+	}
+
+	[Fact]
+	public void ALongMalformedDisplayDataFilterIsShortenedInTheError()
+	{
+		var entry = new string('x', 500);
+
+		var bind = () => CaseQueryBinding.FromRequest(s_noFilters with { DisplayData = [entry] });
+
+		bind.Should().Throw<InvalidCaseQueryException>().Which.Message
+			.Should().Contain($"'{entry[..100]}…'").And.NotContain(entry[..101]);
 	}
 
 	[Fact]

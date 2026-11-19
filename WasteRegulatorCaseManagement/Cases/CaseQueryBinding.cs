@@ -6,6 +6,9 @@ namespace WasteRegulatorCaseManagement.Cases;
 /// </summary>
 internal static class CaseQueryBinding
 {
+	/// <exception cref="InvalidCaseQueryException">
+	/// A <c>displayData</c> entry is not a valid filter.
+	/// </exception>
 	public static CaseQuery FromRequest(CaseListRequest request) =>
 		new(
 			CaseTypes: Values(request.CaseType),
@@ -18,6 +21,7 @@ internal static class CaseQueryBinding
 			Sort: Value(request.Sort),
 			SortDescending: SortDescending(request.Dir),
 			OrgId: Value(request.OrgId),
+			DisplayData: DisplayDataFilters(request.DisplayData),
 			IsTerminal: request.IsTerminal
 		);
 
@@ -33,6 +37,46 @@ internal static class CaseQueryBinding
 			"asc" or "ascending" => false,
 			_ => null,
 		};
+
+	/// <summary>
+	/// The non-blank <c>displayData</c> entries grouped by name, or
+	/// <c>null</c> when there are none. The value is kept exactly as given,
+	/// because it is matched exactly against the stored value.
+	/// </summary>
+	/// <exception cref="InvalidCaseQueryException">
+	/// An entry is not <c>name:value</c> with a
+	/// <see cref="CaseDisplayField.IsValidName">valid name</see> and a
+	/// non-empty value.
+	/// </exception>
+	private static IReadOnlyDictionary<string, IReadOnlyCollection<string>>? DisplayDataFilters(string[]? entries)
+	{
+		var filters = (entries ?? [])
+			.Where(e => !string.IsNullOrWhiteSpace(e))
+			.Select(ParseDisplayDataFilter)
+			.GroupBy(f => f.Name, StringComparer.Ordinal)
+			.ToDictionary(
+				g => g.Key,
+				g => (IReadOnlyCollection<string>)g.Select(f => f.Value).Distinct(StringComparer.Ordinal).ToList(),
+				StringComparer.Ordinal
+			);
+
+		return filters.Count == 0 ? null : filters;
+	}
+
+	private static (string Name, string Value) ParseDisplayDataFilter(string entry)
+	{
+		var separator = entry.IndexOf(':');
+		var name = separator < 0 ? entry : entry[..separator];
+		var value = separator < 0 ? "" : entry[(separator + 1)..];
+		if (!CaseDisplayField.IsValidName(name) || value.Length == 0)
+		{
+			throw new InvalidCaseQueryException(
+				$"'displayData' must be name:value, with a name of letters, digits, '_' or '-', but was '{CaseDisplayField.Shortened(entry)}'."
+			);
+		}
+
+		return (name, value);
+	}
 
 	private static IReadOnlyCollection<string>? Values(string[]? values)
 	{

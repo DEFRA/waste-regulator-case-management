@@ -255,7 +255,8 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
 	private async Task SeedAsync(
 		string orgId,
 		string stateId = "submitted",
-		int submittedMinutesAgo = 0
+		int submittedMinutesAgo = 0,
+		Dictionary<string, CaseDisplayField>? displayData = null
 	)
 	{
 		var now = _time.GetUtcNow().UtcDateTime;
@@ -269,12 +270,66 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
 			StateId = stateId,
 			SubmittedAt = now.AddMinutes(-submittedMinutesAgo),
 			LastModifiedAt = now,
+			DisplayData = displayData ?? new(),
 		};
 		await _clientFactory.GetCollection<Case>("cases").InsertOneAsync(item, cancellationToken: TestContext.Current.CancellationToken);
 	}
 
 	private static string[] OrgOrder(CasePage page) =>
 		page.Items.Select(i => i.OrgId).ToArray();
+
+	private static Dictionary<string, CaseDisplayField> Display(string producerType, string size) =>
+		new()
+		{
+			["producerType"] = new CaseDisplayField(producerType, "string"),
+			["size"] = new CaseDisplayField(size, "string"),
+		};
+
+	[Theory]
+	[InlineData(null)]
+	[InlineData("status")]
+	public async Task QueryAsync_display_data_matches_any_value_of_a_name_and_every_name(string? sort)
+	{
+		// Both the default find and the status-sort aggregation, which renders
+		// the filter into a $match of its own.
+		var ct = TestContext.Current.CancellationToken;
+		await SeedAsync("direct-large", displayData: Display("DIRECT_PRODUCER", "large"));
+		await SeedAsync("scheme-large", displayData: Display("COMPLIANCE_SCHEME", "large"));
+		await SeedAsync("direct-small", displayData: Display("DIRECT_PRODUCER", "small"));
+		await SeedAsync("other-large", displayData: Display("OTHER", "large"));
+		await SeedAsync("no-display-data");
+
+		var page = await _persistence.QueryAsync(
+			new CaseQuery(
+				Sort: sort,
+				DisplayData: new Dictionary<string, IReadOnlyCollection<string>>
+				{
+					["producerType"] = ["DIRECT_PRODUCER", "COMPLIANCE_SCHEME"],
+					["size"] = ["large"],
+				}
+			),
+			ct
+		);
+
+		OrgOrder(page).Should().BeEquivalentTo("direct-large", "scheme-large");
+		page.TotalCount.Should().Be(2);
+	}
+
+	[Fact]
+	public async Task QueryAsync_display_data_match_is_exact_and_case_sensitive()
+	{
+		var ct = TestContext.Current.CancellationToken;
+		await SeedAsync("exact", displayData: Display("DIRECT_PRODUCER", "large"));
+		await SeedAsync("lower", displayData: Display("direct_producer", "large"));
+		await SeedAsync("padded", displayData: Display(" DIRECT_PRODUCER", "large"));
+
+		var page = await _persistence.QueryAsync(
+			new CaseQuery(DisplayData: new Dictionary<string, IReadOnlyCollection<string>> { ["producerType"] = ["DIRECT_PRODUCER"] }),
+			ct
+		);
+
+		OrgOrder(page).Should().Equal("exact");
+	}
 
 	[Fact]
 	public async Task QueryAsync_default_sort_is_newest_submitted_first()

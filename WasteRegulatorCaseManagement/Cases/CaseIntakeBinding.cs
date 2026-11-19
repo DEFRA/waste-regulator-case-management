@@ -45,6 +45,10 @@ internal static class CaseIntakeBinding
 		var displayData = new Dictionary<string, CaseDisplayField>(StringComparer.Ordinal);
 		foreach (var (name, field) in request.DisplayData ?? new Dictionary<string, CaseDisplayField>())
 		{
+			if (!CaseDisplayField.IsValidName(name))
+			{
+				return $"'displayData' names must be letters, digits, '_' or '-', so the case list can filter on them, but one was '{CaseDisplayField.Shortened(name)}'.";
+			}
 			if (field?.Value is null || field.Type is null || !CaseDisplayField.Types.Contains(field.Type))
 			{
 				return $"'displayData.{name}' must be {{ \"value\": string, \"type\": "

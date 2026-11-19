@@ -130,6 +130,23 @@ public class CasePersistenceBuildFilterTests
 	}
 
 	[Fact]
+	public void DisplayDataRendersAnInClausePerName()
+	{
+		var doc = Render(new CaseQuery(DisplayData: new Dictionary<string, IReadOnlyCollection<string>>
+		{
+			["producerType"] = ["DIRECT_PRODUCER", "COMPLIANCE_SCHEME"],
+			["size"] = ["large"],
+		}));
+
+		var expected = new BsonDocument
+		{
+			{ "displayData.producerType.value", new BsonDocument("$in", new BsonArray { "DIRECT_PRODUCER", "COMPLIANCE_SCHEME" }) },
+			{ "displayData.size.value", new BsonDocument("$in", new BsonArray { "large" }) },
+		};
+		doc.Should().BeEquivalentTo(expected);
+	}
+
+	[Fact]
 	public void BlankSearchIsIgnored()
 	{
 		var doc = Render(new CaseQuery(Search: "   "));

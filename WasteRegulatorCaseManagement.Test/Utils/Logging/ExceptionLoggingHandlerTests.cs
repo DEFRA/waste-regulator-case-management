@@ -1,6 +1,8 @@
 using AwesomeAssertions.Execution;
 using WasteRegulatorCaseManagement.Utils.Logging;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using WasteRegulatorCaseManagement.Utils.Http;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 
@@ -60,6 +62,33 @@ public class ExceptionLoggingHandlerTests
 
 		result.Should().BeFalse();
 	}
+
+	[Fact]
+	public async Task TryHandleAsync_answers_a_bad_request_with_a_400_problem_and_a_warning()
+	{
+		var logger = new CapturingLogger<ExceptionLoggingHandler>();
+		var pds = Substitute.For<IProblemDetailsService>();
+		ProblemDetailsContext? written = null;
+		pds.TryWriteAsync(Arg.Do<ProblemDetailsContext>(c => written = c)).Returns(ValueTask.FromResult(true));
+
+		var handler = new ExceptionLoggingHandler(logger, pds);
+		var context = new DefaultHttpContext();
+
+		await handler.TryHandleAsync(context, new TestBadRequestException(), CancellationToken.None);
+
+		using var scope = new AssertionScope();
+		context.Response.StatusCode.Should().Be(StatusCodes.Status400BadRequest);
+		logger.Entries.Should().Equal((LogLevel.Warning, (Exception?)null));
+		written!.ProblemDetails.Should().BeEquivalentTo(new ProblemDetails
+		{
+			Status = StatusCodes.Status400BadRequest,
+			Title = "Bad thing",
+			Detail = "The caller sent a bad thing.",
+		});
+		written.Exception.Should().BeNull("a caller's mistake has no stack trace worth showing them");
+	}
+
+	private sealed class TestBadRequestException() : BadRequestException("Bad thing", "The caller sent a bad thing.");
 
 	private sealed class CapturingLogger<T> : ILogger<T>
 	{
