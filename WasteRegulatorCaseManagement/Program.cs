@@ -569,17 +569,21 @@ static void LogNotifyClientRegistration(WebApplication app)
 [ExcludeFromCodeCoverage]
 static void ConfigureMiddleware(WebApplication app)
 {
-	// ExceptionHandler MUST be the very first middleware so unhandled
-	// exceptions thrown anywhere downstream are caught and translated into
-	// an RFC 7807 ProblemDetails response (configured via
+	// Request logging wraps the exception handler so it records the
+	// response the handler produced. Inside it, an exception passing
+	// through is logged with the exception attached, a second copy of what
+	// ExceptionLoggingHandler already logs.
+	app.UseSerilogRequestLogging();
+
+	// ExceptionHandler comes before everything that handles the request, so
+	// unhandled exceptions thrown anywhere downstream are caught and
+	// translated into an RFC 7807 ProblemDetails response (configured via
 	// services.AddProblemDetails()) instead of leaking stack traces or
 	// returning a bare 500.
 	app.UseExceptionHandler();
 	// StatusCodePages turns plain status-only responses (e.g. a 404 from
 	// routing) into ProblemDetails too, for a uniform error shape.
 	app.UseStatusCodePages();
-
-	app.UseSerilogRequestLogging();
 
 	app.UseHeaderPropagation();
 
