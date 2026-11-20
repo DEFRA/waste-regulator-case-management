@@ -259,6 +259,11 @@ public sealed class CasePersistence
 			clauses.Add(builder.Eq(w => w.OrgId, orgId));
 		}
 
+		if (query.ProducerTypes is { Count: > 0 } producerTypes)
+		{
+			clauses.Add(builder.In(w => w.ProducerType, producerTypes));
+		}
+
 		if (query.IsTerminal is { } isTerminal)
 		{
 			clauses.Add(builder.Eq(w => w.IsTerminal, isTerminal));
