@@ -1401,6 +1401,24 @@ public class CaseEndpointsTests
 	}
 
 	[Fact]
+	public async Task Get_list_filters_by_producer_type()
+	{
+		// Arrange
+		var cancellationToken = TestContext.Current.CancellationToken;
+		await using var factory = NewFactory();
+		using var client = factory.CreateClient();
+		await factory.SeedAsync(ProducerCase(orgId: "org-00456", producerType: "DIRECT_PRODUCER"), cancellationToken);
+		await factory.SeedAsync(ProducerCase(orgId: "org-00789", producerType: "COMPLIANCE_SCHEME"), cancellationToken);
+
+		// Act
+		var body = await client.GetFromJsonAsync<CaseListResponse>("/cases?producerType=DIRECT_PRODUCER", cancellationToken);
+
+		// Assert
+		var item = body!.Items.Should().ContainSingle().Subject;
+		item.Should().BeEquivalentTo(new { OrgId = "org-00456", ProducerType = "DIRECT_PRODUCER" });
+	}
+
+	[Fact]
 	public async Task Get_list_filters_to_concluded_cases()
 	{
 		// Arrange
@@ -1417,6 +1435,20 @@ public class CaseEndpointsTests
 		var item = body!.Items.Should().ContainSingle().Subject;
 		item.StateId.Should().Be("approved");
 	}
+
+	private static Case ProducerCase(string orgId, string producerType) =>
+		new()
+		{
+			SourceSystemId = Ulid.NewUlid().ToString(),
+			CallbackUrl = "https://source-system.test/callback",
+			Nation = "ENGLAND",
+			OrgId = orgId,
+			Id = Ulid.NewUlid().ToString(),
+			CaseType = CaseType,
+			StateId = "submitted",
+			SubmittedBy = "test-client",
+			ProducerType = producerType,
+		};
 
 	private static Case ListedCase(string orgId, string stateId, bool isTerminal) =>
 		new()

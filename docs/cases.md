@@ -246,6 +246,7 @@ The Mongo collection has an `assigneeAndSubmitted` index for the common
 | `assigneeId=<userId>` | only items currently assigned to that user |
 | `unassigned=true` | only items with no current assignee |
 | `orgId=<orgId>` | only cases of that organisation |
+| `producerType=<producerType>` | only cases of that producer type, such as `DIRECT_PRODUCER`; repeat to match any of several |
 | `isTerminal=true` | only concluded cases (`false`: only open ones) |
 
 If both are supplied, the list holds the cases assigned to that user or to no one.

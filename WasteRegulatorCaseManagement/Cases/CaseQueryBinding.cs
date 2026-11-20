@@ -18,6 +18,7 @@ internal static class CaseQueryBinding
 			Sort: Value(request.Sort),
 			SortDescending: SortDescending(request.Dir),
 			OrgId: Value(request.OrgId),
+			ProducerTypes: Values(request.ProducerType),
 			IsTerminal: request.IsTerminal
 		);
 

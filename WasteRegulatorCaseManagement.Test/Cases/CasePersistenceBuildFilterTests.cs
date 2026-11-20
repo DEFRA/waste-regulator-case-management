@@ -68,6 +68,16 @@ public class CasePersistenceBuildFilterTests
 	}
 
 	[Fact]
+	public void ProducerTypesRenderAsInClause()
+	{
+		var doc = Render(new CaseQuery(ProducerTypes: ["DIRECT_PRODUCER", "COMPLIANCE_SCHEME"]));
+
+		var expected = new BsonDocument("producerType", new BsonDocument("$in",
+			new BsonArray { "DIRECT_PRODUCER", "COMPLIANCE_SCHEME" }));
+		doc.Should().BeEquivalentTo(expected);
+	}
+
+	[Fact]
 	public void StateIdsRenderAsInClause()
 	{
 		// RA-313: the caller's selection is the entire stateId clause — what

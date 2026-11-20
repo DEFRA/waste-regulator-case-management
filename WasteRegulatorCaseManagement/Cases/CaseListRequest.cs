@@ -11,6 +11,7 @@ internal sealed record CaseListRequest(
 	string? AssigneeId,
 	bool? Unassigned,
 	string? OrgId,
+	string[]? ProducerType,
 	bool? IsTerminal,
 	string? Sort,
 	string? Dir,

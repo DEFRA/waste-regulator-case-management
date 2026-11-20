@@ -11,6 +11,7 @@ public class CaseQueryBindingTests
 		AssigneeId: null,
 		Unassigned: null,
 		OrgId: null,
+		ProducerType: null,
 		IsTerminal: null,
 		Sort: null,
 		Dir: null,
@@ -24,6 +25,14 @@ public class CaseQueryBindingTests
 		var query = CaseQueryBinding.FromRequest(s_noFilters with { OrgId = "   " });
 
 		query.OrgId.Should().BeNull();
+	}
+
+	[Fact]
+	public void BlankAndRepeatedProducerTypesAreDropped()
+	{
+		var query = CaseQueryBinding.FromRequest(s_noFilters with { ProducerType = [" DIRECT_PRODUCER ", "", "DIRECT_PRODUCER"] });
+
+		query.ProducerTypes.Should().Equal("DIRECT_PRODUCER");
 	}
 
 	[Fact]
