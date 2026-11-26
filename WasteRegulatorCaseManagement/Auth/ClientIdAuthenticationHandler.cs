@@ -405,7 +405,7 @@ public class ClientIdAuthenticationHandler(
 		if (userId is not null)
 			claims.Add(new Claim("user:id", userId));
 		if (userName is not null)
-			claims.Add(new Claim("user:name", userName));
+			claims.Add(new Claim("user:name", Uri.UnescapeDataString(userName)));
 		if (role is not null)
 			claims.Add(new Claim("user:role", role));
 		if (nation is not null)

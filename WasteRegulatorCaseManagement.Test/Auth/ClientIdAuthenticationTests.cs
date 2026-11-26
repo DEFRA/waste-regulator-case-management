@@ -144,6 +144,40 @@ public class ClientIdAuthenticationTests
 	}
 
 	[Fact]
+	public async Task Signature_over_percent_encoded_user_name_is_200()
+	{
+		// Arrange
+		var cancellationToken = TestContext.Current.CancellationToken;
+		await using var factory = new BareFactory(
+			clientSecrets: new Dictionary<string, string> { [ClientId] = Secret }
+		);
+		factory
+			.MockPersistence.QueryAsync(Arg.Any<CaseQuery>(), Arg.Any<CancellationToken>())
+			.Returns(new CasePage(Array.Empty<Case>(), 0, 1, 20));
+
+		var timestamp = factory.FakeTime.GetUtcNow().ToString("O");
+		var nonce = "nonce-encoded-user-name";
+		var signature = ClientIdAuthenticationHandler.ComputeSignature(
+			Secret,
+			new ClientIdSignaturePayload(ClientId, "gwyn-1", "Gw%C5%B7n%20Jones", timestamp, nonce, Nation: "ENGLAND")
+		);
+
+		using var client = factory.CreateClient();
+		client.DefaultRequestHeaders.Add(ClientIdDefaults.DefaultHeaderName, ClientId);
+		AddTimestampAndNonce(client, timestamp, nonce);
+		client.DefaultRequestHeaders.Add("x-cdp-user-id", "gwyn-1");
+		client.DefaultRequestHeaders.Add("x-cdp-user-name", "Gw%C5%B7n%20Jones");
+		client.DefaultRequestHeaders.Add("x-cdp-user-nation", "ENGLAND");
+		client.DefaultRequestHeaders.Add("x-cdp-auth-signature", signature);
+
+		// Act
+		var response = await client.GetAsync("/cases", cancellationToken);
+
+		// Assert
+		response.StatusCode.Should().Be(HttpStatusCode.OK);
+	}
+
+	[Fact]
 	public async Task Signature_signed_with_a_different_known_callers_secret_is_401()
 	{
 		// RA-345: the secret used to verify a request must be the one

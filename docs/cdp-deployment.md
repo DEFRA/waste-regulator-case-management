@@ -156,7 +156,14 @@ source system as the deciding user's address when a case is concluded (see
 `docs/cases.md`). Nation scopes every caseworker route (`ENGLAND`, `WALES`,
 `SCOTLAND` or `N_IRELAND`; see `docs/cases.md`); role is an audit-only claim,
 and role-based authorization is the BFF's concern (see
-`docs/adr/0005-rbac-in-frontend-drop-roles-from-payload.md`). See
+`docs/adr/0005-rbac-in-frontend-drop-roles-from-payload.md`).
+
+`x-cdp-user-name` is percent-encoded UTF-8 (JavaScript `encodeURIComponent`),
+because HTTP header values cannot carry characters such as `ŵ` in names like
+"Gwŷn". The signature covers the encoded value as sent; the backend decodes it
+for the `user:name` claim.
+
+See
 `ClientIdAuthenticationHandler.ComputeSignature` / `VerifySignature` for the
 authoritative implementation and
 `docs/adr/0003-hmac-canonical-v2-timestamp-nonce.md` for the timestamp/nonce

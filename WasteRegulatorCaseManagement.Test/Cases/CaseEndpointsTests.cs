@@ -2354,6 +2354,44 @@ public class CaseEndpointsTests
 	}
 
 	[Fact]
+	public async Task AddNote_records_the_percent_decoded_user_name()
+	{
+		// Arrange
+		var cancellationToken = TestContext.Current.CancellationToken;
+		await using var factory = NewFactory(userId: "gwyn-1", userName: "Gw%C5%B7n%20Jones");
+		using var client = factory.CreateClient();
+
+		var id = Ulid.NewUlid().ToString();
+		await factory.SeedAsync(
+			new Case
+			{
+				SourceSystemId = Ulid.NewUlid().ToString(),
+				CallbackUrl = "https://source-system.test/callback",
+				Nation = "ENGLAND",
+				OrgId = "test-org",
+				Id = id,
+				CaseType = CaseType,
+				StateId = "submitted",
+				SubmittedBy = "test-client",
+			},
+			cancellationToken
+		);
+
+		// Act
+		var response = await client.PostAsJsonAsync(
+			$"/cases/{id}/notes",
+			new { text = "Reviewed evidence." },
+			cancellationToken
+		);
+
+		// Assert
+		response.StatusCode.Should().Be(HttpStatusCode.OK);
+		var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
+		var note = body!.Timeline!.Should().ContainSingle(a => a.Action == "note-added").Subject;
+		note.PerformedByName.Should().Be("Gwŷn Jones");
+	}
+
+	[Fact]
 	public async Task AddNote_returns_400_when_text_missing()
 	{
 		var cancellationToken = TestContext.Current.CancellationToken;

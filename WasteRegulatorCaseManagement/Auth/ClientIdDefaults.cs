@@ -23,7 +23,10 @@ public static class ClientIdDefaults
 	/// <summary>
 	/// Optional header carrying the end user's display name (used for audit
 	/// log lines and as the snapshot name on assignment writes so list views
-	/// can render an assignee without a separate lookup).
+	/// can render an assignee without a separate lookup). The value is
+	/// percent-encoded UTF-8, because HTTP header values cannot carry
+	/// characters such as <c>ŵ</c>; it is signed as sent and decoded into
+	/// the <c>"user:name"</c> claim.
 	/// </summary>
 	public const string DefaultUserNameHeaderName = "x-cdp-user-name";
 
