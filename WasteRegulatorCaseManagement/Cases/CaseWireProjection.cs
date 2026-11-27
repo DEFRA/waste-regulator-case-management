@@ -119,7 +119,7 @@ internal static class CaseWireProjection
 			JsonDocument.Parse(spec.PayloadTemplate.ToJson()).RootElement.Clone()
 		);
 
-	private static IReadOnlyCollection<CaseTimelineEntryResponse> MapTimeline(
+	private static List<CaseTimelineEntryResponse> MapTimeline(
 		IReadOnlyList<CaseTimelineEntry> timeline
 	) =>
 		timeline

@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace WasteRegulatorCaseManagement.AuditEvents;
 
@@ -19,6 +20,8 @@ public abstract class AuditEventProcessorBase(
 	internal abstract Task ProcessBatch(CancellationToken cancellationToken);
 
 	[ExcludeFromCodeCoverage(Justification = "BackgroundService timer loop is not unit testable.")]
+	[SuppressMessage("Reliability", "CA2254:Template should be a static expression",
+		Justification = "Message is a constructor-injected constant specific to each processor subclass.")]
 	protected sealed override async Task ExecuteAsync(CancellationToken stoppingToken)
 	{
 		if (string.IsNullOrWhiteSpace(topicArn))
