@@ -1,7 +1,5 @@
 using System.ComponentModel;
-using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
-using MongoDB.Bson;
 
 namespace WasteRegulatorCaseManagement.Cases;
 
@@ -78,58 +76,7 @@ public sealed record CaseResponse(
 
 	[property: Description("Everything that has happened to the case, newest first.")]
 	IReadOnlyCollection<CaseTimelineEntryResponse>? Timeline = null
-)
-{
-	/// <summary>Maps an engine projection to the detail wire shape.</summary>
-	[SuppressMessage(
-		"Major Code Smell",
-		"S107:Methods should not have too many parameters",
-		Justification = "Flat OpenAPI case detail; nested DTOs would change the wire shape."
-	)]
-	internal static CaseResponse FromProjection(CaseEngineProjection projection)
-	{
-		var w = projection.Case;
-		return new CaseResponse(
-			w.Id,
-			w.CaseType,
-			w.StateId,
-			w.IsTerminal,
-			w.SubmittedAt,
-			w.LastModifiedAt,
-			w.SubmittedBy,
-			projection.TemplateVersion,
-			w.SourceSystemId,
-			new CompletionEventResponse(
-				w.CompletionEvent.EventType,
-				JsonDocument.Parse(w.CompletionEvent.PayloadTemplate.ToJson()).RootElement.Clone()
-			),
-			w.Nation,
-			w.OrgId,
-			w.ProducerType,
-			w.DisplayData,
-			projection.AvailableActions,
-			w.Decision,
-			w.AssignedToId,
-			w.AssignedToName,
-			w.AssignedAt,
-			w.AssignedBy,
-			w.Timeline.Select((e, i) => (Entry: e, Index: i))
-				.OrderByDescending(x => x.Entry.PerformedAt)
-				.ThenByDescending(x => x.Index)
-				.Select(x => new CaseTimelineEntryResponse(
-					x.Entry.Id,
-					x.Entry.Action,
-					x.Entry.ActionDisplayName,
-					x.Entry.Details,
-					x.Entry.PerformedAt,
-					x.Entry.PerformedById,
-					x.Entry.PerformedByName,
-					x.Entry.StateId
-				))
-				.ToList()
-		);
-	}
-}
+);
 
 [Description("Completion event template stored on the case at intake.")]
 public sealed record CompletionEventResponse(

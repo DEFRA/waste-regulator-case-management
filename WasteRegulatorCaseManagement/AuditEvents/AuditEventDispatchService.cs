@@ -41,7 +41,8 @@ public sealed class AuditEventDispatchService(
 		{
 			filter = Builders<AuditEvent>.Filter.And(
 				filter,
-				Builders<AuditEvent>.Filter.Exists(nameof(AuditEvent.CompletionEnvelope), true)
+				Builders<AuditEvent>.Filter.Exists(nameof(AuditEvent.CompletionEnvelope), true),
+				Builders<AuditEvent>.Filter.Ne(a => a.CompletionEnvelope, null)
 			);
 		}
 
