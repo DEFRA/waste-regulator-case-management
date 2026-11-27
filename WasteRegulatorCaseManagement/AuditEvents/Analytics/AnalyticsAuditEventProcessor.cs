@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
 namespace WasteRegulatorCaseManagement.AuditEvents.Analytics;
@@ -15,37 +14,18 @@ public sealed class AnalyticsAuditEventProcessor(
 	IAnalyticsEventSender analyticsEventSender,
 	IOptions<AnalyticsAuditEventProcessorOptions> options,
 	ILogger<AnalyticsAuditEventProcessor> logger
-) : BackgroundService
+) : AuditEventProcessorBase(
+	options.Value.TopicArn,
+	AnalyticsAuditEventProcessorOptions.SectionName,
+	options.Value.PollIntervalSeconds,
+	options.Value.PollJitterSeconds,
+	"Analytics audit event processing failed",
+	logger
+)
 {
 	private const string ProcessName = AuditEventService.AnalyticsProcessName;
 
-	protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-	{
-		if (string.IsNullOrWhiteSpace(options.Value.TopicArn))
-		{
-			throw new InvalidOperationException(
-				$"{AnalyticsAuditEventProcessorOptions.SectionName}:TopicArn is required when processing is enabled."
-			);
-		}
-
-		await Delay(stoppingToken);
-
-		while (!stoppingToken.IsCancellationRequested)
-		{
-			try
-			{
-				await ProcessBatch(stoppingToken);
-			}
-			catch (Exception exception) when (exception is not OperationCanceledException)
-			{
-				logger.LogError(exception, "Analytics audit event processing failed");
-			}
-
-			await Delay(stoppingToken);
-		}
-	}
-
-	internal async Task ProcessBatch(CancellationToken cancellationToken)
+	internal override async Task ProcessBatch(CancellationToken cancellationToken)
 	{
 		var leaseDuration = TimeSpan.FromSeconds(options.Value.LeaseDurationSeconds);
 
@@ -101,13 +81,5 @@ public sealed class AnalyticsAuditEventProcessor(
 		{
 			await auditEventLeaseService.Release(ProcessName, cancellationToken);
 		}
-	}
-
-	private Task Delay(CancellationToken cancellationToken)
-	{
-		var pollInterval = TimeSpan.FromSeconds(options.Value.PollIntervalSeconds);
-		var jitter = TimeSpan.FromSeconds(Random.Shared.Next(0, options.Value.PollJitterSeconds + 1));
-
-		return Task.Delay(pollInterval + jitter, cancellationToken);
 	}
 }

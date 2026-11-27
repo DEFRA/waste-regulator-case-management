@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
 namespace WasteRegulatorCaseManagement.AuditEvents.Completion;
@@ -13,37 +12,18 @@ public sealed class CaseCompletionAuditEventProcessor(
 	ICompletionEventSender completionEventSender,
 	IOptions<CaseCompletionEventProcessorOptions> options,
 	ILogger<CaseCompletionAuditEventProcessor> logger
-) : BackgroundService
+) : AuditEventProcessorBase(
+	options.Value.TopicArn,
+	CaseCompletionEventProcessorOptions.SectionName,
+	options.Value.PollIntervalSeconds,
+	options.Value.PollJitterSeconds,
+	"Case completion event processing failed",
+	logger
+)
 {
 	private const string ProcessName = AuditEventService.CompletionProcessName;
 
-	protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-	{
-		if (string.IsNullOrWhiteSpace(options.Value.TopicArn))
-		{
-			throw new InvalidOperationException(
-				$"{CaseCompletionEventProcessorOptions.SectionName}:TopicArn is required when processing is enabled."
-			);
-		}
-
-		await Delay(stoppingToken);
-
-		while (!stoppingToken.IsCancellationRequested)
-		{
-			try
-			{
-				await ProcessBatch(stoppingToken);
-			}
-			catch (Exception exception) when (exception is not OperationCanceledException)
-			{
-				logger.LogError(exception, "Case completion event processing failed");
-			}
-
-			await Delay(stoppingToken);
-		}
-	}
-
-	internal async Task ProcessBatch(CancellationToken cancellationToken)
+	internal override async Task ProcessBatch(CancellationToken cancellationToken)
 	{
 		var leaseDuration = TimeSpan.FromSeconds(options.Value.LeaseDurationSeconds);
 
@@ -63,10 +43,8 @@ public sealed class CaseCompletionAuditEventProcessor(
 
 			foreach (var auditEvent in auditEvents)
 			{
-				if (auditEvent.CompletionEnvelope is not { } envelope)
-				{
-					continue;
-				}
+				// ReadUnsent(requireCompletionEnvelope: true) guarantees the envelope is present.
+				var envelope = auditEvent.CompletionEnvelope!;
 
 				if (!await auditEventLeaseService.TryRenew(ProcessName, leaseDuration, cancellationToken))
 				{
@@ -105,13 +83,5 @@ public sealed class CaseCompletionAuditEventProcessor(
 		{
 			await auditEventLeaseService.Release(ProcessName, cancellationToken);
 		}
-	}
-
-	private Task Delay(CancellationToken cancellationToken)
-	{
-		var pollInterval = TimeSpan.FromSeconds(options.Value.PollIntervalSeconds);
-		var jitter = TimeSpan.FromSeconds(Random.Shared.Next(0, options.Value.PollJitterSeconds + 1));
-
-		return Task.Delay(pollInterval + jitter, cancellationToken);
 	}
 }
