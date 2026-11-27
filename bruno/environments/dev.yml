@@ -18,8 +18,8 @@ variables:
     name: CDP_API_KEY
     description: ""
   - secret: true
-    name: AUTH_SHARED_SECRET__CASE_INTAKE
+    name: AUTH_API_KEY__CASE_INTAKE
     description: ""
   - secret: true
-    name: AUTH_SHARED_SECRET__MANAGEMENT_FE
+    name: AUTH_API_KEY__MANAGEMENT_FE
     description: ""

@@ -174,7 +174,7 @@ public sealed class CaseService : ICaseService
 		// application context so audit consumers can reconstruct who
 		// submitted from where without joining back to request logs.
 		// 'source' is caller-supplied (the BFF forwards it);
-		// 'clientId' is the caller-asserted, HMAC-verified client id
+		// 'clientId' is the caller-asserted, API-key-verified client id
 		// (see ClientIdAuthenticationHandler).
 		AppendTimelineEntry(
 			caseRecord,

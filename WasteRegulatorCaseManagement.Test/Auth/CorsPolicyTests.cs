@@ -31,16 +31,14 @@ public class CorsPolicyTests
 	[InlineData("x-cdp-client-id")]
 	[InlineData("x-cdp-user-id")]
 	[InlineData("x-cdp-user-name")]
-	[InlineData("x-cdp-auth-signature")]
-	[InlineData("x-cdp-auth-timestamp")]
-	[InlineData("x-cdp-auth-nonce")]
+	[InlineData("x-cdp-auth-key")]
 	[InlineData("Authorization")]
 	[InlineData("Cookie")]
 	[InlineData("x-api-key")]
 	public async Task Preflight_does_not_allow_x_cdp_identity_header(string forbiddenHeader)
 	{
 		// Defence-in-depth: these headers are BFF-injected server-side and the
-		// HMAC signature check is the primary defence; CORS must not advertise
+		// API key check is the primary defence; CORS must not advertise
 		// them to browsers. Authorization / Cookie are caller credentials we
 		// never accept cross-origin (CDP traffic comes via the BFF).
 		var cancellationToken = TestContext.Current.CancellationToken;

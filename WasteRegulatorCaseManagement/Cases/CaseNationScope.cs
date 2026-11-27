@@ -4,7 +4,7 @@ namespace WasteRegulatorCaseManagement.Cases;
 
 /// <summary>
 /// Cases are scoped by nation: a caseworker sees and acts on only the cases
-/// of the nation in their signed <c>user:nation</c> claim, whose values are
+/// of the nation in their <c>user:nation</c> claim, whose values are
 /// those of <see cref="CaseNations.All"/>.
 /// </summary>
 internal static class CaseNationScope

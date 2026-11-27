@@ -41,19 +41,10 @@ Create via the CDP self-service portal under the service's "secrets" tab:
 
 | Secret               | Notes                                                                                                                    |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `AUTH_SHARED_SECRET__MANAGEMENT_FE` | HMAC secret used to verify signed trust headers from the regulator frontend (see [BFF signing contract](#bff-signing-contract) below). Must match the secret the regulator frontend signs with. **Required in all non-Development environments.** The service will reject every authenticated request with `401` until at least one caller's secret is set (see RA-345 below). Generate with `openssl rand -base64 32`. |
-| `AUTH_SHARED_SECRET__CASE_INTAKE` | HMAC secret used to verify signed trust headers from the Case Intake Processor (see [BFF signing contract](#bff-signing-contract) below). Must match the secret the Case Intake Processor signs with. **Required in all non-Development environments.** Distinct from `AUTH_SHARED_SECRET__MANAGEMENT_FE` — each caller has its own secret so one can be rotated without touching the other (RA-345). Generate with `openssl rand -base64 32`. |
+| `AUTH_API_KEY__MANAGEMENT_FE` | The API key the regulator frontend sends in `x-cdp-auth-key` (see [Caller API keys](#caller-api-keys) below). **Required in all non-Development environments.** The service will reject every authenticated request with `401` until at least one caller's key is set. Generate with `openssl rand -base64 32`. |
+| `AUTH_API_KEY__CASE_INTAKE` | The API key the Case Intake Processor sends in `x-cdp-auth-key` (see [Caller API keys](#caller-api-keys) below). **Required in all non-Development environments.** Distinct from `AUTH_API_KEY__MANAGEMENT_FE` — each caller has its own key so one can be rotated or revoked without touching the other (RA-345). Generate with `openssl rand -base64 32`. |
 | `CALLBACK_AUTH__CSOC` | Basic credentials, as `clientId:clientSecret`, that this service presents when it PATCHes a concluded CSoC case to the Waste Obligations API. The client must be on the Waste Obligations API's access list with `write` scope, to send the decision, and `read` scope, to check a decision it refuses as already held. Without it the callback is sent unauthenticated and rejected, so CSoC cases cannot be accepted or cancelled. |
 | `NOTIFY_API_KEY`     | GOV.UK Notify API key. Only takes effect when the `Notify__Enabled` master switch is `true` (RA-422; default `false`, set per environment in cdp-app-config). With the flag off — the default in every environment — the no-op client is registered, so no email is sent regardless of this key. With the flag on but this key absent, the service boots with a no-op Notify client (notifications logged, not sent). Even with the flag on and this key set, dev and localhost suppress sending regardless — see [Notify sending by environment](#notify-sending-by-environment). |
-
-> **RA-345 (per-caller secrets):** prior to RA-345 there was a single
-> `AUTH_SHARED_SECRET` shared by both inbound callers, with `clientId`
-> self-asserted rather than bound to the secret — any holder of the one
-> secret could forge a request claiming to be either caller. `AUTH_SHARED_SECRET`
-> is no longer read by this service; it has been replaced by the two secrets
-> above, each verified only against the specific `clientId` it is registered
-> for. See `docs/adr/0005-rbac-in-frontend-drop-roles-from-payload.md`'s
-> "Follow-up: per-caller shared secrets" section for the rationale.
 
 ## Notify sending by environment
 
@@ -97,70 +88,25 @@ sending environment). Environment variables for deployed environments live in
 [DEFRA/cdp-app-config](https://github.com/DEFRA/cdp-app-config), not in this
 repo.
 
-## BFF signing contract
+## Caller API keys
 
-Every request a caller sends to this backend must carry the four headers below,
-alongside the identity headers it signs. The backend verifies them before
-accepting the identity headers as authoritative. Requests missing any of these headers, or with an invalid
-signature, are rejected with `401`.
+Every request a caller sends to this backend must carry the two headers below,
+alongside the identity headers. Outside Development, a request missing either
+header, or whose key is not the one registered for its client id, is rejected
+with `401`.
 
-| Header                    | Description                                                                                      |
-| ------------------------- | ------------------------------------------------------------------------------------------------ |
-| `x-cdp-client-id` | The clientId the caller asserts (each caller sets this from its own config — see RA-345 above). The `x-cdp-` prefix matches this scheme's other trust headers by convention only — this value is *not* injected or verified by CDP itself, which is exactly why the HMAC signature below exists. |
-| `x-cdp-auth-timestamp`    | ISO-8601 UTC instant the BFF assembled the request (e.g. `2026-05-18T10:00:00Z`). Must be within 5 minutes of the backend clock. |
-| `x-cdp-auth-nonce`        | Per-request opaque random token minted by the BFF (e.g. base64url of 16 random bytes). Single-use — a replayed nonce is rejected for 10 minutes. |
-| `x-cdp-auth-signature`    | Base64 HMAC-SHA256 of the canonical payload (see below), keyed with the secret registered for the asserted `x-cdp-client-id` (`AUTH_SHARED_SECRET__MANAGEMENT_FE` or `AUTH_SHARED_SECRET__CASE_INTAKE` — see RA-345 above). |
+| Header            | Description |
+| ----------------- | ----------- |
+| `x-cdp-client-id` | The clientId the caller asserts (each caller sets this from its own config). The `x-cdp-` prefix matches this scheme's other trust headers by convention only — this value is *not* injected or verified by CDP itself, which is exactly why the API key exists. |
+| `x-cdp-auth-key`  | The API key registered for the asserted `x-cdp-client-id` (`AUTH_API_KEY__MANAGEMENT_FE` or `AUTH_API_KEY__CASE_INTAKE`). Not `x-api-key`, which the CDP API gateway uses for developer API keys. |
 
-### Canonical payload (v3)
-
-Join the following fields with a newline (`\n`), in this order, then compute
-`HMAC-SHA256(key=secret for the asserted clientId, message=payload)` and base64-encode the result.
-Two wire forms exist — see `docs/adr/0007-role-nation-in-v3-payload-dual-form.md`
-for which peer uses which and why both are accepted.
-
-**Legacy form** — the original v3 string. This is what a service caller with no
-user role or nation (the Case Intake Processor) signs:
-
-```
-v3
-{x-cdp-client-id}
-{x-cdp-user-id or ""}
-{x-cdp-user-name or ""}
-{x-cdp-auth-timestamp}
-{x-cdp-auth-nonce}
-```
-
-**Extended form (RA-469)** — adds the role, nation and email trust headers so
-they carry the same signed-integrity guarantee as user-id/user-name. This is what
-the regulator frontend signs on every call (each as `""` when it has
-none to forward), and the **only** form accepted when any of `x-cdp-user-role`,
-`x-cdp-user-nation` or `x-cdp-user-email` is present on the request:
-
-```
-v3
-{x-cdp-client-id}
-{x-cdp-user-id or ""}
-{x-cdp-user-name or ""}
-{x-cdp-user-role or ""}
-{x-cdp-user-nation or ""}
-{x-cdp-user-email or ""}
-{x-cdp-auth-timestamp}
-{x-cdp-auth-nonce}
-```
-
-Empty-string placeholders must be included for absent optional fields — the
-field count and separator positions are fixed within each form. When a request
-carries no role, nation or email header, either form verifies; when it carries
-one, only the extended form over the sent values does. The email is sent to the
-source system as the deciding user's address when a case is concluded (see
-`docs/cases.md`). Nation scopes every caseworker route (`ENGLAND`, `WALES`,
-`SCOTLAND` or `N_IRELAND`; see `docs/cases.md`); role is an audit-only claim,
-and role-based authorization is the BFF's concern (see
+The key is a credential: callers must keep it out of logs and traces. Nation
+scopes every caseworker route (`ENGLAND`, `WALES`, `SCOTLAND` or `N_IRELAND`;
+see `docs/cases.md`); role is an audit-only claim, and role-based
+authorization is the BFF's concern (see
 `docs/adr/0005-rbac-in-frontend-drop-roles-from-payload.md`). See
-`ClientIdAuthenticationHandler.ComputeSignature` / `VerifySignature` for the
-authoritative implementation and
-`docs/adr/0003-hmac-canonical-v2-timestamp-nonce.md` for the timestamp/nonce
-rationale.
+`docs/adr/0012-per-caller-api-keys-replace-hmac.md` for why API keys replaced
+HMAC signing.
 
 ## AWS resources to provision
 

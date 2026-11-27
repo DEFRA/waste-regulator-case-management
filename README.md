@@ -132,28 +132,27 @@ OpenAPI document.
 ## Authentication
 
 Every case endpoint requires a client id in the `x-cdp-client-id` header.
-CDP does not verify it: outside Development the caller must also sign the
-request with HMAC-SHA256 over a canonical payload, using the secret
-registered for that client id (see
-[BFF signing contract](docs/cdp-deployment.md#bff-signing-contract)). Two
-callers are registered:
+CDP does not verify it: outside Development the caller must also send the
+API key registered for that client id in `x-cdp-auth-key` (see
+[Caller API keys](docs/cdp-deployment.md#caller-api-keys)). Two callers are
+registered:
 
 - **The [Case Intake Processor](https://github.com/DEFRA/waste-case-intake-processor/)**
   is the only caller that can create cases.
 - **The regulator frontend** acts for a caseworker, forwarding the user's id,
-  name, nation and email as signed headers. A caseworker sees and acts on the
+  name, nation and email as headers. A caseworker sees and acts on the
   cases of their own nation only.
 
-In Development only, with no client secrets configured, the handler trusts
-the headers without a signature:
+In Development only, with no API keys configured, the handler trusts the
+headers without a key:
 
 ```bash
 curl -H 'x-cdp-client-id: frontend' -H 'x-cdp-user-id: stub-caseworker-1' \
   -H 'x-cdp-user-nation: ENGLAND' http://localhost:8085/cases
 ```
 
-Requests without the header (or, outside Development, without a valid
-signature) receive `401 Unauthorized`.
+Requests without the header (or, outside Development, without a valid API
+key) receive `401 Unauthorized`.
 
 ## Configuration
 
@@ -167,15 +166,15 @@ per-environment list — the tables below summarise it.
 
 | Variable | Secret? | Description |
 | --- | --- | --- |
-| `AUTH_SHARED_SECRET__CASE_INTAKE` | Yes | Verifies inbound signed requests from the Case Intake Processor — must match the secret it signs with exactly |
-| `AUTH_SHARED_SECRET__MANAGEMENT_FE` | Yes | Verifies inbound signed requests from the regulator frontend — must match the secret it signs with exactly |
+| `AUTH_API_KEY__CASE_INTAKE` | Yes | The API key the Case Intake Processor must send in `x-cdp-auth-key` |
+| `AUTH_API_KEY__MANAGEMENT_FE` | Yes | The API key the regulator frontend must send in `x-cdp-auth-key` |
 | `CALLBACK_AUTH__CSOC` | Yes | `clientId:clientSecret` for the Waste Obligations API, sent as Basic auth on the CSoC decision callback |
 | `Auth__CaseIntakeClientId` | No | Expected `x-cdp-client-id` on inbound calls from the Case Intake Processor (default `case-intake-processor`) |
 | `Auth__ManagementFeClientId` | No | Expected `x-cdp-client-id` on inbound calls from the regulator frontend (default `frontend`) — must differ from `Auth__CaseIntakeClientId` or the service throws at first request |
 
-The `CASE_INTAKE` and `MANAGEMENT_FE` secrets are optional in Development (the
-handler falls back to header-trust mode while no caller secret at all is
-registered) but required in every other environment.
+The `CASE_INTAKE` and `MANAGEMENT_FE` API keys are optional in Development
+(the handler falls back to header-trust mode while no caller API key at all
+is registered) but required in every other environment.
 
 ### GOV.UK Notify
 
@@ -205,8 +204,8 @@ registered) but required in every other environment.
 ### Example local/testing values
 
 ```bash
-AUTH_SHARED_SECRET__CASE_INTAKE=local-fake-case-intake-shared-secret-do-not-use
-AUTH_SHARED_SECRET__MANAGEMENT_FE=local-fake-managementfe-shared-secret-do-not-use
+AUTH_API_KEY__CASE_INTAKE=local-fake-case-intake-api-key-do-not-use
+AUTH_API_KEY__MANAGEMENT_FE=local-fake-managementfe-api-key-do-not-use
 NOTIFY_API_KEY=local-dev-not-a-real-notify-key
 ```
 

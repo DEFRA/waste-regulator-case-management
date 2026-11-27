@@ -1159,8 +1159,8 @@ public class CaseEndpointsTests
 	public async Task Get_by_id_returns_ok_for_item_not_submitted_by_caller()
 	{
 		// RBAC (who may look at whose items) now lives entirely in the
-		// frontend/BFF; the backend trusts any authenticated (shared-secret
-		// signed) caller and does not check ownership.
+		// frontend/BFF; the backend trusts any authenticated (API key
+		// verified) caller and does not check ownership.
 		var cancellationToken = TestContext.Current.CancellationToken;
 		await using var factory = NewFactory();
 		using var client = factory.CreateClient();
@@ -2330,6 +2330,78 @@ public class CaseEndpointsTests
 		var response = await client.PostAsync($"/cases/{id}/notes", content, cancellationToken);
 
 		response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+	}
+
+	[Fact]
+	public async Task AddNote_without_a_user_id_returns_401()
+	{
+		// Arrange
+		var cancellationToken = TestContext.Current.CancellationToken;
+		await using var factory = NewFactory(userId: null);
+		using var client = factory.CreateClient();
+		var id = Ulid.NewUlid().ToString();
+		await factory.SeedAsync(
+			new Case
+			{
+				SourceSystemId = Ulid.NewUlid().ToString(),
+				CallbackUrl = "https://source-system.test/callback",
+				Nation = "ENGLAND",
+				OrgId = "test-org",
+				Id = id,
+				CaseType = CaseType,
+				StateId = "submitted",
+				SubmittedBy = "test-client",
+			},
+			cancellationToken
+		);
+
+		// Act
+		var response = await client.PostAsJsonAsync(
+			$"/cases/{id}/notes",
+			new { text = "Reviewed evidence." },
+			cancellationToken
+		);
+
+		// Assert
+		using var scope = new AssertionScope();
+		response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+		(await response.Content.ReadAsStringAsync(cancellationToken)).Should().Contain("the request did not include a 'user:id' claim");
+	}
+
+	[Fact]
+	public async Task AddNote_without_a_nation_returns_403()
+	{
+		// Arrange
+		var cancellationToken = TestContext.Current.CancellationToken;
+		await using var factory = NewFactory(nation: null);
+		using var client = factory.CreateClient();
+		var id = Ulid.NewUlid().ToString();
+		await factory.SeedAsync(
+			new Case
+			{
+				SourceSystemId = Ulid.NewUlid().ToString(),
+				CallbackUrl = "https://source-system.test/callback",
+				Nation = "ENGLAND",
+				OrgId = "test-org",
+				Id = id,
+				CaseType = CaseType,
+				StateId = "submitted",
+				SubmittedBy = "test-client",
+			},
+			cancellationToken
+		);
+
+		// Act
+		var response = await client.PostAsJsonAsync(
+			$"/cases/{id}/notes",
+			new { text = "Reviewed evidence." },
+			cancellationToken
+		);
+
+		// Assert
+		using var scope = new AssertionScope();
+		response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+		(await response.Content.ReadAsStringAsync(cancellationToken)).Should().Contain("requires a 'user:nation' claim");
 	}
 
 	[Fact]

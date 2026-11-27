@@ -189,7 +189,7 @@ static void ConfigureAuth(IServiceCollection services, IConfiguration configurat
 		.Configure<IConfiguration>(
 			(options, config) =>
 			{
-				options.ClientSecrets = BuildClientSecrets(config);
+				options.ApiKeys = BuildApiKeys(config);
 				options.MaxClientIdLength = config.GetValue(
 					"Auth:MaxClientIdLength",
 					options.MaxClientIdLength
@@ -201,18 +201,6 @@ static void ConfigureAuth(IServiceCollection services, IConfiguration configurat
 				options.MaxUserNameLength = config.GetValue(
 					"Auth:MaxUserNameLength",
 					options.MaxUserNameLength
-				);
-				options.MaxSignatureLength = config.GetValue(
-					"Auth:MaxSignatureLength",
-					options.MaxSignatureLength
-				);
-				options.MaxTimestampLength = config.GetValue(
-					"Auth:MaxTimestampLength",
-					options.MaxTimestampLength
-				);
-				options.MaxNonceLength = config.GetValue(
-					"Auth:MaxNonceLength",
-					options.MaxNonceLength
 				);
 			}
 		);
@@ -230,77 +218,64 @@ static void ConfigureAuth(IServiceCollection services, IConfiguration configurat
 				)
 		)
 	);
-
-	// RA-525: Mongo-backed replay store, shared across every running
-	// instance — replaces the old per-process IMemoryCache. Registered
-	// behind a Lazy<> (see ClientIdAuthenticationHandler's constructor
-	// comment) so constructing the handler — which happens for every
-	// request, not just signed ones (RA-105) — never depends on Mongo
-	// being reachable.
-	services.AddSingleton<IClientIdAuthNonceStore, ClientIdAuthNonceStore>();
-	services.AddSingleton(sp => new Lazy<IClientIdAuthNonceStore>(() =>
-		sp.GetRequiredService<IClientIdAuthNonceStore>()
-	));
 }
 
-// RA-345: per-caller secrets, keyed by the clientId each caller is expected
-// to assert. Each caller gets its own secret env var so one can be rotated
-// without touching the other — see ADR-0005's "Follow-up: per-caller
-// shared secrets" section.
+// Per-caller API keys, keyed by the clientId each caller is expected to
+// assert. Each caller gets its own key env var so one can be rotated or
+// revoked without touching the other — see ADR-0006 and ADR-0012.
 [ExcludeFromCodeCoverage]
-static IReadOnlyDictionary<string, string> BuildClientSecrets(IConfiguration config)
+static IReadOnlyDictionary<string, string> BuildApiKeys(IConfiguration config)
 {
 	var map = new Dictionary<string, string>(StringComparer.Ordinal);
 	// Config-key form, NOT the literal env var name: EnvironmentVariablesConfigurationProvider
 	// rewrites "__" to ":" while loading, so the real env var
-	// AUTH_SHARED_SECRET__MANAGEMENT_FE is stored under config key
-	// "AUTH_SHARED_SECRET:MANAGEMENT_FE" — a GetValue call using the literal
+	// AUTH_API_KEY__MANAGEMENT_FE is stored under config key
+	// "AUTH_API_KEY:MANAGEMENT_FE" — a GetValue call using the literal
 	// double-underscore string never matches it.
-	AddCallerSecret(
+	AddCallerApiKey(
 		map,
 		config,
 		callerName: "ManagementFe",
 		clientIdKey: "Auth:ManagementFeClientId",
 		clientIdDefault: "frontend",
-		secretKey: "AUTH_SHARED_SECRET:MANAGEMENT_FE"
+		apiKeyKey: "AUTH_API_KEY:MANAGEMENT_FE"
 	);
-	AddCallerSecret(
+	AddCallerApiKey(
 		map,
 		config,
 		callerName: "CaseIntake",
 		clientIdKey: CaseIntakePolicy.ClientIdKey,
 		clientIdDefault: CaseIntakePolicy.DefaultClientId,
-		secretKey: "AUTH_SHARED_SECRET:CASE_INTAKE"
+		apiKeyKey: "AUTH_API_KEY:CASE_INTAKE"
 	);
 	return map;
 }
 
 [ExcludeFromCodeCoverage]
-static void AddCallerSecret(
+static void AddCallerApiKey(
 	Dictionary<string, string> map,
 	IConfiguration config,
 	string callerName,
 	string clientIdKey,
 	string clientIdDefault,
-	string secretKey
+	string apiKeyKey
 )
 {
-	var secret = config.GetValue<string>(secretKey);
-	if (string.IsNullOrEmpty(secret))
+	var apiKey = config.GetValue<string>(apiKeyKey);
+	if (string.IsNullOrEmpty(apiKey))
 	{
-		// Caller not configured yet — same "not signed" posture as today
-		// when AUTH_SHARED_SECRET was unset.
+		// Caller not configured yet.
 		return;
 	}
 
 	var clientId = config.GetValue(clientIdKey, clientIdDefault);
 
 	// Fail LOUD: two callers configured to assert the same clientId would
-	// mean the second caller's secret silently overwrites the first's in
-	// the map, breaking the first caller's signing and defeating the
-	// entire point of per-caller secrets (RA-345). Always a config
-	// mistake — never a legitimate state — so this throws rather than
-	// silently letting the later AddCallerSecret call win.
+	// mean the second caller's key silently overwrites the first's in the
+	// map, locking the first caller out and defeating the entire point of
+	// per-caller keys (RA-345). Always a config mistake — never a
+	// legitimate state — so this throws rather than silently letting the
+	// later AddCallerApiKey call win.
 	if (map.ContainsKey(clientId))
 	{
 		throw new InvalidOperationException(
@@ -311,7 +286,7 @@ static void AddCallerSecret(
 		);
 	}
 
-	map[clientId] = secret;
+	map[clientId] = apiKey;
 }
 
 [ExcludeFromCodeCoverage]
@@ -330,13 +305,9 @@ static void ConfigureHeaderPropagation(IServiceCollection services, IConfigurati
 		// Things deliberately NOT propagated:
 		//   * Authorization, Cookie  — caller credentials must never be
 		//     replayed verbatim to a downstream API.
-		//   * x-cdp-auth-signature, x-cdp-auth-timestamp, x-cdp-auth-nonce,
-		//     x-api-key — caller-bound to THIS request: the signature is an
-		//     HMAC over the trust headers for THIS API, the timestamp
-		//     bounds replay against THIS API's clock, and the nonce is
-		//     burned in THIS API's replay cache. Forwarding any of them
-		//     downstream would either leak the integrity proof to another
-		//     service or replay the nonce out of band.
+		//   * x-cdp-auth-key, x-api-key — caller credentials for THIS
+		//     API and the CDP gateway. Forwarding either downstream would
+		//     leak it to another service.
 		//   * x-cdp-user-id, x-cdp-user-name,
 		//     x-cdp-client-id — identity headers from the BFF are
 		//     for THIS service to consume; downstream services that need
@@ -489,12 +460,11 @@ static void ConfigureCors(IServiceCollection services, IConfiguration configurat
 						//     credentials over CORS. CDP traffic reaches this
 						//     service via the server-side BFF, not directly from
 						//     a browser.
-						//   * x-cdp-auth-signature, x-cdp-auth-timestamp,
-						//     x-cdp-auth-nonce, x-api-key — HMAC inputs are
-						//     injected by the BFF server-side and must never
-						//     originate from a browser. The HMAC check remains
-						//     the primary defence; excluding them here ensures a
-						//     browser preflight cannot even smuggle them.
+						//   * x-cdp-auth-key, x-api-key — API keys are injected
+						//     server-side and must never originate from a
+						//     browser. The API key check remains the primary
+						//     defence; excluding them here ensures a browser
+						//     preflight cannot even smuggle them.
 						//   * x-cdp-user-id, x-cdp-user-name,
 						//     x-cdp-client-id — identity headers are
 						//     BFF-injected and must not be browser-supplied.

@@ -1,7 +1,7 @@
 # ADR-0003: HMAC canonical payload v2 — timestamp + nonce required
 
 **Date:** 2026-04-30
-**Status:** Accepted
+**Status:** Superseded by [ADR-0012](0012-per-caller-api-keys-replace-hmac.md)
 
 ## Context
 

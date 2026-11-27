@@ -2,7 +2,7 @@ namespace WasteRegulatorCaseManagement.Auth;
 
 /// <summary>
 /// Authorisation policy for creating cases: only the Case Intake Processor,
-/// identified by its HMAC-verified client id, may call <c>POST /cases</c>.
+/// identified by its API-key-verified client id, may call <c>POST /cases</c>.
 /// </summary>
 public static class CaseIntakePolicy
 {

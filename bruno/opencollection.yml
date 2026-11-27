@@ -23,15 +23,13 @@ request:
   scripts:
     - type: before-request
       code: |-
-        const CryptoJS = require("crypto-js");
-
         const isCaseIntake = req.getMethod() === "POST" && req.getUrl().endsWith("/cases");
         const clientId = isCaseIntake
           ? bru.getEnvVar("caseIntakeClientId")
           : bru.getEnvVar("frontendClientId");
-        const secret = isCaseIntake
-          ? bru.getEnvVar("AUTH_SHARED_SECRET__CASE_INTAKE")
-          : bru.getEnvVar("AUTH_SHARED_SECRET__MANAGEMENT_FE");
+        const callerApiKey = isCaseIntake
+          ? bru.getEnvVar("AUTH_API_KEY__CASE_INTAKE")
+          : bru.getEnvVar("AUTH_API_KEY__MANAGEMENT_FE");
         const userId = isCaseIntake ? "" : bru.getEnvVar("userId");
         const userName = isCaseIntake ? "" : bru.getEnvVar("userName");
         const nation = isCaseIntake ? "" : bru.getEnvVar("userNation");
@@ -45,13 +43,8 @@ request:
           req.setHeader("x-cdp-user-email", email);
         }
 
-        if (secret) {
-          const timestamp = new Date().toISOString();
-          const nonce = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-          const payload = ["v3", clientId, userId, userName, "", nation, email, timestamp, nonce].join("\n");
-          req.setHeader("x-cdp-auth-timestamp", timestamp);
-          req.setHeader("x-cdp-auth-nonce", nonce);
-          req.setHeader("x-cdp-auth-signature", CryptoJS.HmacSHA256(payload, secret).toString(CryptoJS.enc.Base64));
+        if (callerApiKey) {
+          req.setHeader("x-cdp-auth-key", callerApiKey);
         }
 
 docs:
@@ -62,15 +55,15 @@ docs:
 
     ## Set up
 
-    `local` needs nothing: the service runs in Development there and accepts unsigned requests.
+    `local` needs nothing: the service runs in Development there and accepts requests without a caller API key.
 
     For `dev`, set these secret variables in the `dev` environment. Bruno keeps their values on your machine, not in the repository.
 
     | Variable | Value |
     | --- | --- |
     | `CDP_API_KEY` | A [CDP developer API key](https://portal.cdp-int.defra.cloud/documentation/how-to/developer-api-key.md) |
-    | `AUTH_SHARED_SECRET__CASE_INTAKE` | The service's Case Intake secret in dev |
-    | `AUTH_SHARED_SECRET__MANAGEMENT_FE` | The service's regulator frontend secret in dev |
+    | `AUTH_API_KEY__CASE_INTAKE` | The service's Case Intake API key in dev |
+    | `AUTH_API_KEY__MANAGEMENT_FE` | The service's regulator frontend API key in dev |
 
     ## How requests are authenticated
 
@@ -81,7 +74,7 @@ docs:
     - `POST /cases` is sent as the Case Intake Processor (`caseIntakeClientId`).
     - Every other request is sent as the regulator frontend (`frontendClientId`), acting for the caseworker in the environment's `userId`, `userName`, `userEmail` and `userNation`.
 
-    When that caller's secret is set, the script also signs the request (`x-cdp-auth-timestamp`, `x-cdp-auth-nonce`, `x-cdp-auth-signature`) as described in the service's [BFF signing contract](https://github.com/DEFRA/waste-regulator-case-management/blob/main/docs/cdp-deployment.md#bff-signing-contract).
+    When that caller's API key is set, the script also sends it in `x-cdp-auth-key`, as described in the service's [caller API keys](https://github.com/DEFRA/waste-regulator-case-management/blob/main/docs/cdp-deployment.md#caller-api-keys).
 
     ## Running the collection
 

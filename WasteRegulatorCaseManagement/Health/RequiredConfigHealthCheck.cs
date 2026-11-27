@@ -6,8 +6,8 @@ namespace WasteRegulatorCaseManagement.Health;
 
 /// <summary>
 /// Readiness check for required config that otherwise has no signal at all when
-/// missing. <c>AddCallerSecret</c> (Program.cs) treats a blank per-caller shared
-/// secret as "caller not configured yet" and silently no-ops — intentional for
+/// missing. <c>AddCallerApiKey</c> (Program.cs) treats a blank per-caller API
+/// key as "caller not configured yet" and silently no-ops — intentional for
 /// local development (see appsettings.Development.json, which never sets any of
 /// these), but dangerous left unset in a deployed environment where nothing else
 /// reports it (RA-441).
@@ -21,23 +21,23 @@ public sealed class RequiredConfigHealthCheck(IConfiguration configuration, IHos
 	{
 		var missing = new List<string>();
 
-		// docs/cdp-deployment.md: both caller secrets are "Required in all
-		// non-Development environments." AddCallerSecret has no other signal when
-		// one is blank — the caller just never gets an entry in ClientSecrets.
+		// docs/cdp-deployment.md: both caller API keys are "Required in all
+		// non-Development environments." AddCallerApiKey has no other signal when
+		// one is blank — the caller just never gets an entry in ApiKeys.
 		if (!environment.IsDevelopment())
 		{
 			if (
 				string.IsNullOrWhiteSpace(
-					configuration.GetValue<string>("AUTH_SHARED_SECRET:MANAGEMENT_FE")
+					configuration.GetValue<string>("AUTH_API_KEY:MANAGEMENT_FE")
 				)
 			)
-				missing.Add("AUTH_SHARED_SECRET__MANAGEMENT_FE");
+				missing.Add("AUTH_API_KEY__MANAGEMENT_FE");
 			if (
 				string.IsNullOrWhiteSpace(
-					configuration.GetValue<string>("AUTH_SHARED_SECRET:CASE_INTAKE")
+					configuration.GetValue<string>("AUTH_API_KEY:CASE_INTAKE")
 				)
 			)
-				missing.Add("AUTH_SHARED_SECRET__CASE_INTAKE");
+				missing.Add("AUTH_API_KEY__CASE_INTAKE");
 		}
 
 		return Task.FromResult(
