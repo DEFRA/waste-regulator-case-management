@@ -11,7 +11,9 @@ namespace WasteRegulatorCaseManagement.Cases;
 
 // Marker type for IStructuredLogger category — CaseEndpoints is a
 // static class and therefore cannot itself be used as a type argument.
+#pragma warning disable S2094
 internal sealed class CaseEndpointsLogger;
+#pragma warning restore S2094
 
 /// <summary>
 /// HTTP endpoints for ingesting, listing and progressing cases of every
