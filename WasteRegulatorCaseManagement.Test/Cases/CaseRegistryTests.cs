@@ -100,26 +100,4 @@ public class CaseRegistryTests
 		load.Should().Throw<InvalidCaseModuleConfigException>().WithMessage("*action 'accept'*");
 	}
 
-	[Fact]
-	public void Load_throws_when_a_callback_is_mapped_for_an_undeclared_state()
-	{
-		// Arrange
-		var registry = new CaseRegistry([]);
-		var invalid = new CaseModuleConfig
-		{
-			CaseType = "alpha",
-			DisplayName = "Alpha",
-			TemplateVersion = "v1",
-			InitialStateId = "submitted",
-			States = [new CaseState("submitted", "Submitted")],
-			Transitions = [],
-			CallbackMappings = new() { ["accepted"] = new BsonDocument("status", "Accepted") },
-		};
-
-		// Act
-		var load = () => registry.Load([invalid]);
-
-		// Assert
-		load.Should().Throw<InvalidCaseModuleConfigException>().WithMessage("*undeclared state 'accepted'*");
-	}
 }

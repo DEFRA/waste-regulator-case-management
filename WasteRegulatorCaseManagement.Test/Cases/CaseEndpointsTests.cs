@@ -65,7 +65,7 @@ public class CaseEndpointsTests
 			{
 				caseType = CaseType,
 				sourceSystemId = Ulid.NewUlid().ToString(),
-				callbackUrl = "https://source-system.test/callback",
+				completionEvent = CaseTestCompletionEvent.WireBody,
 				nation = "ENGLAND",
 				orgId = "test-org",
 			},
@@ -138,7 +138,7 @@ public class CaseEndpointsTests
 			{
 				caseType = CaseType,
 				sourceSystemId = "csoc-2024-eng-00123",
-				callbackUrl = "https://source-system.test/declarations/00123",
+				completionEvent = CaseTestCompletionEvent.WireBody,
 				nation = "ENGLAND",
 				orgId = "org-00456",
 				producerType = "DIRECT_PRODUCER",
@@ -173,7 +173,7 @@ public class CaseEndpointsTests
 				StateId = "submitted",
 				SubmittedBy = "test-client",
 				SourceSystemId = "csoc-2024-eng-00123",
-				CallbackUrl = "https://source-system.test/declarations/00123",
+				CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 				Nation = "ENGLAND",
 				OrgId = "org-00456",
 				ProducerType = "DIRECT_PRODUCER",
@@ -215,7 +215,7 @@ public class CaseEndpointsTests
 			{
 				caseType = "CSoC",
 				sourceSystemId = "csoc-2024-eng-00124",
-				callbackUrl = "https://source-system.test/declarations/00124",
+				completionEvent = CaseTestCompletionEvent.WireBody,
 				nation = "ENGLAND",
 				orgId = "org-00456",
 			},
@@ -226,7 +226,7 @@ public class CaseEndpointsTests
 		response.StatusCode.Should().Be(HttpStatusCode.Created);
 		var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
 		body!.StateId.Should().Be("SUBMITTED");
-		body.AvailableActions.Select(a => a.ActionId).OrderBy(a => a, StringComparer.Ordinal).Should().Equal(["accept", "cancel"]);
+		body.AvailableActions.Select(a => a.ActionId).OrderBy(a => a, StringComparer.Ordinal).Should().Equal("accept", "cancel");
 	}
 
 	[Fact]
@@ -246,7 +246,7 @@ public class CaseEndpointsTests
 			{
 				caseType = CaseType,
 				sourceSystemId = Ulid.NewUlid().ToString(),
-				callbackUrl = "https://source-system.test/callback",
+				completionEvent = CaseTestCompletionEvent.WireBody,
 				nation = "ENGLAND",
 				orgId = "test-org",
 			},
@@ -304,7 +304,7 @@ public class CaseEndpointsTests
 			{
 				caseType = CaseType,
 				sourceSystemId = Ulid.NewUlid().ToString(),
-				callbackUrl = "https://source-system.test/callback",
+				completionEvent = CaseTestCompletionEvent.WireBody,
 				nation = "ENGLAND",
 				orgId = "test-org",
 			},
@@ -332,7 +332,7 @@ public class CaseEndpointsTests
 			{
 				caseType = CaseType,
 				sourceSystemId = Ulid.NewUlid().ToString(),
-				callbackUrl = "https://source-system.test/callback",
+				completionEvent = CaseTestCompletionEvent.WireBody,
 				nation = "ENGLAND",
 				orgId = "test-org",
 			},
@@ -359,7 +359,7 @@ public class CaseEndpointsTests
 			{
 				caseType = CaseType,
 				sourceSystemId = Ulid.NewUlid().ToString(),
-				callbackUrl = "https://source-system.test/callback",
+				completionEvent = CaseTestCompletionEvent.WireBody,
 				nation = "ENGLAND",
 				orgId = "test-org",
 				source = "operator-fe",
@@ -403,7 +403,7 @@ public class CaseEndpointsTests
 			{
 				caseType = CaseType,
 				sourceSystemId = Ulid.NewUlid().ToString(),
-				callbackUrl = "https://source-system.test/callback",
+				completionEvent = CaseTestCompletionEvent.WireBody,
 				nation = "ENGLAND",
 				orgId = "test-org",
 			},
@@ -444,7 +444,9 @@ public class CaseEndpointsTests
 		{
 			["caseType"] = CaseType,
 			["sourceSystemId"] = Ulid.NewUlid().ToString(),
-			["callbackUrl"] = "https://source-system.test/callback",
+			["completionEvent"] = System.Text.Json.Nodes.JsonNode.Parse(
+				System.Text.Json.JsonSerializer.Serialize(CaseTestCompletionEvent.WireBody)
+			),
 			["nation"] = "ENGLAND",
 			["orgId"] = "test-org",
 		};
@@ -475,7 +477,7 @@ public class CaseEndpointsTests
 			{
 				caseType = CaseType,
 				sourceSystemId = Ulid.NewUlid().ToString(),
-				callbackUrl = "https://source-system.test/callback",
+				completionEvent = CaseTestCompletionEvent.WireBody,
 				nation = "ENGLAND",
 				orgId = "test-org",
 			},
@@ -501,7 +503,7 @@ public class CaseEndpointsTests
 			new
 			{
 				caseType = CaseType,
-				callbackUrl = "https://source-system.test/callback",
+				completionEvent = CaseTestCompletionEvent.WireBody,
 				nation = "ENGLAND",
 				orgId = "test-org",
 			},
@@ -526,7 +528,7 @@ public class CaseEndpointsTests
 			{
 				caseType = CaseType,
 				sourceSystemId = Ulid.NewUlid().ToString(),
-				callbackUrl = "https://source-system.test/callback",
+				completionEvent = CaseTestCompletionEvent.WireBody,
 				nation = "England",
 				orgId = "test-org",
 			},
@@ -539,7 +541,7 @@ public class CaseEndpointsTests
 	}
 
 	[Fact]
-	public async Task Post_returns_problem_when_callback_url_is_not_absolute()
+	public async Task Post_returns_problem_when_completion_event_is_missing()
 	{
 		var cancellationToken = TestContext.Current.CancellationToken;
 		await using var factory = NewFactory();
@@ -551,7 +553,6 @@ public class CaseEndpointsTests
 			{
 				caseType = CaseType,
 				sourceSystemId = Ulid.NewUlid().ToString(),
-				callbackUrl = "/declarations/00123",
 				nation = "ENGLAND",
 				orgId = "test-org",
 			},
@@ -560,7 +561,7 @@ public class CaseEndpointsTests
 
 		response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
 		var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken);
-		problem!.Detail.Should().Contain("callbackUrl");
+		TestAsserts.NotNull(problem).Detail.Should().Contain("completionEvent");
 	}
 
 	[Theory]
@@ -578,7 +579,9 @@ public class CaseEndpointsTests
 		{
 			["caseType"] = CaseType,
 			["sourceSystemId"] = Ulid.NewUlid().ToString(),
-			["callbackUrl"] = "https://source-system.test/callback",
+			["completionEvent"] = System.Text.Json.Nodes.JsonNode.Parse(
+				System.Text.Json.JsonSerializer.Serialize(CaseTestCompletionEvent.WireBody)
+			),
 			["nation"] = "ENGLAND",
 			["orgId"] = "test-org",
 			["displayData"] = new System.Text.Json.Nodes.JsonObject
@@ -601,9 +604,12 @@ public class CaseEndpointsTests
 	}
 
 	[Theory]
-	[InlineData("callbackUrl", "null", "'callbackUrl' is required and must be a non-empty string.")]
-	[InlineData("callbackUrl", "\"ftp://source-system.test/callback\"", "'callbackUrl' must be an absolute http or https URL.")]
-	[InlineData("callbackUrl", "\"source-system.test/callback\"", "'callbackUrl' must be an absolute http or https URL.")]
+	[InlineData("completionEvent", "null", "'completionEvent' is required.")]
+	[InlineData(
+		"completionEvent",
+		"""{ "eventType": "test.case.concluded", "payload": "not-an-object" }""",
+		"'completionEvent.payload' must be a JSON object."
+	)]
 	[InlineData("nation", "null", "'nation' is required and must be a non-empty string.")]
 	[InlineData("orgId", "\"   \"", "'orgId' is required and must be a non-empty string.")]
 	[InlineData("initialState", "\"  \"", "'initialState' is required and must be a non-empty string.")]
@@ -621,7 +627,9 @@ public class CaseEndpointsTests
 		{
 			["caseType"] = CaseType,
 			["sourceSystemId"] = Ulid.NewUlid().ToString(),
-			["callbackUrl"] = "https://source-system.test/callback",
+			["completionEvent"] = System.Text.Json.Nodes.JsonNode.Parse(
+				System.Text.Json.JsonSerializer.Serialize(CaseTestCompletionEvent.WireBody)
+			),
 			["nation"] = "ENGLAND",
 			["orgId"] = "test-org",
 		};
@@ -650,7 +658,7 @@ public class CaseEndpointsTests
 		{
 			caseType = CaseType,
 			sourceSystemId = "csoc-2024-eng-00999",
-			callbackUrl = "https://source-system.test/callback",
+			completionEvent = CaseTestCompletionEvent.WireBody,
 			nation = "ENGLAND",
 			orgId = "test-org",
 		};
@@ -681,7 +689,7 @@ public class CaseEndpointsTests
 			{
 				caseType = CaseType,
 				sourceSystemId = Ulid.NewUlid().ToString(),
-				callbackUrl = "https://source-system.test/callback",
+				completionEvent = CaseTestCompletionEvent.WireBody,
 				nation = "ENGLAND",
 				orgId = "test-org",
 				initialState = "accepted",
@@ -708,7 +716,7 @@ public class CaseEndpointsTests
 			{
 				caseType = CaseType,
 				sourceSystemId = Ulid.NewUlid().ToString(),
-				callbackUrl = "https://source-system.test/callback",
+				completionEvent = CaseTestCompletionEvent.WireBody,
 				nation = "ENGLAND",
 				orgId = "test-org",
 				initialState = "accepted",
@@ -737,7 +745,7 @@ public class CaseEndpointsTests
 			{
 				caseType = CaseType,
 				sourceSystemId = Ulid.NewUlid().ToString(),
-				callbackUrl = "https://source-system.test/callback",
+				completionEvent = CaseTestCompletionEvent.WireBody,
 				nation = "ENGLAND",
 				orgId = "test-org",
 				createdAt,
@@ -791,11 +799,12 @@ public class CaseEndpointsTests
 
 		// Assert
 		response.StatusCode.Should().Be(HttpStatusCode.OK);
-		var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
-		body!.StateId.Should().Be("CANCELLED");
+		var body = TestAsserts.NotNull(await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken));
+		body.StateId.Should().Be("CANCELLED");
 		body.IsTerminal.Should().BeTrue();
-		body.Decision!["reason"].Should().Be("Submitted against the wrong obligation year.");
-		var stateChange = body.Timeline!.Should().ContainSingle(e => e.Action == "state-changed").Subject;
+		TestAsserts.NotNull(body.Decision)["reason"].Should().Be("Submitted against the wrong obligation year.");
+		ArgumentNullException.ThrowIfNull(body.Timeline);
+		var stateChange = body.Timeline.Should().ContainSingle(e => e.Action == "state-changed").Subject;
 		stateChange.Details["decision.reason"].Should().Be("Submitted against the wrong obligation year.");
 	}
 
@@ -831,7 +840,8 @@ public class CaseEndpointsTests
 				created.Entity.Should().Be("case");
 				created.SchemaVersion.Should().Be("case.v1.0");
 				created.Before.Should().BeNull();
-				created.After!["stateId"].AsString.Should().Be("SUBMITTED");
+				ArgumentNullException.ThrowIfNull(created.After);
+				created.After["stateId"].AsString.Should().Be("SUBMITTED");
 			},
 			cancelled =>
 			{
@@ -839,8 +849,10 @@ public class CaseEndpointsTests
 				cancelled.EventType.Should().Be("state-changed");
 				cancelled.Actor.Should().Be("user:alice-1");
 				cancelled.Version.Should().Be(1);
-				cancelled.Before!["stateId"].AsString.Should().Be("SUBMITTED");
-				cancelled.After!["stateId"].AsString.Should().Be("CANCELLED");
+				ArgumentNullException.ThrowIfNull(cancelled.Before);
+				ArgumentNullException.ThrowIfNull(cancelled.After);
+				cancelled.Before["stateId"].AsString.Should().Be("SUBMITTED");
+				cancelled.After["stateId"].AsString.Should().Be("CANCELLED");
 			}
 		);
 	}
@@ -859,8 +871,8 @@ public class CaseEndpointsTests
 
 		// Assert
 		response.StatusCode.Should().Be(HttpStatusCode.OK);
-		var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
-		body!.StateId.Should().Be("ACCEPTED");
+		var body = TestAsserts.NotNull(await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken));
+		body.StateId.Should().Be("ACCEPTED");
 		body.Decision.Should().BeNull();
 	}
 
@@ -901,195 +913,79 @@ public class CaseEndpointsTests
 
 		// Assert
 		response.StatusCode.Should().Be(HttpStatusCode.OK);
-		var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
-		body!.StateId.Should().Be("ACCEPTED");
+		TestAsserts.NotNull(await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken))
+			.StateId.Should().Be("ACCEPTED");
 	}
 
 	[Fact]
-	public async Task Accept_patches_the_callback_url_with_the_accepted_status_and_the_deciding_user()
+	public async Task Accept_writes_a_completion_envelope_with_the_accepted_status_and_the_deciding_user()
 	{
-		// Arrange
 		var cancellationToken = TestContext.Current.CancellationToken;
 		await using var factory = NewFactory(userId: "ae5cf737-333a-4af0-8d91-18f7768ceb96", userName: "Casey Worker");
 		using var client = factory.CreateClient();
 		var caseId = await SubmitCSoCCaseAsync(client, "csoc-2024-eng-00130", cancellationToken);
 
-		// Act
 		var response = await client.PostAsync($"/cases/{caseId}/actions/accept", content: null, cancellationToken);
 
-		// Assert
 		response.StatusCode.Should().Be(HttpStatusCode.OK);
-		var callback = factory.Callbacks.Requests.Should().ContainSingle().Subject;
-		callback.Method.Should().Be(HttpMethod.Patch);
-		callback.Uri.ToString().Should().Be("https://source-system.test/declarations/csoc-2024-eng-00130");
-		callback.Authorization.Should().Be($"Basic {Convert.ToBase64String(Encoding.UTF8.GetBytes("case-management:callback-secret"))}");
-		using var body = JsonDocument.Parse(callback.Body!);
-		body.RootElement.GetProperty("status").GetString().Should().Be("Accepted");
-		var callbackUser = body.RootElement.GetProperty("user");
-		callbackUser.GetProperty("id").GetString().Should().Be("ae5cf737-333a-4af0-8d91-18f7768ceb96");
-		callbackUser.GetProperty("email").GetString().Should().Be("caseworker@regulator.example");
-		callbackUser.GetProperty("name").GetString().Should().Be("Casey Worker");
+		var envelope = await factory.LatestCompletionEnvelopeAsync(cancellationToken);
+		envelope.CaseId.Should().Be(caseId);
+		envelope.StateId.Should().Be("ACCEPTED");
+		envelope.Payload["status"].AsString.Should().Be("Accepted");
+		envelope.Payload["reason"].IsBsonNull.Should().BeTrue();
+		var user = envelope.Payload["user"].AsBsonDocument;
+		user["id"].AsString.Should().Be("ae5cf737-333a-4af0-8d91-18f7768ceb96");
+		user["email"].AsString.Should().Be("caseworker@regulator.example");
+		user["name"].AsString.Should().Be("Casey Worker");
 	}
 
 	[Fact]
-	public async Task Cancel_patches_the_callback_url_with_the_cancelled_status_and_reason()
+	public async Task Cancel_writes_a_completion_envelope_with_the_cancelled_status_and_reason()
 	{
-		// Arrange
 		var cancellationToken = TestContext.Current.CancellationToken;
 		await using var factory = NewFactory(userName: "Casey Worker");
 		using var client = factory.CreateClient();
 		var caseId = await SubmitCSoCCaseAsync(client, "csoc-2024-eng-00131", cancellationToken);
 
-		// Act
 		await client.PostAsJsonAsync(
 			$"/cases/{caseId}/actions/cancel",
 			new { decision = new { reason = "Submitted against the wrong obligation year." } },
 			cancellationToken
 		);
 
-		// Assert
-		using var body = JsonDocument.Parse(factory.Callbacks.Requests.Should().ContainSingle().Subject.Body!);
-		body.RootElement.GetProperty("status").GetString().Should().Be("Cancelled");
-		body.RootElement.GetProperty("reason").GetString().Should().Be("Submitted against the wrong obligation year.");
+		var envelope = await factory.LatestCompletionEnvelopeAsync(cancellationToken);
+		envelope.Payload["status"].AsString.Should().Be("Cancelled");
+		envelope.Payload["reason"].AsString.Should().Be("Submitted against the wrong obligation year.");
 	}
 
 	[Fact]
-	public async Task Accept_rejected_by_the_source_system_returns_502_and_records_the_failure_on_a_submitted_case()
+	public async Task Accept_succeeds_without_calling_any_source_system()
 	{
-		// Arrange
 		var cancellationToken = TestContext.Current.CancellationToken;
 		await using var factory = NewFactory(userName: "Casey Worker");
 		using var client = factory.CreateClient();
 		var caseId = await SubmitCSoCCaseAsync(client, "csoc-2024-eng-00132", cancellationToken);
-		factory.Callbacks.Respond = _ => new HttpResponseMessage(HttpStatusCode.InternalServerError);
 
-		// Act
 		var response = await client.PostAsync($"/cases/{caseId}/actions/accept", content: null, cancellationToken);
 
-		// Assert
-		response.StatusCode.Should().Be(HttpStatusCode.BadGateway);
-		var persisted = await factory.Persistence.GetByIdAsync(caseId, cancellationToken);
-		persisted!.StateId.Should().Be("SUBMITTED");
-		var failure = persisted.Timeline.Should().ContainSingle(e => e.Action == "callback-failed").Subject;
-		failure.Details["actionId"].Should().Be("accept");
-		failure.Details["reason"].Should().Be("https://source-system.test/declarations/csoc-2024-eng-00132 returned 500 Internal Server Error.");
-	}
-
-	[Fact]
-	public async Task Accept_is_applied_when_the_source_system_already_holds_the_accepted_status()
-	{
-		// Arrange
-		var cancellationToken = TestContext.Current.CancellationToken;
-		await using var factory = NewFactory(userName: "Casey Worker");
-		using var client = factory.CreateClient();
-		var caseId = await SubmitCSoCCaseAsync(client, "csoc-2024-eng-00133", cancellationToken);
-		factory.Callbacks.Respond = request =>
-			request.Method == HttpMethod.Patch
-				? new HttpResponseMessage(HttpStatusCode.UnprocessableEntity)
-				: new HttpResponseMessage(HttpStatusCode.OK)
-				{
-					Content = new StringContent("""{ "id": "csoc-2024-eng-00133", "status": "Accepted" }"""),
-				};
-
-		// Act
-		var response = await client.PostAsync($"/cases/{caseId}/actions/accept", content: null, cancellationToken);
-
-		// Assert
 		response.StatusCode.Should().Be(HttpStatusCode.OK);
-		factory.Callbacks.Requests.Select(r => r.Method).Should().Equal([HttpMethod.Patch, HttpMethod.Get]);
-		var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
-		body!.StateId.Should().Be("ACCEPTED");
+		TestAsserts.NotNull(await factory.Persistence.GetByIdAsync(caseId, cancellationToken))
+			.StateId.Should().Be("ACCEPTED");
 	}
 
 	[Fact]
-	public async Task Accept_returns_502_when_the_source_system_refuses_it_and_holds_a_different_status()
+	public async Task Accept_by_a_caller_without_an_email_returns_400_and_leaves_the_case_submitted()
 	{
-		// Arrange
-		var cancellationToken = TestContext.Current.CancellationToken;
-		await using var factory = NewFactory(userName: "Casey Worker");
-		using var client = factory.CreateClient();
-		var caseId = await SubmitCSoCCaseAsync(client, "csoc-2024-eng-00134", cancellationToken);
-		factory.Callbacks.Respond = request =>
-			request.Method == HttpMethod.Patch
-				? new HttpResponseMessage(HttpStatusCode.UnprocessableEntity)
-				: new HttpResponseMessage(HttpStatusCode.OK)
-				{
-					Content = new StringContent("""{ "id": "csoc-2024-eng-00134", "status": "Cancelled" }"""),
-				};
-
-		// Act
-		var response = await client.PostAsync($"/cases/{caseId}/actions/accept", content: null, cancellationToken);
-
-		// Assert
-		response.StatusCode.Should().Be(HttpStatusCode.BadGateway);
-		var persisted = await factory.Persistence.GetByIdAsync(caseId, cancellationToken);
-		persisted!.StateId.Should().Be("SUBMITTED");
-	}
-
-	[Fact]
-	public async Task Accept_returns_502_when_the_source_system_refuses_it_and_cannot_be_read_back()
-	{
-		// Arrange
-		var cancellationToken = TestContext.Current.CancellationToken;
-		await using var factory = NewFactory(userName: "Casey Worker");
-		using var client = factory.CreateClient();
-		var caseId = await SubmitCSoCCaseAsync(client, "csoc-2024-eng-00136", cancellationToken);
-		factory.Callbacks.Respond = request =>
-			request.Method == HttpMethod.Patch
-				? new HttpResponseMessage(HttpStatusCode.UnprocessableEntity)
-				: new HttpResponseMessage(HttpStatusCode.NotFound);
-
-		// Act
-		var response = await client.PostAsync($"/cases/{caseId}/actions/accept", content: null, cancellationToken);
-
-		// Assert
-		response.StatusCode.Should().Be(HttpStatusCode.BadGateway);
-		factory.Callbacks.Requests.Select(r => r.Method).Should().Equal([HttpMethod.Patch, HttpMethod.Get]);
-		var persisted = await factory.Persistence.GetByIdAsync(caseId, cancellationToken);
-		persisted!.StateId.Should().Be("SUBMITTED");
-	}
-
-	[Fact]
-	public async Task Accept_returns_502_and_records_the_failure_when_the_source_system_cannot_be_reached()
-	{
-		// Arrange
-		var cancellationToken = TestContext.Current.CancellationToken;
-		await using var factory = NewFactory(userName: "Casey Worker");
-		using var client = factory.CreateClient();
-		var caseId = await SubmitCSoCCaseAsync(client, "csoc-2024-eng-00137", cancellationToken);
-		factory.Callbacks.Respond = _ => throw new HttpRequestException("Connection refused");
-
-		// Act
-		var response = await client.PostAsync($"/cases/{caseId}/actions/accept", content: null, cancellationToken);
-
-		// Assert
-		response.StatusCode.Should().Be(HttpStatusCode.BadGateway);
-		var persisted = await factory.Persistence.GetByIdAsync(caseId, cancellationToken);
-		persisted!.StateId.Should().Be("SUBMITTED");
-		var failure = persisted.Timeline.Should().ContainSingle(e => e.Action == "callback-failed").Subject;
-		failure.Details["reason"].Should().Be(
-			"https://source-system.test/declarations/csoc-2024-eng-00137 could not be reached: Connection refused"
-		);
-	}
-
-	[Fact]
-	public async Task Accept_by_a_caller_without_an_email_records_the_failure_without_calling_the_source_system()
-	{
-		// Arrange
 		var cancellationToken = TestContext.Current.CancellationToken;
 		await using var factory = NewFactory(userName: "Casey Worker", userEmail: null);
 		using var client = factory.CreateClient();
 		var caseId = await SubmitCSoCCaseAsync(client, "csoc-2024-eng-00135", cancellationToken);
 
-		// Act
 		var response = await client.PostAsync($"/cases/{caseId}/actions/accept", content: null, cancellationToken);
 
-		// Assert
-		response.StatusCode.Should().Be(HttpStatusCode.BadGateway);
-		factory.Callbacks.Requests.Should().BeEmpty();
-		var persisted = await factory.Persistence.GetByIdAsync(caseId, cancellationToken);
-		var failure = persisted!.Timeline.Should().ContainSingle(e => e.Action == "callback-failed").Subject;
-		failure.Details["reason"].Should().Be("Callback field 'actor.email' has no value.");
+		response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+		TestAsserts.NotNull(await factory.Persistence.GetByIdAsync(caseId, cancellationToken))
+			.StateId.Should().Be("SUBMITTED");
 	}
 
 	private static async Task<string> SubmitCSoCCaseAsync(
@@ -1103,7 +999,7 @@ public class CaseEndpointsTests
 			{
 				caseType = "CSoC",
 				sourceSystemId,
-				callbackUrl = $"https://source-system.test/declarations/{sourceSystemId}",
+				completionEvent = CaseTestCompletionEvent.WireBody,
 				nation = "ENGLAND",
 				orgId = "org-00456",
 			},
@@ -1126,7 +1022,7 @@ public class CaseEndpointsTests
 			new Case
 			{
 				SourceSystemId = Ulid.NewUlid().ToString(),
-				CallbackUrl = "https://source-system.test/callback",
+				CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 				Nation = "ENGLAND",
 				OrgId = "test-org",
 				Id = id,
@@ -1170,7 +1066,7 @@ public class CaseEndpointsTests
 			new Case
 			{
 				SourceSystemId = Ulid.NewUlid().ToString(),
-				CallbackUrl = "https://source-system.test/callback",
+				CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 				Nation = "ENGLAND",
 				OrgId = "test-org",
 				Id = id,
@@ -1197,7 +1093,7 @@ public class CaseEndpointsTests
 			new Case
 			{
 				SourceSystemId = Ulid.NewUlid().ToString(),
-				CallbackUrl = "https://source-system.test/callback",
+				CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 				Nation = "WALES",
 				OrgId = "test-org",
 				Id = id,
@@ -1227,7 +1123,7 @@ public class CaseEndpointsTests
 			new Case
 			{
 				SourceSystemId = Ulid.NewUlid().ToString(),
-				CallbackUrl = "https://source-system.test/callback",
+				CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 				Nation = "ENGLAND",
 				OrgId = "test-org",
 				Id = id,
@@ -1272,7 +1168,7 @@ public class CaseEndpointsTests
 			new Case
 			{
 				SourceSystemId = Ulid.NewUlid().ToString(),
-				CallbackUrl = "https://source-system.test/callback",
+				CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 				Nation = "WALES",
 				OrgId = "test-org",
 				Id = walesId,
@@ -1286,7 +1182,7 @@ public class CaseEndpointsTests
 			new Case
 			{
 				SourceSystemId = Ulid.NewUlid().ToString(),
-				CallbackUrl = "https://source-system.test/callback",
+				CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 				Nation = "ENGLAND",
 				OrgId = "test-org",
 				Id = Ulid.NewUlid().ToString(),
@@ -1317,7 +1213,7 @@ public class CaseEndpointsTests
 			new Case
 			{
 				SourceSystemId = Ulid.NewUlid().ToString(),
-				CallbackUrl = "https://source-system.test/callback",
+				CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 				Nation = "SCOTLAND",
 				OrgId = "test-org",
 				Id = id,
@@ -1350,7 +1246,7 @@ public class CaseEndpointsTests
 			new Case
 			{
 				SourceSystemId = Ulid.NewUlid().ToString(),
-				CallbackUrl = "https://source-system.test/callback",
+				CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 				Nation = "ENGLAND",
 				OrgId = "test-org",
 				Id = Ulid.NewUlid().ToString(),
@@ -1364,7 +1260,7 @@ public class CaseEndpointsTests
 			new Case
 			{
 				SourceSystemId = Ulid.NewUlid().ToString(),
-				CallbackUrl = "https://source-system.test/callback",
+				CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 				Nation = "ENGLAND",
 				OrgId = "test-org",
 				Id = Ulid.NewUlid().ToString(),
@@ -1441,7 +1337,7 @@ public class CaseEndpointsTests
 		new()
 		{
 			SourceSystemId = Ulid.NewUlid().ToString(),
-			CallbackUrl = "https://source-system.test/callback",
+			CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 			Nation = "ENGLAND",
 			OrgId = orgId,
 			Id = Ulid.NewUlid().ToString(),
@@ -1490,7 +1386,10 @@ public class CaseEndpointsTests
 		var body = new CaseIntakeRequest(
 			CaseType: CaseType,
 			SourceSystemId: Ulid.NewUlid().ToString(),
-			CallbackUrl: "https://source-system.test/callback",
+			CompletionEvent: new CompletionEventIntakeRequest(
+				CaseTestCompletionEvent.DefaultEventType,
+				JsonDocument.Parse(CaseTestCompletionEvent.DefaultSpec.PayloadTemplate.ToJson()).RootElement.Clone()
+			),
 			Nation: "ENGLAND",
 			OrgId: "test-org"
 		);
@@ -1585,7 +1484,10 @@ public class CaseEndpointsTests
 		var body = new CaseIntakeRequest(
 			CaseType: CaseType,
 			SourceSystemId: Ulid.NewUlid().ToString(),
-			CallbackUrl: "https://source-system.test/callback",
+			CompletionEvent: new CompletionEventIntakeRequest(
+				CaseTestCompletionEvent.DefaultEventType,
+				JsonDocument.Parse(CaseTestCompletionEvent.DefaultSpec.PayloadTemplate.ToJson()).RootElement.Clone()
+			),
 			Nation: "ENGLAND",
 			OrgId: "test-org"
 		);
@@ -1644,7 +1546,7 @@ public class CaseEndpointsTests
 			new Case
 			{
 				SourceSystemId = Ulid.NewUlid().ToString(),
-				CallbackUrl = "https://source-system.test/callback",
+				CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 				Nation = "ENGLAND",
 				OrgId = "test-org",
 				Id = Ulid.NewUlid().ToString(),
@@ -1658,7 +1560,7 @@ public class CaseEndpointsTests
 			new Case
 			{
 				SourceSystemId = Ulid.NewUlid().ToString(),
-				CallbackUrl = "https://source-system.test/callback",
+				CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 				Nation = "ENGLAND",
 				OrgId = "test-org",
 				Id = Ulid.NewUlid().ToString(),
@@ -1701,7 +1603,7 @@ public class CaseEndpointsTests
 		var caseRecord = new Case
 		{
 			SourceSystemId = Ulid.NewUlid().ToString(),
-			CallbackUrl = "https://source-system.test/callback",
+			CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 			Nation = "ENGLAND",
 			OrgId = "test-org",
 			Id = Ulid.NewUlid().ToString(),
@@ -1770,11 +1672,10 @@ public class CaseEndpointsTests
 		);
 		response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-		var captured = factory.Recording.LastQuery;
-		captured.Should().NotBeNull();
+		var captured = TestAsserts.NotNull(factory.Recording.LastQuery);
 
 		using var scope = new AssertionScope();
-		captured!.CaseTypes.Should().Equal(s_expectedCapturedTypeIds);
+		captured.CaseTypes.Should().Equal(s_expectedCapturedTypeIds);
 		captured.StateIds.Should().Equal(s_expectedCapturedStateIds);
 		captured.ProducerTypes.Should().Equal(s_expectedCapturedProducerTypes);
 		captured.Should().BeEquivalentTo(
@@ -1802,7 +1703,7 @@ public class CaseEndpointsTests
 			new Case
 			{
 				SourceSystemId = Ulid.NewUlid().ToString(),
-				CallbackUrl = "https://source-system.test/callback",
+				CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 				Nation = "ENGLAND",
 				OrgId = "test-org",
 				Id = id,
@@ -1849,7 +1750,7 @@ public class CaseEndpointsTests
 			new Case
 			{
 				SourceSystemId = Ulid.NewUlid().ToString(),
-				CallbackUrl = "https://source-system.test/callback",
+				CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 				Nation = "ENGLAND",
 				OrgId = "test-org",
 				Id = id,
@@ -1881,7 +1782,7 @@ public class CaseEndpointsTests
 			new Case
 			{
 				SourceSystemId = Ulid.NewUlid().ToString(),
-				CallbackUrl = "https://source-system.test/callback",
+				CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 				Nation = "ENGLAND",
 				OrgId = "test-org",
 				Id = id,
@@ -1910,7 +1811,7 @@ public class CaseEndpointsTests
 			new Case
 			{
 				SourceSystemId = Ulid.NewUlid().ToString(),
-				CallbackUrl = "https://source-system.test/callback",
+				CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 				Nation = "ENGLAND",
 				OrgId = "test-org",
 				Id = id,
@@ -1943,7 +1844,7 @@ public class CaseEndpointsTests
 			new Case
 			{
 				SourceSystemId = Ulid.NewUlid().ToString(),
-				CallbackUrl = "https://source-system.test/callback",
+				CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 				Nation = "ENGLAND",
 				OrgId = "test-org",
 				Id = id,
@@ -1991,7 +1892,7 @@ public class CaseEndpointsTests
 			new Case
 			{
 				SourceSystemId = Ulid.NewUlid().ToString(),
-				CallbackUrl = "https://source-system.test/callback",
+				CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 				Nation = "ENGLAND",
 				OrgId = "test-org",
 				Id = id,
@@ -2038,7 +1939,7 @@ public class CaseEndpointsTests
 			new Case
 			{
 				SourceSystemId = Ulid.NewUlid().ToString(),
-				CallbackUrl = "https://source-system.test/callback",
+				CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 				Nation = "ENGLAND",
 				OrgId = "test-org",
 				Id = id,
@@ -2071,7 +1972,7 @@ public class CaseEndpointsTests
 			new Case
 			{
 				SourceSystemId = Ulid.NewUlid().ToString(),
-				CallbackUrl = "https://source-system.test/callback",
+				CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 				Nation = "ENGLAND",
 				OrgId = "test-org",
 				Id = id,
@@ -2113,7 +2014,7 @@ public class CaseEndpointsTests
 			new Case
 			{
 				SourceSystemId = Ulid.NewUlid().ToString(),
-				CallbackUrl = "https://source-system.test/callback",
+				CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 				Nation = "ENGLAND",
 				OrgId = "test-org",
 				Id = id,
@@ -2169,7 +2070,7 @@ public class CaseEndpointsTests
 			new Case
 			{
 				SourceSystemId = Ulid.NewUlid().ToString(),
-				CallbackUrl = "https://source-system.test/callback",
+				CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 				Nation = "ENGLAND",
 				OrgId = "test-org",
 				Id = id,
@@ -2220,7 +2121,7 @@ public class CaseEndpointsTests
 			new Case
 			{
 				SourceSystemId = Ulid.NewUlid().ToString(),
-				CallbackUrl = "https://source-system.test/callback",
+				CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 				Nation = "ENGLAND",
 				OrgId = "test-org",
 				Id = id,
@@ -2274,7 +2175,7 @@ public class CaseEndpointsTests
 			new Case
 			{
 				SourceSystemId = Ulid.NewUlid().ToString(),
-				CallbackUrl = "https://source-system.test/callback",
+				CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 				Nation = "ENGLAND",
 				OrgId = "test-org",
 				Id = id,
@@ -2315,7 +2216,7 @@ public class CaseEndpointsTests
 			new Case
 			{
 				SourceSystemId = Ulid.NewUlid().ToString(),
-				CallbackUrl = "https://source-system.test/callback",
+				CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 				Nation = "ENGLAND",
 				OrgId = "test-org",
 				Id = id,
@@ -2344,7 +2245,7 @@ public class CaseEndpointsTests
 			new Case
 			{
 				SourceSystemId = Ulid.NewUlid().ToString(),
-				CallbackUrl = "https://source-system.test/callback",
+				CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 				Nation = "ENGLAND",
 				OrgId = "test-org",
 				Id = id,
@@ -2387,7 +2288,7 @@ public class CaseEndpointsTests
 			new Case
 			{
 				SourceSystemId = Ulid.NewUlid().ToString(),
-				CallbackUrl = "https://source-system.test/callback",
+				CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 				Nation = "ENGLAND",
 				OrgId = "test-org",
 				Id = id,
@@ -2453,7 +2354,7 @@ public class CaseEndpointsTests
 			new Case
 			{
 				SourceSystemId = Ulid.NewUlid().ToString(),
-				CallbackUrl = "https://source-system.test/callback",
+				CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 				Nation = "ENGLAND",
 				OrgId = "test-org",
 				Id = id,
@@ -2528,7 +2429,7 @@ public class CaseEndpointsTests
 			new Case
 			{
 				SourceSystemId = Ulid.NewUlid().ToString(),
-				CallbackUrl = "https://source-system.test/callback",
+				CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 				Nation = "ENGLAND",
 				OrgId = "test-org",
 				Id = id,
@@ -2619,7 +2520,7 @@ public class CaseEndpointsTests
 			new Case
 			{
 				SourceSystemId = Ulid.NewUlid().ToString(),
-				CallbackUrl = "https://source-system.test/callback",
+				CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 				Nation = "ENGLAND",
 				OrgId = "test-org",
 				Id = id,
@@ -2695,8 +2596,6 @@ public class CaseEndpointsTests
 			_states = states;
 		}
 
-		public StubCallbackHandler Callbacks { get; } = new();
-
 		public ICasePersistence Persistence => Recording.Inner;
 
 		public RecordingPersistence Recording =>
@@ -2717,11 +2616,23 @@ public class CaseEndpointsTests
 			return page.Items.ToList();
 		}
 
+		public async Task<CaseCompletionEnvelope> LatestCompletionEnvelopeAsync(CancellationToken cancellationToken)
+		{
+			var auditEvents = Services
+				.GetRequiredService<IMongoDbClientFactory>()
+				.GetCollection<AuditEvent>(AuditEventService.AuditEventCollectionName);
+			var doc = await auditEvents
+				.Find(e => e.CompletionEnvelope != null)
+				.SortByDescending(e => e.Sequence)
+				.FirstOrDefaultAsync(cancellationToken);
+			ArgumentNullException.ThrowIfNull(doc);
+			return doc.CompletionEnvelope
+				?? throw new InvalidOperationException("Expected a completion envelope on the audit event.");
+		}
+
 		protected override void ConfigureWebHost(IWebHostBuilder builder)
 		{
 			builder.UseSetting(CaseIntakePolicy.ClientIdKey, IntakeClientId);
-			builder.UseSetting("CALLBACK_AUTH:CSoC", "case-management:callback-secret");
-
 			builder.ConfigureServices(services =>
 			{
 				services.RemoveAll<ICasePersistence>();
@@ -2743,9 +2654,6 @@ public class CaseEndpointsTests
 						sp.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>(),
 						sp.GetRequiredService<CaseRegistry>(), new AuditEventService(clientFactory, TimeProvider.System))
 				));
-				services
-					.AddHttpClient(CaseCallbackClient.HttpClientName)
-					.ConfigurePrimaryHttpMessageHandler(() => Callbacks);
 				services.UseCaseModuleConfigs(
 					TestCaseType.Create(
 						CaseType,
@@ -2836,7 +2744,8 @@ public class CaseEndpointsTests
 
 		public Task ReplaceAsync(
 			Case caseRecord,
+			CaseCompletionEnvelopeContent? completionContent = null,
 			CancellationToken cancellationToken = default
-		) => Inner.ReplaceAsync(caseRecord, cancellationToken);
+		) => Inner.ReplaceAsync(caseRecord, completionContent, cancellationToken);
 	}
 }

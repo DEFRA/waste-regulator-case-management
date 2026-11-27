@@ -49,7 +49,6 @@ public class CaseServiceTimestampTests
 		new(
 			new CaseRegistry([type]),
 			_persistence,
-			Substitute.For<ICaseCallbackClient>(),
 			NullLogger<CaseService>.Instance,
 			_time);
 
@@ -61,12 +60,7 @@ public class CaseServiceTimestampTests
 			states: [new CaseState("submitted", "Submitted")]);
 
 	private static ClaimsPrincipal User() =>
-		new(new ClaimsIdentity(
-		[
-			new Claim("client_id", "test-client"),
-			new Claim("user:nation", "ENGLAND"), new Claim("user:id", "alice-1"),
-			new Claim("user:name", "Alice Example")
-		], "test"));
+		TestCaseworkerClaims.Principal(userIdOverride: "alice-1");
 
 	private async Task<Case> SeedAsync(Case caseRecord)
 	{
@@ -77,8 +71,7 @@ public class CaseServiceTimestampTests
 	private async Task<Case> GetAsync(string id)
 	{
 		var fetched = await _persistence.GetByIdAsync(id, TestContext.Current.CancellationToken);
-		fetched.Should().NotBeNull();
-		return fetched!;
+		return TestAsserts.NotNull(fetched);
 	}
 
 	[Fact]
@@ -88,7 +81,7 @@ public class CaseServiceTimestampTests
 			BuildType(),
 			new CaseIntake(
 				SourceSystemId: Ulid.NewUlid().ToString(),
-				CallbackUrl: "https://source-system.test/callback",
+				CompletionEvent: CaseTestCompletionEvent.DefaultSpec,
 				Nation: "ENGLAND",
 				OrgId: "test-org",
 				ProducerType: null,
@@ -98,7 +91,7 @@ public class CaseServiceTimestampTests
 
 		result.IsSuccess.Should().BeTrue(result.Message);
 
-		var fetched = await GetAsync(result.Case!.Id);
+		var fetched = await GetAsync(TestAsserts.NotNull(result.Case).Id);
 		var expected = T.UtcDateTime;
 		fetched.Should().BeEquivalentTo(
 			new
@@ -116,7 +109,7 @@ public class CaseServiceTimestampTests
 		var caseRecord = await SeedAsync(new Case
 		{
 			SourceSystemId = Ulid.NewUlid().ToString(),
-			CallbackUrl = "https://source-system.test/callback",
+			CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 			Nation = "ENGLAND",
 			OrgId = "test-org",
 			Id = Ulid.NewUlid().ToString(),
@@ -151,7 +144,7 @@ public class CaseServiceTimestampTests
 		var caseRecord = new Case
 		{
 			SourceSystemId = Ulid.NewUlid().ToString(),
-			CallbackUrl = "https://source-system.test/callback",
+			CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 			Nation = "ENGLAND",
 			OrgId = "test-org",
 			CaseType = CaseType,

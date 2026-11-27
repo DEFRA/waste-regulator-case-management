@@ -40,9 +40,8 @@ public sealed class CaseModuleConfigLoaderTests : IAsyncDisposable
 			.Find(c => c.CaseType == "CSoC")
 			.SingleAsync(cancellationToken);
 		stored.InitialStateId.Should().Be("SUBMITTED");
-		stored.States.Where(s => s.IsTerminal).Select(s => s.Id).Should().Equal(["ACCEPTED", "CANCELLED"]);
-		stored.Transitions.Select(t => t.ActionId).Should().Equal(["accept", "cancel"]);
-		stored.CallbackMappings["CANCELLED"]["reason"].AsString.Should().Be("{{decision.reason}}");
+		stored.States.Where(s => s.IsTerminal).Select(s => s.Id).Should().Equal("ACCEPTED", "CANCELLED");
+		stored.Transitions.Select(t => t.ActionId).Should().Equal("accept", "cancel");
 	}
 
 	[Fact]
@@ -76,6 +75,6 @@ public sealed class CaseModuleConfigLoaderTests : IAsyncDisposable
 		await _loader.StartAsync(cancellationToken);
 
 		// Assert
-		_registry.Find("CSoC")!.DisplayName.Should().Be("CSoC");
+		TestAsserts.NotNull(_registry.Find("CSoC")).DisplayName.Should().Be("CSoC");
 	}
 }

@@ -11,7 +11,6 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
-using WasteRegulatorCaseManagement.Auth;
 using NUlid;
 
 namespace WasteRegulatorCaseManagement.Test.Cases;
@@ -43,7 +42,7 @@ public class CaseEngineEndpointsTests
 		await factory.SeedAsync(new Case
 		{
 			SourceSystemId = Ulid.NewUlid().ToString(),
-			CallbackUrl = "https://source-system.test/callback",
+			CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 			Nation = "ENGLAND",
 			OrgId = "test-org",
 			Id = caseId,
@@ -71,7 +70,7 @@ public class CaseEngineEndpointsTests
 		await factory.SeedAsync(new Case
 		{
 			SourceSystemId = Ulid.NewUlid().ToString(),
-			CallbackUrl = "https://source-system.test/callback",
+			CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 			Nation = "ENGLAND",
 			OrgId = "test-org",
 			Id = caseId,
@@ -84,11 +83,10 @@ public class CaseEngineEndpointsTests
 			$"/cases/{caseId}/actions/approve", content: null, cancellationToken);
 
 		response.StatusCode.Should().Be(HttpStatusCode.OK);
-		var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
-		body.Should().NotBeNull();
+		var body = TestAsserts.NotNull(await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken));
 
 		using var scope = new AssertionScope();
-		body!.StateId.Should().Be("approved");
+		body.StateId.Should().Be("approved");
 		body.AvailableActions.Should().BeEmpty();
 	}
 
@@ -116,7 +114,7 @@ public class CaseEngineEndpointsTests
 		await factory.SeedAsync(new Case
 		{
 			SourceSystemId = Ulid.NewUlid().ToString(),
-			CallbackUrl = "https://source-system.test/callback",
+			CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 			Nation = "ENGLAND",
 			OrgId = "test-org",
 			Id = caseId,
@@ -142,7 +140,7 @@ public class CaseEngineEndpointsTests
 		await factory.SeedAsync(new Case
 		{
 			SourceSystemId = Ulid.NewUlid().ToString(),
-			CallbackUrl = "https://source-system.test/callback",
+			CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 			Nation = "ENGLAND",
 			OrgId = "test-org",
 			Id = caseId,
@@ -151,14 +149,14 @@ public class CaseEngineEndpointsTests
 			SubmittedBy = "test-client"
 		}, cancellationToken);
 
-		var body = await client.GetFromJsonAsync<CaseResponse>($"/cases/{caseId}", cancellationToken);
-
-		body.Should().NotBeNull();
+		var body = TestAsserts.NotNull(
+			await client.GetFromJsonAsync<CaseResponse>($"/cases/{caseId}", cancellationToken)
+		);
 		// RA-410: "approve" used to be absent here because it was gated on
 		// an outstanding task. The task framework (and the gate) are gone,
 		// so the same seed now offers it — regression cover for the
 		// ungating.
-		body!.AvailableActions.Should().Contain(a => a.ActionId == "approve");
+		body.AvailableActions.Should().Contain(a => a.ActionId == "approve");
 	}
 
 	private sealed class EngineFactory : WebApplicationFactory<Program>
@@ -205,9 +203,7 @@ public class CaseEngineEndpointsTests
 		protected override void ConfigureClient(HttpClient client)
 		{
 			base.ConfigureClient(client);
-			client.DefaultRequestHeaders.Add(ClientIdDefaults.DefaultHeaderName, "test-client");
-			client.DefaultRequestHeaders.Add("x-cdp-user-id", "test-user");
-			client.DefaultRequestHeaders.Add("x-cdp-user-nation", "ENGLAND");
+			TestCaseworkerClaims.ApplyCaseworkerHeaders(client);
 		}
 
 		protected override void Dispose(bool disposing)

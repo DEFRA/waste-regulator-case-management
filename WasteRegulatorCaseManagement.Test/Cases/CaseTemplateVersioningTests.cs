@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using AwesomeAssertions.Execution;
 using WasteRegulatorCaseManagement.Cases;
+using WasteRegulatorCaseManagement.Test.TestSupport;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using NUlid;
@@ -20,12 +21,7 @@ public class CaseTemplateVersioningTests
 
 	private readonly ICasePersistence _persistence = Substitute.For<ICasePersistence>();
 
-	private static ClaimsPrincipal User() =>
-		new(new ClaimsIdentity(
-		[
-			new Claim("client_id", "test-client"),
-			new Claim("user:nation", "ENGLAND"), new Claim("user:id", "test-user")
-		], "test"));
+	private static ClaimsPrincipal User() => TestCaseworkerClaims.Principal();
 
 	[Fact]
 	public void Capture_freezes_states_and_transitions()
@@ -65,7 +61,7 @@ public class CaseTemplateVersioningTests
 		var caseRecord = new Case
 		{
 			SourceSystemId = Ulid.NewUlid().ToString(),
-			CallbackUrl = "https://source-system.test/callback",
+			CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 			Nation = "ENGLAND",
 			OrgId = "test-org",
 			CaseType = CaseType,
@@ -102,7 +98,7 @@ public class CaseTemplateVersioningTests
 		var caseRecord = new Case
 		{
 			SourceSystemId = Ulid.NewUlid().ToString(),
-			CallbackUrl = "https://source-system.test/callback",
+			CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 			Nation = "ENGLAND",
 			OrgId = "test-org",
 			Id = Ulid.NewUlid().ToString(),
@@ -134,7 +130,7 @@ public class CaseTemplateVersioningTests
 		var legacy = new Case
 		{
 			SourceSystemId = Ulid.NewUlid().ToString(),
-			CallbackUrl = "https://source-system.test/callback",
+			CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 			Nation = "ENGLAND",
 			OrgId = "test-org",
 			CaseType = CaseType,
@@ -163,14 +159,14 @@ public class CaseTemplateVersioningTests
 		var orphan = new Case
 		{
 			SourceSystemId = Ulid.NewUlid().ToString(),
-			CallbackUrl = "https://source-system.test/callback",
+			CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 			Nation = "ENGLAND",
 			OrgId = "test-org",
 			CaseType = "different-type",
 			StateId = "anything"
 		};
 
-		var projection = new CaseService(registry, _persistence, Substitute.For<ICaseCallbackClient>(), NullLogger<CaseService>.Instance)
+		var projection = new CaseService(registry, _persistence, NullLogger<CaseService>.Instance)
 			.Project(orphan);
 
 		using var scope = new AssertionScope();
@@ -179,7 +175,7 @@ public class CaseTemplateVersioningTests
 	}
 
 	private CaseService BuildService(CaseModuleConfig type) =>
-		new(new CaseRegistry([type]), _persistence, Substitute.For<ICaseCallbackClient>(), NullLogger<CaseService>.Instance);
+		new(new CaseRegistry([type]), _persistence, NullLogger<CaseService>.Instance);
 
 	/// <summary>
 	/// Test fixture exposing TemplateVersion override so we can register

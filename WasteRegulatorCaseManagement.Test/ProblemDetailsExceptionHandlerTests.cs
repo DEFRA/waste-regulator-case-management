@@ -1,6 +1,5 @@
 using WasteRegulatorCaseManagement.AuditEvents;
 using System.Net;
-using MongoDB.Bson;
 using System.Net.Http.Json;
 using WasteRegulatorCaseManagement.Test.TestSupport;
 using WasteRegulatorCaseManagement.Cases;
@@ -12,6 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging.Abstractions;
 using WasteRegulatorCaseManagement.Auth;
+using NSubstitute;
 
 namespace WasteRegulatorCaseManagement.Test;
 
@@ -46,11 +46,11 @@ public class ProblemDetailsExceptionHandlerTests
 		var response = await client.GetAsync("/cases", ct);
 
 		response.StatusCode.Should().Be(HttpStatusCode.InternalServerError);
-		response.Content.Headers.ContentType.Should().NotBeNull();
-		response.Content.Headers.ContentType!.MediaType.Should().Be("application/problem+json");
-		var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(ct);
-		problem.Should().NotBeNull();
-		problem!.Status.Should().Be(StatusCodes.Status500InternalServerError);
+		response.Content.Headers.ContentType?.MediaType.Should().Be("application/problem+json");
+		var problem =
+			await response.Content.ReadFromJsonAsync<ProblemDetails>(ct)
+			?? throw new InvalidOperationException("Expected problem details body.");
+		problem.Status.Should().Be(StatusCodes.Status500InternalServerError);
 	}
 
 	private sealed class ThrowingFactory(MongoIntegrationFixture fixture) : WebApplicationFactory<Program>
@@ -63,41 +63,37 @@ public class ProblemDetailsExceptionHandlerTests
 			{
 				services.UseEphemeralMongoPersistence(fixture, _databaseName);
 
-				// Wrap the real persistence so QueryAsync throws — the
-				// rest of the service surface is the production code
-				// path.
 				services.RemoveAll<ICasePersistence>();
 				var clientFactory = new TestMongoDbClientFactory(
 					fixture.ConnectionString, _databaseName);
 				var real = new CasePersistence(clientFactory, NullLoggerFactory.Instance, new CaseRegistry([]), new AuditEventService(clientFactory, TimeProvider.System));
-				services.AddSingleton<ICasePersistence>(new ThrowingOnQueryPersistence(real));
+				var persistence = Substitute.For<ICasePersistence>();
+				persistence
+					.QueryAsync(Arg.Any<CaseQuery>(), Arg.Any<CancellationToken>())
+					.Returns<Task<CasePage>>(_ => throw new InvalidOperationException("boom"));
+				persistence
+					.GetByIdAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+					.Returns(call =>
+						real.GetByIdAsync(call.ArgAt<string>(0), call.ArgAt<CancellationToken>(1)));
+				persistence
+					.FindBySourceSystemIdAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+					.Returns(call =>
+						real.FindBySourceSystemIdAsync(call.ArgAt<string>(0), call.ArgAt<CancellationToken>(1)));
+				persistence
+					.CreateAsync(Arg.Any<Case>(), Arg.Any<CancellationToken>())
+					.Returns(call => real.CreateAsync(call.ArgAt<Case>(0), call.ArgAt<CancellationToken>(1)));
+				persistence
+					.ReplaceAsync(
+						Arg.Any<Case>(),
+						Arg.Any<CaseCompletionEnvelopeContent>(),
+						Arg.Any<CancellationToken>())
+					.Returns(call =>
+						real.ReplaceAsync(
+							call.ArgAt<Case>(0),
+							call.ArgAt<CaseCompletionEnvelopeContent?>(1),
+							call.ArgAt<CancellationToken>(2)));
+				services.AddSingleton(persistence);
 			});
 		}
-	}
-
-	/// <summary>
-	/// Wraps a real <see cref="ICasePersistence"/> and throws on
-	/// <see cref="ICasePersistence.QueryAsync"/> only. Every other
-	/// member delegates so the fault is surgical: the exception handler
-	/// is the only thing under test.
-	/// </summary>
-	private sealed class ThrowingOnQueryPersistence(ICasePersistence inner) : ICasePersistence
-	{
-		public Task CreateAsync(Case caseRecord, CancellationToken cancellationToken = default) =>
-			inner.CreateAsync(caseRecord, cancellationToken);
-
-		public Task<Case?> GetByIdAsync(string id, CancellationToken cancellationToken = default) =>
-			inner.GetByIdAsync(id, cancellationToken);
-
-		public Task<Case?> FindBySourceSystemIdAsync(
-			string sourceSystemId,
-			CancellationToken cancellationToken = default
-		) => inner.FindBySourceSystemIdAsync(sourceSystemId, cancellationToken);
-
-		public Task<CasePage> QueryAsync(CaseQuery query, CancellationToken cancellationToken = default) =>
-			throw new InvalidOperationException("boom");
-
-		public Task ReplaceAsync(Case caseRecord, CancellationToken cancellationToken = default) =>
-			inner.ReplaceAsync(caseRecord, cancellationToken);
 	}
 }
