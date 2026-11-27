@@ -12,34 +12,16 @@ namespace WasteRegulatorCaseManagement.Cases;
 internal static class CaseWireProjection
 {
 	internal static CaseListItemResponse ToListItemResponse(CaseEngineProjection projection) =>
-		MapListItem(projection.Case, projection.TemplateVersion, projection.AvailableActions);
+		ToListItem(MapListCore(projection.Case, projection.TemplateVersion, projection.AvailableActions));
 
 	internal static CaseResponse ToDetailResponse(CaseEngineProjection projection)
 	{
 		var w = projection.Case;
-		var list = MapListItem(w, projection.TemplateVersion, projection.AvailableActions);
-		return new CaseResponse(
-			list.Id,
-			list.CaseType,
-			list.StateId,
-			list.IsTerminal,
-			list.SubmittedAt,
-			list.LastModifiedAt,
-			list.SubmittedBy,
-			list.TemplateVersion,
-			list.SourceSystemId,
-			MapCompletionEvent(w.CompletionEvent),
-			list.Nation,
-			list.OrgId,
-			list.ProducerType,
-			list.DisplayData,
-			list.AvailableActions,
+		return ToDetail(
+			MapListCore(w, projection.TemplateVersion, projection.AvailableActions),
+			w.CompletionEvent,
 			w.Decision,
-			list.AssignedToId,
-			list.AssignedToName,
-			list.AssignedAt,
-			list.AssignedBy,
-			MapTimeline(w.Timeline)
+			w.Timeline
 		);
 	}
 
@@ -48,7 +30,7 @@ internal static class CaseWireProjection
 		"S107:Methods should not have too many parameters",
 		Justification = "Flat OpenAPI list row; nested DTOs would change the wire shape."
 	)]
-	private static CaseListItemResponse MapListItem(
+	private static CaseWireListCore MapListCore(
 		Case caseRecord,
 		string templateVersion,
 		IReadOnlyCollection<CaseTransition> availableActions
@@ -72,6 +54,63 @@ internal static class CaseWireProjection
 			caseRecord.AssignedToName,
 			caseRecord.AssignedAt,
 			caseRecord.AssignedBy
+		);
+
+	private static CaseListItemResponse ToListItem(CaseWireListCore core) =>
+		new(
+			core.Id,
+			core.CaseType,
+			core.StateId,
+			core.IsTerminal,
+			core.SubmittedAt,
+			core.LastModifiedAt,
+			core.SubmittedBy,
+			core.TemplateVersion,
+			core.SourceSystemId,
+			core.Nation,
+			core.OrgId,
+			core.ProducerType,
+			core.DisplayData,
+			core.AvailableActions,
+			core.AssignedToId,
+			core.AssignedToName,
+			core.AssignedAt,
+			core.AssignedBy
+		);
+
+	[SuppressMessage(
+		"Major Code Smell",
+		"S107:Methods should not have too many parameters",
+		Justification = "Flat OpenAPI case detail; nested DTOs would change the wire shape."
+	)]
+	private static CaseResponse ToDetail(
+		CaseWireListCore core,
+		CompletionEventSpec completionEvent,
+		IReadOnlyDictionary<string, string>? decision,
+		IReadOnlyList<CaseTimelineEntry> timeline
+	) =>
+		new(
+			core.Id,
+			core.CaseType,
+			core.StateId,
+			core.IsTerminal,
+			core.SubmittedAt,
+			core.LastModifiedAt,
+			core.SubmittedBy,
+			core.TemplateVersion,
+			core.SourceSystemId,
+			MapCompletionEvent(completionEvent),
+			core.Nation,
+			core.OrgId,
+			core.ProducerType,
+			core.DisplayData,
+			core.AvailableActions,
+			decision,
+			core.AssignedToId,
+			core.AssignedToName,
+			core.AssignedAt,
+			core.AssignedBy,
+			MapTimeline(timeline)
 		);
 
 	private static CompletionEventResponse MapCompletionEvent(CompletionEventSpec spec) =>
@@ -98,4 +137,25 @@ internal static class CaseWireProjection
 				x.Entry.StateId
 			))
 			.ToList();
+
+	private readonly record struct CaseWireListCore(
+		string Id,
+		string CaseType,
+		string StateId,
+		bool IsTerminal,
+		DateTime SubmittedAt,
+		DateTime LastModifiedAt,
+		string? SubmittedBy,
+		string TemplateVersion,
+		string SourceSystemId,
+		string Nation,
+		string OrgId,
+		string? ProducerType,
+		IReadOnlyDictionary<string, CaseDisplayField> DisplayData,
+		IReadOnlyCollection<CaseTransition> AvailableActions,
+		string? AssignedToId,
+		string? AssignedToName,
+		DateTime? AssignedAt,
+		string? AssignedBy
+	);
 }

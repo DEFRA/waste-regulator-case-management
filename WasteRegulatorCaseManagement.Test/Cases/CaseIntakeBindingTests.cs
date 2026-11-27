@@ -73,6 +73,58 @@ public sealed class CaseIntakeBindingTests
 	}
 
 	[Fact]
+	public void TryRead_returns_an_error_when_completion_event_is_missing()
+	{
+		using var payload = JsonDocument.Parse("""{"status":"ok"}""");
+		var request = new CaseIntakeRequest(
+			CaseType: "CSoC",
+			SourceSystemId: "src-1",
+			CompletionEvent: null!,
+			Nation: "ENGLAND",
+			OrgId: "org-1"
+		);
+
+		var error = CaseIntakeBinding.TryRead(request, out var intake);
+
+		error.Should().Be("'completionEvent' is required.");
+		intake.Should().BeNull();
+	}
+
+	[Fact]
+	public void TryRead_returns_an_error_when_org_id_is_missing()
+	{
+		using var payload = JsonDocument.Parse("""{"status":"ok"}""");
+		var request = new CaseIntakeRequest(
+			CaseType: "CSoC",
+			SourceSystemId: "src-1",
+			CompletionEvent: new CompletionEventIntakeRequest("csoc.case.concluded", payload.RootElement),
+			Nation: "ENGLAND",
+			OrgId: "  "
+		);
+
+		var error = CaseIntakeBinding.TryRead(request, out var intake);
+
+		error.Should().Be("'orgId' is required and must be a non-empty string.");
+		intake.Should().BeNull();
+	}
+
+	[Fact]
+	public void TryRead_returns_an_error_when_display_data_field_type_is_invalid()
+	{
+		var request = ValidRequest(
+			displayData: new Dictionary<string, CaseDisplayField>
+			{
+				["organisationName"] = new("Acme", "not-a-valid-type"),
+			}
+		);
+
+		var error = CaseIntakeBinding.TryRead(request, out var intake);
+
+		error.Should().Contain("displayData.organisationName");
+		intake.Should().BeNull();
+	}
+
+	[Fact]
 	public void TryRead_returns_an_error_when_completion_payload_is_not_a_json_object()
 	{
 		using var payload = JsonDocument.Parse("\"only a string\"");
@@ -87,7 +139,8 @@ public sealed class CaseIntakeBindingTests
 	private static CaseIntakeRequest ValidRequest(
 		CompletionEventIntakeRequest? completionEvent = null,
 		DateTime? createdAt = null,
-		string? initialState = null
+		string? initialState = null,
+		IReadOnlyDictionary<string, CaseDisplayField>? displayData = null
 	)
 	{
 		using var payload = JsonDocument.Parse("""{"status":"ok"}""");
@@ -97,6 +150,7 @@ public sealed class CaseIntakeBindingTests
 			CompletionEvent: completionEvent ?? new CompletionEventIntakeRequest("csoc.case.concluded", payload.RootElement.Clone()),
 			Nation: "ENGLAND",
 			OrgId: "org-1",
+			DisplayData: displayData,
 			InitialState: initialState,
 			CreatedAt: createdAt
 		);

@@ -54,7 +54,7 @@ public sealed class CaseCompletionAuditEventProcessorTests : IAsyncDisposable
 	{
 		var cancellationToken = TestContext.Current.CancellationToken;
 		await AuditEvents.InsertOneAsync(
-			AnalyticsStyleAuditEvent(sequence: 1, dispatches: []),
+			AuditEventCompletionTestFixtures.AnalyticsEvent(s_now, sequence: 1),
 			cancellationToken: cancellationToken
 		);
 
@@ -68,7 +68,10 @@ public sealed class CaseCompletionAuditEventProcessorTests : IAsyncDisposable
 	{
 		var cancellationToken = TestContext.Current.CancellationToken;
 		await AuditEvents.InsertManyAsync(
-			[CompletionAuditEventWith(sequence: 2, dispatches: []), CompletionAuditEventWith(sequence: 1, dispatches: [])],
+			[
+				AuditEventCompletionTestFixtures.CompletionEvent(s_now, sequence: 2),
+				AuditEventCompletionTestFixtures.CompletionEvent(s_now, sequence: 1),
+			],
 			cancellationToken: cancellationToken
 		);
 
@@ -93,7 +96,8 @@ public sealed class CaseCompletionAuditEventProcessorTests : IAsyncDisposable
 	public async Task ProcessBatch_retries_a_failed_event_once_its_next_attempt_is_due()
 	{
 		var cancellationToken = TestContext.Current.CancellationToken;
-		var auditEvent = CompletionAuditEventWith(
+		var auditEvent = AuditEventCompletionTestFixtures.CompletionEvent(
+			s_now,
 			sequence: 1,
 			dispatches: new()
 			{
@@ -120,7 +124,7 @@ public sealed class CaseCompletionAuditEventProcessorTests : IAsyncDisposable
 	public async Task ProcessBatch_marks_failed_when_a_publish_throws()
 	{
 		var cancellationToken = TestContext.Current.CancellationToken;
-		var auditEvent = CompletionAuditEventWith(sequence: 1, dispatches: []);
+		var auditEvent = AuditEventCompletionTestFixtures.CompletionEvent(s_now, sequence: 1);
 		await AuditEvents.InsertOneAsync(auditEvent, cancellationToken: cancellationToken);
 		_sender.FailFor(auditEvent.EventId, "Topic unavailable");
 
@@ -144,7 +148,10 @@ public sealed class CaseCompletionAuditEventProcessorTests : IAsyncDisposable
 	public async Task ProcessBatch_publishes_nothing_while_another_instance_holds_the_lease()
 	{
 		var cancellationToken = TestContext.Current.CancellationToken;
-		await AuditEvents.InsertOneAsync(CompletionAuditEventWith(sequence: 1, dispatches: []), cancellationToken: cancellationToken);
+		await AuditEvents.InsertOneAsync(
+			AuditEventCompletionTestFixtures.CompletionEvent(s_now, sequence: 1),
+			cancellationToken: cancellationToken
+		);
 		var otherInstance = new AuditEventLeaseService(_clientFactory, _time);
 		await otherInstance.TryAcquire(Completion, TimeSpan.FromMinutes(1), cancellationToken);
 
@@ -157,8 +164,8 @@ public sealed class CaseCompletionAuditEventProcessorTests : IAsyncDisposable
 	public async Task ProcessBatch_stops_publishing_when_the_lease_is_lost_part_way_through()
 	{
 		var cancellationToken = TestContext.Current.CancellationToken;
-		var first = CompletionAuditEventWith(sequence: 1, dispatches: []);
-		var second = CompletionAuditEventWith(sequence: 2, dispatches: []);
+		var first = AuditEventCompletionTestFixtures.CompletionEvent(s_now, sequence: 1);
+		var second = AuditEventCompletionTestFixtures.CompletionEvent(s_now, sequence: 2);
 		await AuditEvents.InsertManyAsync([first, second], cancellationToken: cancellationToken);
 		_sender.OnSend = () =>
 			_clientFactory
@@ -180,7 +187,8 @@ public sealed class CaseCompletionAuditEventProcessorTests : IAsyncDisposable
 	public async Task ProcessBatch_dead_letters_an_event_whose_last_allowed_attempt_fails()
 	{
 		var cancellationToken = TestContext.Current.CancellationToken;
-		var auditEvent = CompletionAuditEventWith(
+		var auditEvent = AuditEventCompletionTestFixtures.CompletionEvent(
+			s_now,
 			sequence: 1,
 			dispatches: new()
 			{
@@ -209,59 +217,6 @@ public sealed class CaseCompletionAuditEventProcessorTests : IAsyncDisposable
 			Message = "Topic unavailable",
 			AttemptCount = MaxDispatchAttempts,
 		});
-	}
-
-	private static AuditEvent AnalyticsStyleAuditEvent(long sequence, Dictionary<string, AuditEventDispatch> dispatches) =>
-		new()
-		{
-			EventId = Ulid.NewUlid().ToString(),
-			Sequence = sequence,
-			Entity = "case",
-			EntityId = $"case_{Ulid.NewUlid()}",
-			Operation = "update",
-			EventType = "note-added",
-			OccurredAt = s_now.AddMinutes(-10),
-			RecordedAt = s_now.AddMinutes(-10),
-			Actor = "user:caseworker-1",
-			Version = 2,
-			Before = new BsonDocument("version", 1),
-			After = new BsonDocument("version", 2),
-			SchemaVersion = "case.v1.0",
-			Dispatches = dispatches,
-		};
-
-	private static AuditEvent CompletionAuditEventWith(long sequence, Dictionary<string, AuditEventDispatch> dispatches)
-	{
-		var eventId = Ulid.NewUlid().ToString();
-		return new AuditEvent
-		{
-			EventId = eventId,
-			Sequence = sequence,
-			Entity = "case",
-			EntityId = $"case_{Ulid.NewUlid()}",
-			Operation = "update",
-			EventType = "state-changed",
-			OccurredAt = s_now.AddMinutes(-10),
-			RecordedAt = s_now.AddMinutes(-10),
-			Actor = "user:caseworker-1",
-			Version = 2,
-			Before = new BsonDocument("version", 1),
-			After = new BsonDocument("version", 2),
-			SchemaVersion = "case.v1.0",
-			Dispatches = dispatches,
-			CompletionEnvelope = new CaseCompletionEnvelope
-			{
-				EventId = eventId,
-				CaseId = Ulid.NewUlid().ToString(),
-				CaseType = "CSoC",
-				SourceSystemId = Ulid.NewUlid().ToString(),
-				OrgId = "org-1",
-				StateId = "ACCEPTED",
-				OccurredAt = s_now.AddMinutes(-10),
-				EventType = "csoc.case.concluded",
-				Payload = BsonDocument.Parse("""{"status":"Accepted","reason":null}"""),
-			},
-		};
 	}
 
 	private sealed class RecordingCompletionEventSender : ICompletionEventSender
