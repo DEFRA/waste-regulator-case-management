@@ -46,6 +46,24 @@ public class ClientIdAuthenticationTests
 	}
 
 	[Fact]
+	public async Task Protected_endpoint_returns_401_with_whitespace_client_id_header()
+	{
+		// Arrange
+		var cancellationToken = TestContext.Current.CancellationToken;
+		await using var factory = new BareFactory();
+		using var client = factory.CreateClient();
+		client.DefaultRequestHeaders.TryAddWithoutValidation(ClientIdDefaults.DefaultHeaderName, "   ");
+
+		// Act
+		var response = await client.GetAsync("/cases", cancellationToken);
+
+		// Assert
+		using var scope = new AssertionScope();
+		response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+		response.Headers.WwwAuthenticate.ToString().Should().Contain("Empty x-cdp-client-id header");
+	}
+
+	[Fact]
 	public async Task Protected_endpoint_succeeds_with_client_id_header()
 	{
 		var cancellationToken = TestContext.Current.CancellationToken;
@@ -304,6 +322,7 @@ public class ClientIdAuthenticationTests
 	[InlineData(ClientIdDefaults.DefaultHeaderName, 256)]
 	[InlineData("x-cdp-user-id", 128)]
 	[InlineData("x-cdp-user-name", 256)]
+	[InlineData("x-cdp-user-email", 320)]
 	public async Task Identity_header_exceeding_cap_is_401_with_descriptive_reason(
 		string header,
 		int cap
@@ -356,6 +375,7 @@ public class ClientIdAuthenticationTests
 	[InlineData(ClientIdDefaults.DefaultHeaderName, 256)]
 	[InlineData("x-cdp-user-id", 128)]
 	[InlineData("x-cdp-user-name", 256)]
+	[InlineData("x-cdp-user-email", 320)]
 	public async Task Identity_header_at_exactly_cap_is_accepted(string header, int cap)
 	{
 		var cancellationToken = TestContext.Current.CancellationToken;
@@ -455,6 +475,24 @@ public class ClientIdAuthenticationTests
 		var response = await client.GetAsync("/cases", cancellationToken);
 
 		response.StatusCode.Should().Be(HttpStatusCode.OK);
+	}
+
+	[Fact]
+	public async Task Whitespace_only_nation_header_is_treated_as_absent()
+	{
+		// Arrange
+		var cancellationToken = TestContext.Current.CancellationToken;
+		await using var factory = new BareFactory();
+		using var client = factory.CreateClient();
+		client.DefaultRequestHeaders.Add(ClientIdDefaults.DefaultHeaderName, ClientId);
+		client.DefaultRequestHeaders.TryAddWithoutValidation("x-cdp-user-nation", "   ");
+
+		// Act
+		var response = await client.GetAsync("/cases", cancellationToken);
+
+		// Assert
+		// Authenticated (not 401), but with no nation claim case reads are refused.
+		response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
 	}
 
 	[Fact]
