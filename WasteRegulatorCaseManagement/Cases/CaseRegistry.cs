@@ -38,13 +38,14 @@ public sealed class CaseRegistry
 				$"Case type '{type.CaseType}' starts in undeclared state '{type.InitialStateId}'.");
 		}
 
-		foreach (var transition in type.Transitions)
+		var invalidTransition = type.Transitions.FirstOrDefault(
+			transition =>
+				!stateIds.Contains(transition.FromStateId) || !stateIds.Contains(transition.ToStateId)
+		);
+		if (invalidTransition is not null)
 		{
-			if (!stateIds.Contains(transition.FromStateId) || !stateIds.Contains(transition.ToStateId))
-			{
-				throw new InvalidCaseModuleConfigException(
-					$"Case type '{type.CaseType}' action '{transition.ActionId}' moves between undeclared states.");
-			}
+			throw new InvalidCaseModuleConfigException(
+				$"Case type '{type.CaseType}' action '{invalidTransition.ActionId}' moves between undeclared states.");
 		}
 
 	}

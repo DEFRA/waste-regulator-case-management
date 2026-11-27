@@ -5,15 +5,15 @@ using Microsoft.Extensions.Logging;
 
 namespace WasteRegulatorCaseManagement.Test.Utils.Logging;
 
-public class StructuredLoggerTests
+public sealed class StructuredLoggerTests
 {
-	private sealed class Anchor { }
+	public StructuredLoggerTests() { }
 
 	[Fact]
 	public void Log_emits_record_with_caller_supplied_properties()
 	{
-		var inner = new ListLogger<Anchor>();
-		var sut = new StructuredLogger<Anchor>(inner);
+		var inner = new ListLogger<StructuredLoggerTests>();
+		var sut = new StructuredLogger<StructuredLoggerTests>(inner);
 
 		sut.Log(
 			LogLevel.Information,
@@ -40,8 +40,8 @@ public class StructuredLoggerTests
 	[Fact]
 	public void Log_forwards_exception_so_ecs_error_fields_are_populated()
 	{
-		var inner = new ListLogger<Anchor>();
-		var sut = new StructuredLogger<Anchor>(inner);
+		var inner = new ListLogger<StructuredLoggerTests>();
+		var sut = new StructuredLogger<StructuredLoggerTests>(inner);
 		var boom = new InvalidOperationException("boom");
 
 		sut.Log(
@@ -60,8 +60,8 @@ public class StructuredLoggerTests
 	[Fact]
 	public void Log_skips_when_underlying_logger_disables_the_level()
 	{
-		var inner = new DisabledLogger<Anchor>();
-		var sut = new StructuredLogger<Anchor>(inner);
+		var inner = new DisabledLogger();
+		var sut = new StructuredLogger<StructuredLoggerTests>(inner);
 
 		sut.Log(
 			LogLevel.Information,
@@ -71,10 +71,28 @@ public class StructuredLoggerTests
 		inner.Should().BeEquivalentTo(new { LogCalls = 0, ScopesOpened = 0 });
 	}
 
+	private sealed class DisabledLogger : ILogger<StructuredLoggerTests>
+	{
+		public int LogCalls { get; private set; }
+		public int ScopesOpened { get; private set; }
+		public IDisposable BeginScope<TState>(TState state) where TState : notnull
+		{
+			ScopesOpened++;
+			return NullLogScope.Instance;
+		}
+		public bool IsEnabled(LogLevel logLevel) => false;
+		public void Log<TState>(
+			LogLevel logLevel,
+			EventId eventId,
+			TState state,
+			Exception? exception,
+			Func<TState, Exception?, string> formatter) => LogCalls++;
+	}
+
 	[Fact]
 	public void Log_throws_for_null_message_or_properties()
 	{
-		var sut = new StructuredLogger<Anchor>(new ListLogger<Anchor>());
+		var sut = new StructuredLogger<StructuredLoggerTests>(new ListLogger<StructuredLoggerTests>());
 
 		var nullMessage = () =>
 			sut.Log(LogLevel.Information, null!, new Dictionary<string, object?>());
@@ -85,28 +103,4 @@ public class StructuredLoggerTests
 		nullProperties.Should().ThrowExactly<ArgumentNullException>();
 	}
 
-	private sealed class DisabledLogger<T> : ILogger<T>
-	{
-		public int LogCalls { get; private set; }
-		public int ScopesOpened { get; private set; }
-		public IDisposable BeginScope<TState>(TState state) where TState : notnull
-		{
-			ScopesOpened++;
-			return NoopScope.Instance;
-		}
-		public bool IsEnabled(LogLevel logLevel) => false;
-		public void Log<TState>(
-			LogLevel logLevel,
-			EventId eventId,
-			TState state,
-			Exception? exception,
-			Func<TState, Exception?, string> formatter) => LogCalls++;
-
-		private sealed class NoopScope : IDisposable
-		{
-			public static readonly NoopScope Instance = new();
-			public void Dispose() { }
-		}
-	}
 }
-

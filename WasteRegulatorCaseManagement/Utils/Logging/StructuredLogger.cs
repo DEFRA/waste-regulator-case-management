@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 
 namespace WasteRegulatorCaseManagement.Utils.Logging;
@@ -29,6 +30,11 @@ namespace WasteRegulatorCaseManagement.Utils.Logging;
 /// by <c>StructuredLoggerTests</c>.
 /// </para>
 /// </summary>
+[SuppressMessage(
+	"Major Code Smell",
+	"S2326:Unused type parameters should be removed",
+	Justification = "T is the source-context category forwarded to ILogger<T>."
+)]
 public interface IStructuredLogger<T>
 {
 	/// <summary>
@@ -66,6 +72,11 @@ public interface IStructuredLogger<T>
 /// the emitted <c>LogEvent</c>. Registered as an open-generic
 /// singleton in <see cref="Program"/>.
 /// </summary>
+[SuppressMessage(
+	"Major Code Smell",
+	"S6672:Implementations should be private",
+	Justification = "ILogger<T> is intentional: T is the consuming component's category, not StructuredLogger<T>."
+)]
 internal sealed class StructuredLogger<T>(ILogger<T> logger) : IStructuredLogger<T>
 {
 	private readonly ILogger<T> _logger = logger;

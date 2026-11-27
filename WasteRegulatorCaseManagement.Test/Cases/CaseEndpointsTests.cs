@@ -121,8 +121,8 @@ public class CaseEndpointsTests
 		);
 
 		response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-		var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken);
-		problem!.Title.Should().Be("Unknown case type");
+		var problem = TestAsserts.NotNull(await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken));
+		problem.Title.Should().Be("Unknown case type");
 	}
 
 	[Fact]
@@ -152,10 +152,9 @@ public class CaseEndpointsTests
 		);
 
 		response.StatusCode.Should().Be(HttpStatusCode.Created);
-		response.Headers.Location.Should().NotBeNull();
-		response.Headers.Location!.AbsolutePath.Should().StartWith("/cases/");
-		var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
-		var persisted = await factory.Persistence.GetByIdAsync(body!.Id, cancellationToken);
+		TestAsserts.NotNull(response.Headers.Location).AbsolutePath.Should().StartWith("/cases/");
+		var body = TestAsserts.NotNull(await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken));
+		var persisted = TestAsserts.NotNull(await factory.Persistence.GetByIdAsync(body.Id, cancellationToken));
 		var expectedDisplayData = new Dictionary<string, CaseDisplayField>
 		{
 			["organisationName"] = new("Acme Packaging Ltd", "string"),
@@ -224,8 +223,8 @@ public class CaseEndpointsTests
 
 		// Assert
 		response.StatusCode.Should().Be(HttpStatusCode.Created);
-		var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
-		body!.StateId.Should().Be("SUBMITTED");
+		var body = TestAsserts.NotNull(await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken));
+		body.StateId.Should().Be("SUBMITTED");
 		body.AvailableActions.Select(a => a.ActionId).OrderBy(a => a, StringComparer.Ordinal).Should().Equal("accept", "cancel");
 	}
 
@@ -254,8 +253,8 @@ public class CaseEndpointsTests
 		);
 
 		response.StatusCode.Should().Be(HttpStatusCode.Created);
-		var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
-		var persisted = await factory.Persistence.GetByIdAsync(body!.Id, cancellationToken);
+		var body = TestAsserts.NotNull(await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken));
+		var persisted = TestAsserts.NotNull(await factory.Persistence.GetByIdAsync(body.Id, cancellationToken));
 
 		using var scope = new AssertionScope();
 		// Birth event was part of the original CreateAsync (no follow-up
@@ -272,7 +271,7 @@ public class CaseEndpointsTests
 						ActionDisplayName = "Case submitted",
 						PerformedById = "service:test-client",
 						PerformedByName = "test-client",
-						PerformedAt = persisted?.SubmittedAt,
+						PerformedAt = persisted.SubmittedAt,
 						Details = new Dictionary<string, string?>
 						{
 							["caseType"] = CaseType,
@@ -312,8 +311,8 @@ public class CaseEndpointsTests
 		);
 
 		response.StatusCode.Should().Be(HttpStatusCode.Created);
-		var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
-		var created = body!.Timeline!.Should().ContainSingle().Subject;
+		var body = TestAsserts.NotNull(await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken));
+		var created = TestAsserts.NotNull(body.Timeline).Should().ContainSingle().Subject;
 		created.PerformedById.Should().Be("service:test-client");
 		created.PerformedByName.Should().Be("test-client");
 	}
@@ -368,10 +367,9 @@ public class CaseEndpointsTests
 		);
 
 		response.StatusCode.Should().Be(HttpStatusCode.Created);
-		var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
-		var persisted = await factory.Persistence.GetByIdAsync(body!.Id, cancellationToken);
-		persisted.Should().NotBeNull();
-		var entry = persisted!.Timeline.Should().ContainSingle().Subject;
+		var body = TestAsserts.NotNull(await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken));
+		var persisted = TestAsserts.NotNull(await factory.Persistence.GetByIdAsync(body.Id, cancellationToken));
+		var entry = persisted.Timeline.Should().ContainSingle().Subject;
 		entry.Should().BeEquivalentTo(
 			new
 			{
@@ -411,9 +409,9 @@ public class CaseEndpointsTests
 		);
 
 		response.StatusCode.Should().Be(HttpStatusCode.Created);
-		var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
-		var persisted = await factory.Persistence.GetByIdAsync(body!.Id, cancellationToken);
-		var entry = persisted!.Timeline.Should().ContainSingle().Subject;
+		var body = TestAsserts.NotNull(await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken));
+		var persisted = TestAsserts.NotNull(await factory.Persistence.GetByIdAsync(body.Id, cancellationToken));
+		var entry = persisted.Timeline.Should().ContainSingle().Subject;
 		entry.Details.Should().BeEquivalentTo(
 			new Dictionary<string, string?>
 			{
@@ -485,10 +483,9 @@ public class CaseEndpointsTests
 		);
 
 		response.StatusCode.Should().Be(HttpStatusCode.Created);
-		var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
-		var persisted = await factory.Persistence.GetByIdAsync(body!.Id, cancellationToken);
-		persisted.Should().NotBeNull();
-		persisted!.DisplayData.Should().BeEmpty();
+		var body = TestAsserts.NotNull(await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken));
+		var persisted = TestAsserts.NotNull(await factory.Persistence.GetByIdAsync(body.Id, cancellationToken));
+		persisted.DisplayData.Should().BeEmpty();
 	}
 
 	[Fact]
@@ -511,8 +508,8 @@ public class CaseEndpointsTests
 		);
 
 		response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-		var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken);
-		problem!.Detail.Should().Contain("sourceSystemId");
+		var problem = TestAsserts.NotNull(await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken));
+		problem.Detail.Should().Contain("sourceSystemId");
 	}
 
 	[Fact]
@@ -536,8 +533,8 @@ public class CaseEndpointsTests
 		);
 
 		response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-		var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken);
-		problem!.Detail.Should().Contain("nation");
+		var problem = TestAsserts.NotNull(await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken));
+		problem.Detail.Should().Contain("nation");
 	}
 
 	[Fact]
@@ -560,7 +557,7 @@ public class CaseEndpointsTests
 		);
 
 		response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-		var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken);
+		var problem = TestAsserts.NotNull(await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken));
 		TestAsserts.NotNull(problem).Detail.Should().Contain("completionEvent");
 	}
 
@@ -599,8 +596,8 @@ public class CaseEndpointsTests
 
 		// Assert
 		response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-		var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken);
-		problem!.Detail.Should().Contain("displayData.organisationName");
+		var problem = TestAsserts.NotNull(await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken));
+		problem.Detail.Should().Contain("displayData.organisationName");
 	}
 
 	[Theory]
@@ -644,8 +641,8 @@ public class CaseEndpointsTests
 
 		// Assert
 		response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-		var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken);
-		problem!.Detail.Should().Be(expectedDetail);
+		var problem = TestAsserts.NotNull(await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken));
+		problem.Detail.Should().Be(expectedDetail);
 	}
 
 	[Fact]
@@ -669,9 +666,9 @@ public class CaseEndpointsTests
 		first.StatusCode.Should().Be(HttpStatusCode.Created);
 		second.StatusCode.Should().Be(HttpStatusCode.OK);
 		second.Headers.GetValues(CaseEndpoints.IdempotentReplayHeader).Single().Should().Be("true");
-		var firstBody = await first.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
-		var secondBody = await second.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
-		secondBody!.Id.Should().Be(firstBody!.Id);
+		var firstBody = TestAsserts.NotNull(await first.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken));
+		var secondBody = TestAsserts.NotNull(await second.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken));
+		secondBody.Id.Should().Be(firstBody.Id);
 	}
 
 	[Fact]
@@ -698,8 +695,8 @@ public class CaseEndpointsTests
 		);
 
 		response.StatusCode.Should().Be(HttpStatusCode.Created);
-		var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
-		body!.StateId.Should().Be("accepted");
+		var body = TestAsserts.NotNull(await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken));
+		body.StateId.Should().Be("accepted");
 		body.IsTerminal.Should().BeTrue();
 	}
 
@@ -725,8 +722,8 @@ public class CaseEndpointsTests
 		);
 
 		response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-		var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken);
-		problem!.Detail.Should().Contain("initialState");
+		var problem = TestAsserts.NotNull(await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken));
+		problem.Detail.Should().Contain("initialState");
 	}
 
 	[Theory]
@@ -754,8 +751,8 @@ public class CaseEndpointsTests
 		);
 
 		response.StatusCode.Should().Be(HttpStatusCode.Created);
-		var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
-		body!.SubmittedAt.Should().Be(new DateTime(2024, 11, 1, 10, 32, 0, DateTimeKind.Utc));
+		var body = TestAsserts.NotNull(await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken));
+		body.SubmittedAt.Should().Be(new DateTime(2024, 11, 1, 10, 32, 0, DateTimeKind.Utc));
 	}
 
 	[Fact]
@@ -777,8 +774,8 @@ public class CaseEndpointsTests
 		// Assert
 		response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
 		(await response.Content.ReadAsStringAsync(cancellationToken)).Should().Contain("requires decision field 'reason'");
-		var persisted = await factory.Persistence.GetByIdAsync(caseId, cancellationToken);
-		persisted!.StateId.Should().Be("SUBMITTED");
+		var persisted = TestAsserts.NotNull(await factory.Persistence.GetByIdAsync(caseId, cancellationToken));
+		persisted.StateId.Should().Be("SUBMITTED");
 	}
 
 	[Fact]
@@ -1036,7 +1033,7 @@ public class CaseEndpointsTests
 		var response = await client.GetAsync($"/cases/{id}", cancellationToken);
 		response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-		var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
+		var body = TestAsserts.NotNull(await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken));
 		body.Should().BeEquivalentTo(new { Id = id, CaseType });
 	}
 
@@ -1194,10 +1191,10 @@ public class CaseEndpointsTests
 		);
 
 		// Act
-		var body = await client.GetFromJsonAsync<CaseListResponse>("/cases", cancellationToken);
+		var body = TestAsserts.NotNull(await client.GetFromJsonAsync<CaseListResponse>("/cases", cancellationToken));
 
 		// Assert
-		var item = body!.Items.Should().ContainSingle().Subject;
+		var item = body.Items.Should().ContainSingle().Subject;
 		item.Id.Should().Be(walesId);
 	}
 
@@ -1271,12 +1268,10 @@ public class CaseEndpointsTests
 			cancellationToken
 		);
 
-		var body = await client.GetFromJsonAsync<CaseListResponse>(
-			"/cases",
-			cancellationToken
+		var body = TestAsserts.NotNull(
+			await client.GetFromJsonAsync<CaseListResponse>("/cases", cancellationToken)
 		);
-		body.Should().NotBeNull();
-		body!.Items.Should().HaveCount(2);
+		body.Items.Should().HaveCount(2);
 	}
 
 	[Fact]
@@ -1290,10 +1285,10 @@ public class CaseEndpointsTests
 		await factory.SeedAsync(ListedCase(orgId: "org-00789", stateId: "submitted", isTerminal: false), cancellationToken);
 
 		// Act
-		var body = await client.GetFromJsonAsync<CaseListResponse>("/cases?orgId=org-00456", cancellationToken);
+		var body = TestAsserts.NotNull(await client.GetFromJsonAsync<CaseListResponse>("/cases?orgId=org-00456", cancellationToken));
 
 		// Assert
-		var item = body!.Items.Should().ContainSingle().Subject;
+		var item = body.Items.Should().ContainSingle().Subject;
 		item.OrgId.Should().Be("org-00456");
 	}
 
@@ -1308,10 +1303,10 @@ public class CaseEndpointsTests
 		await factory.SeedAsync(ListedCase(orgId: "org-00789", stateId: "submitted", isTerminal: false, producerType: "COMPLIANCE_SCHEME"), cancellationToken);
 
 		// Act
-		var body = await client.GetFromJsonAsync<CaseListResponse>("/cases?producerType=DIRECT_PRODUCER", cancellationToken);
+		var body = TestAsserts.NotNull(await client.GetFromJsonAsync<CaseListResponse>("/cases?producerType=DIRECT_PRODUCER", cancellationToken));
 
 		// Assert
-		var item = body!.Items.Should().ContainSingle().Subject;
+		var item = body.Items.Should().ContainSingle().Subject;
 		item.Should().BeEquivalentTo(new { OrgId = "org-00456", ProducerType = "DIRECT_PRODUCER" });
 	}
 
@@ -1326,10 +1321,10 @@ public class CaseEndpointsTests
 		await factory.SeedAsync(ListedCase(orgId: "org-00456", stateId: "approved", isTerminal: true), cancellationToken);
 
 		// Act
-		var body = await client.GetFromJsonAsync<CaseListResponse>("/cases?isTerminal=true", cancellationToken);
+		var body = TestAsserts.NotNull(await client.GetFromJsonAsync<CaseListResponse>("/cases?isTerminal=true", cancellationToken));
 
 		// Assert
-		var item = body!.Items.Should().ContainSingle().Subject;
+		var item = body.Items.Should().ContainSingle().Subject;
 		item.StateId.Should().Be("approved");
 	}
 
@@ -1571,14 +1566,12 @@ public class CaseEndpointsTests
 			cancellationToken
 		);
 
-		var body = await client.GetFromJsonAsync<CaseListResponse>(
-			"/cases",
-			cancellationToken
+		var body = TestAsserts.NotNull(
+			await client.GetFromJsonAsync<CaseListResponse>("/cases", cancellationToken)
 		);
-		body.Should().NotBeNull();
 
 		using var scope = new AssertionScope();
-		body!.Items.Should().HaveCount(2);
+		body.Items.Should().HaveCount(2);
 		body.Should().BeEquivalentTo(
 			new
 			{
@@ -1633,20 +1626,21 @@ public class CaseEndpointsTests
 		// Property-level assertion: the JSON must not even mention
 		// 'timeline' on a list item.
 		var rawJson = await response.Content.ReadAsStringAsync(cancellationToken);
-		var root = System.Text.Json.Nodes.JsonNode.Parse(rawJson);
-		root.Should().NotBeNull();
-		var firstItem = root!["items"]!.AsArray()[0]!.AsObject();
+		var root = TestAsserts.NotNull(System.Text.Json.Nodes.JsonNode.Parse(rawJson));
+		var items = TestAsserts.NotNull(root["items"]).AsArray();
+		var firstItem = TestAsserts.NotNull(items[0]).AsObject();
 		firstItem.ContainsKey("timeline").Should().BeFalse("list item must not include 'timeline'");
 
-		var body = System.Text.Json.JsonSerializer.Deserialize<CaseListResponse>(
-			rawJson,
-			new System.Text.Json.JsonSerializerOptions
-			{
-				PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
-			}
+		var body = TestAsserts.NotNull(
+			System.Text.Json.JsonSerializer.Deserialize<CaseListResponse>(
+				rawJson,
+				new System.Text.Json.JsonSerializerOptions
+				{
+					PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+				}
+			)
 		);
-		body.Should().NotBeNull();
-		var item = body!.Items.Should().ContainSingle().Subject;
+		var item = body.Items.Should().ContainSingle().Subject;
 		item.Should().BeEquivalentTo(
 			new
 			{
@@ -1721,9 +1715,8 @@ public class CaseEndpointsTests
 		);
 
 		response.StatusCode.Should().Be(HttpStatusCode.OK);
-		var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
-		body.Should().NotBeNull();
-		var persisted = await factory.Persistence.GetByIdAsync(id, cancellationToken);
+		var body = TestAsserts.NotNull(await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken));
+		var persisted = TestAsserts.NotNull(await factory.Persistence.GetByIdAsync(id, cancellationToken));
 
 		using var scope = new AssertionScope();
 		body.Should().BeEquivalentTo(
@@ -1734,7 +1727,7 @@ public class CaseEndpointsTests
 				AssignedBy = "actor-1",
 			}
 		);
-		body!.AssignedAt.Should().NotBeNull();
+		body.AssignedAt.Should().NotBeNull();
 		persisted.Should().BeEquivalentTo(new { AssignedToId = "alice-1", Version = 1 });
 	}
 
@@ -1914,7 +1907,7 @@ public class CaseEndpointsTests
 		);
 
 		response.StatusCode.Should().Be(HttpStatusCode.OK);
-		var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
+		var body = TestAsserts.NotNull(await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken));
 		body.Should().BeEquivalentTo(
 			new
 			{
@@ -1995,7 +1988,7 @@ public class CaseEndpointsTests
 
 		response.StatusCode.Should().Be(HttpStatusCode.OK);
 		response.Headers.TryGetValues("X-Idempotent-Replay", out var values).Should().BeTrue();
-		var persisted = await factory.Persistence.GetByIdAsync(id, cancellationToken);
+		var persisted = TestAsserts.NotNull(await factory.Persistence.GetByIdAsync(id, cancellationToken));
 
 		using var scope = new AssertionScope();
 		values.Should().Equal("true");
@@ -2033,7 +2026,7 @@ public class CaseEndpointsTests
 
 		response.StatusCode.Should().Be(HttpStatusCode.OK);
 		response.Headers.TryGetValues("X-Idempotent-Replay", out var values).Should().BeTrue();
-		var persisted = await factory.Persistence.GetByIdAsync(id, cancellationToken);
+		var persisted = TestAsserts.NotNull(await factory.Persistence.GetByIdAsync(id, cancellationToken));
 
 		using var scope = new AssertionScope();
 		values.Should().Equal("true");
@@ -2088,14 +2081,13 @@ public class CaseEndpointsTests
 		);
 
 		response.StatusCode.Should().Be(HttpStatusCode.Conflict);
-		var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken);
-		problem.Should().NotBeNull();
-		var persisted = await factory.Persistence.GetByIdAsync(id, cancellationToken);
+		var problem = TestAsserts.NotNull(await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken));
+		var persisted = TestAsserts.NotNull(await factory.Persistence.GetByIdAsync(id, cancellationToken));
 
 		using var scope = new AssertionScope();
 		response.Headers.Contains("X-Idempotent-Replay").Should().BeFalse();
 		problem.Should().BeEquivalentTo(new { Title = "Action not allowed", Status = 409 });
-		problem!.Detail.Should().Contain(stateId).And.NotContain(id.ToString());
+		problem.Detail.Should().Contain(stateId).And.NotContain(id.ToString());
 		persisted.Should().BeEquivalentTo(
 			new
 			{
@@ -2143,14 +2135,13 @@ public class CaseEndpointsTests
 		);
 
 		response.StatusCode.Should().Be(HttpStatusCode.Conflict);
-		var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken);
-		problem.Should().NotBeNull();
-		var persisted = await factory.Persistence.GetByIdAsync(id, cancellationToken);
+		var problem = TestAsserts.NotNull(await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken));
+		var persisted = TestAsserts.NotNull(await factory.Persistence.GetByIdAsync(id, cancellationToken));
 
 		using var scope = new AssertionScope();
 		response.Headers.Contains("X-Idempotent-Replay").Should().BeFalse();
 		problem.Should().BeEquivalentTo(new { Title = "Action not allowed", Status = 409 });
-		problem!.Detail.Should().NotContain(id.ToString());
+		problem.Detail.Should().NotContain(id.ToString());
 		persisted.Should().BeEquivalentTo(
 			new
 			{
@@ -2200,8 +2191,8 @@ public class CaseEndpointsTests
 		);
 		unassign.StatusCode.Should().Be(HttpStatusCode.OK);
 
-		var persisted = await factory.Persistence.GetByIdAsync(id, cancellationToken);
-		persisted!.AssignedToId.Should().BeNull();
+		var persisted = TestAsserts.NotNull(await factory.Persistence.GetByIdAsync(id, cancellationToken));
+		persisted.AssignedToId.Should().BeNull();
 	}
 
 	[Fact]
@@ -2263,16 +2254,14 @@ public class CaseEndpointsTests
 		);
 
 		response.StatusCode.Should().Be(HttpStatusCode.OK);
-		var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
-		body!.Timeline.Should().NotBeNull();
-		var note = body.Timeline!.Should().ContainSingle(a => a.Action == "note-added").Subject;
-		var persisted = await factory.Persistence.GetByIdAsync(id, cancellationToken);
-		persisted.Should().NotBeNull();
+		var body = TestAsserts.NotNull(await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken));
+		var note = TestAsserts.NotNull(body.Timeline).Should().ContainSingle(a => a.Action == "note-added").Subject;
+		var persisted = TestAsserts.NotNull(await factory.Persistence.GetByIdAsync(id, cancellationToken));
 
 		using var scope = new AssertionScope();
 		note.Should().BeEquivalentTo(new { PerformedById = "alice-1", PerformedByName = "Alice Example" });
 		note.Details.Should().Contain("text", "Reviewed evidence; awaiting confirmation.");
-		persisted!.Timeline.Should().ContainSingle(a => a.Action == "note-added");
+		persisted.Timeline.Should().ContainSingle(a => a.Action == "note-added");
 		persisted.Version.Should().Be(1);
 	}
 
@@ -2391,9 +2380,8 @@ public class CaseEndpointsTests
 		var response = await client.GetAsync($"/cases/{id}", cancellationToken);
 		response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-		var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
-		body!.Timeline.Should().NotBeNull();
-		body.Timeline!.Should().SatisfyRespectively(
+		var body = TestAsserts.NotNull(await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken));
+		TestAsserts.NotNull(body.Timeline).Should().SatisfyRespectively(
 			first => first.Should().BeEquivalentTo(new { Action = "note-added", PerformedAt = newer }),
 			second =>
 			{
@@ -2467,9 +2455,8 @@ public class CaseEndpointsTests
 		var response = await client.GetAsync($"/cases/{id}", cancellationToken);
 		response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-		var body = await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken);
-		body!.Timeline.Should().NotBeNull();
-		body.Timeline!.Select(e => e.Details["sequence"]).Should().Equal("3", "2", "1");
+		var body = TestAsserts.NotNull(await response.Content.ReadFromJsonAsync<CaseResponse>(cancellationToken));
+		TestAsserts.NotNull(body.Timeline).Select(e => e.Details["sequence"]).Should().Equal("3", "2", "1");
 	}
 
 	// ----------------------------------------------------------------
@@ -2540,7 +2527,7 @@ public class CaseEndpointsTests
 				cancellationToken
 			),
 			"POST" => await client.PostAsJsonAsync(path, body, cancellationToken),
-			"PUT" => await client.PutAsJsonAsync(path, body!, cancellationToken),
+			"PUT" => await client.PutAsJsonAsync(path, TestAsserts.NotNull(body), cancellationToken),
 			_ => throw new InvalidOperationException($"Unsupported method '{method}'."),
 		};
 
@@ -2625,9 +2612,7 @@ public class CaseEndpointsTests
 				.Find(e => e.CompletionEnvelope != null)
 				.SortByDescending(e => e.Sequence)
 				.FirstOrDefaultAsync(cancellationToken);
-			ArgumentNullException.ThrowIfNull(doc);
-			return doc.CompletionEnvelope
-				?? throw new InvalidOperationException("Expected a completion envelope on the audit event.");
+			return TestAsserts.NotNull(doc.CompletionEnvelope);
 		}
 
 		protected override void ConfigureWebHost(IWebHostBuilder builder)

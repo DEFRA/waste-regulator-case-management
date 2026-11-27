@@ -25,68 +25,73 @@ internal static class NotifyTestConstants
 /// env-var-mutation collection (DisableParallelization = true) to prevent
 /// races with other WebApplicationFactory spin-ups.
 /// </summary>
-public class NotifyApiKeyRegistrationTests
+public static class NotifyApiKeyRegistrationTests
 {
-	private readonly MongoIntegrationFixture _fixture;
-
-	public NotifyApiKeyRegistrationTests(MongoIntegrationFixture fixture) => _fixture = fixture;
-
-	[Fact]
-	public void Default_flag_absent_registers_noop_client()
+	/// <summary>
+	/// xUnit consumer for the assembly <see cref="MongoIntegrationFixture"/>.
+	/// Kept nested so the outer type can stay static (Sonar S1118).
+	/// </summary>
+	public sealed class Wiring(MongoIntegrationFixture fixture)
 	{
-		// No Notify:Enabled override at all: the shipped appsettings default
-		// (false) applies, so even a configured API key yields the no-op
-		// client.
-		using var factory = new EphemeralMongoTestFactory(
-			_fixture,
-			"notify-default",
-			settings: new Dictionary<string, string?>
-			{
-				["NOTIFY_API_KEY"] = NotifyTestConstants.FakeApiKey,
-			});
+		private readonly MongoIntegrationFixture _fixture = fixture;
 
-		factory.Services.GetRequiredService<INotifyClient>().Should().BeOfType<NoOpNotifyClient>();
-	}
-
-	[Fact]
-	public void Explicitly_disabled_registers_noop_client()
-	{
-		using var factory = NewFactory(NotifyTestConstants.FakeApiKey, enabled: false);
-
-		factory.Services.GetRequiredService<INotifyClient>().Should().BeOfType<NoOpNotifyClient>();
-	}
-
-	[Fact]
-	public void Enabled_with_api_key_registers_govuk_client()
-	{
-		using var factory = NewFactory(NotifyTestConstants.FakeApiKey, enabled: true);
-
-		factory.Services.GetRequiredService<INotifyClient>().Should().BeOfType<GovukNotifyClient>();
-	}
-
-	[Fact]
-	public void Enabled_without_api_key_registers_noop_client()
-	{
-		using var factory = NewFactory(apiKey: null, enabled: true);
-
-		factory.Services.GetRequiredService<INotifyClient>().Should().BeOfType<NoOpNotifyClient>();
-	}
-
-	// Always set NOTIFY_API_KEY and Notify:Enabled explicitly so an ambient
-	// value in the test runner's environment cannot influence the outcome.
-	//
-	// NOTIFY_SENDEMAILS=true pins NotifySendingPolicy open. Without it the
-	// enabled+API-key case would assert the dev/localhost environment gate
-	// (the test host defaults to the Development environment) instead of the
-	// flag×API-key matrix it is about — NotifyEnvironmentGatingTests covers
-	// the gate itself.
-	private EphemeralMongoTestFactory NewFactory(string? apiKey, bool enabled) =>
-		new(_fixture, "notify-key", settings: new Dictionary<string, string?>
+		[Fact]
+		public void Default_flag_absent_registers_noop_client()
 		{
-			["NOTIFY_API_KEY"] = apiKey ?? string.Empty,
-			["Notify:Enabled"] = enabled ? "true" : "false",
-			[NotifySendingPolicy.SendEmailsKey] = "true",
-		});
+			// No Notify:Enabled override at all: the shipped appsettings default
+			// (false) applies, so even a configured API key yields the no-op
+			// client.
+			using var factory = new EphemeralMongoTestFactory(
+				_fixture,
+				"notify-default",
+				settings: new Dictionary<string, string?>
+				{
+					["NOTIFY_API_KEY"] = NotifyTestConstants.FakeApiKey,
+				});
+
+			factory.Services.GetRequiredService<INotifyClient>().Should().BeOfType<NoOpNotifyClient>();
+		}
+
+		[Fact]
+		public void Explicitly_disabled_registers_noop_client()
+		{
+			using var factory = NewFactory(NotifyTestConstants.FakeApiKey, enabled: false);
+
+			factory.Services.GetRequiredService<INotifyClient>().Should().BeOfType<NoOpNotifyClient>();
+		}
+
+		[Fact]
+		public void Enabled_with_api_key_registers_govuk_client()
+		{
+			using var factory = NewFactory(NotifyTestConstants.FakeApiKey, enabled: true);
+
+			factory.Services.GetRequiredService<INotifyClient>().Should().BeOfType<GovukNotifyClient>();
+		}
+
+		[Fact]
+		public void Enabled_without_api_key_registers_noop_client()
+		{
+			using var factory = NewFactory(apiKey: null, enabled: true);
+
+			factory.Services.GetRequiredService<INotifyClient>().Should().BeOfType<NoOpNotifyClient>();
+		}
+
+		// Always set NOTIFY_API_KEY and Notify:Enabled explicitly so an ambient
+		// value in the test runner's environment cannot influence the outcome.
+		//
+		// NOTIFY_SENDEMAILS=true pins NotifySendingPolicy open. Without it the
+		// enabled+API-key case would assert the dev/localhost environment gate
+		// (the test host defaults to the Development environment) instead of the
+		// flag×API-key matrix it is about — NotifyEnvironmentGatingTests covers
+		// the gate itself.
+		private EphemeralMongoTestFactory NewFactory(string? apiKey, bool enabled) =>
+			new(_fixture, "notify-key", settings: new Dictionary<string, string?>
+			{
+				["NOTIFY_API_KEY"] = apiKey ?? string.Empty,
+				["Notify:Enabled"] = enabled ? "true" : "false",
+				[NotifySendingPolicy.SendEmailsKey] = "true",
+			});
+	}
 }
 
 /// <summary>
@@ -97,6 +102,8 @@ public class NotifyApiKeyRegistrationTests
 public sealed class EnvVarMutationCollection
 {
 	public const string Name = "env-var-mutation";
+
+	private EnvVarMutationCollection() { }
 }
 
 /// <summary>

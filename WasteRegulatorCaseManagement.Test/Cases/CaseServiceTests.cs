@@ -423,8 +423,8 @@ public class CaseServiceTests : IAsyncDisposable
 
 		var projection = BuildService(type).Project(caseRecord);
 
-		projection.AvailableActions.Select(a => a.ActionId).OrderBy(a => a).ToArray()
-			.Should().Equal(["approve", "reject", "withdraw"]);
+		projection.AvailableActions.Select(a => a.ActionId).OrderBy(a => a)
+			.Should().Equal("approve", "reject", "withdraw");
 	}
 
 	[Fact]
@@ -455,8 +455,8 @@ public class CaseServiceTests : IAsyncDisposable
 
 		var projection = BuildService(type).Project(caseRecord);
 
-		projection.AvailableActions.Select(a => a.ActionId).OrderBy(a => a).ToArray()
-			.Should().Equal(["approve", "reject"]);
+		projection.AvailableActions.Select(a => a.ActionId).OrderBy(a => a)
+			.Should().Equal("approve", "reject");
 		await Task.CompletedTask;
 	}
 

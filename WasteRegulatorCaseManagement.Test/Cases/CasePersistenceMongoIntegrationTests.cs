@@ -302,7 +302,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
 
 		var page = await _persistence.QueryAsync(new CaseQuery(Sort: "status"), ct);
 
-		page.Items.Select(i => i.StateId).ToArray().Should().Equal(s_expectedStatusRankAscending);
+		page.Items.Select(i => i.StateId).Should().Equal(s_expectedStatusRankAscending);
 	}
 
 	[Fact]

@@ -117,6 +117,66 @@ public sealed class CaseCompletionAuditEventProcessorTests : IAsyncDisposable
 	}
 
 	[Fact]
+	public async Task ProcessBatch_marks_failed_when_a_publish_throws()
+	{
+		var cancellationToken = TestContext.Current.CancellationToken;
+		var auditEvent = CompletionAuditEventWith(sequence: 1, dispatches: []);
+		await AuditEvents.InsertOneAsync(auditEvent, cancellationToken: cancellationToken);
+		_sender.FailFor(auditEvent.EventId, "Topic unavailable");
+
+		await _processor.ProcessBatch(cancellationToken);
+
+		_sender.SentEnvelopes.Should().ContainSingle();
+		var stored = await AuditEvents.Find(e => e.EventId == auditEvent.EventId).SingleAsync(cancellationToken);
+		stored.Dispatches[Completion].Should().BeEquivalentTo(
+			new AuditEventDispatch
+			{
+				Status = AuditEventDispatchStatus.Failed,
+				Date = s_now,
+				Message = "Topic unavailable",
+				AttemptCount = 1,
+				NextAttemptAt = s_now.AddSeconds(60),
+			}
+		);
+	}
+
+	[Fact]
+	public async Task ProcessBatch_publishes_nothing_while_another_instance_holds_the_lease()
+	{
+		var cancellationToken = TestContext.Current.CancellationToken;
+		await AuditEvents.InsertOneAsync(CompletionAuditEventWith(sequence: 1, dispatches: []), cancellationToken: cancellationToken);
+		var otherInstance = new AuditEventLeaseService(_clientFactory, _time);
+		await otherInstance.TryAcquire(Completion, TimeSpan.FromMinutes(1), cancellationToken);
+
+		await _processor.ProcessBatch(cancellationToken);
+
+		_sender.SentEnvelopes.Should().BeEmpty();
+	}
+
+	[Fact]
+	public async Task ProcessBatch_stops_publishing_when_the_lease_is_lost_part_way_through()
+	{
+		var cancellationToken = TestContext.Current.CancellationToken;
+		var first = CompletionAuditEventWith(sequence: 1, dispatches: []);
+		var second = CompletionAuditEventWith(sequence: 2, dispatches: []);
+		await AuditEvents.InsertManyAsync([first, second], cancellationToken: cancellationToken);
+		_sender.OnSend = () =>
+			_clientFactory
+				.GetCollection<AuditEventDispatchLease>(AuditEventService.AuditEventDispatchLeaseCollectionName)
+				.UpdateOneAsync(
+					lease => lease.Id == Completion,
+					Builders<AuditEventDispatchLease>.Update.Set(lease => lease.Owner, "another-instance"),
+					cancellationToken: cancellationToken
+				);
+
+		await _processor.ProcessBatch(cancellationToken);
+
+		_sender.SentEnvelopes.Select(e => e.EventId).Should().Equal(first.EventId);
+		var unsent = await AuditEvents.Find(e => e.EventId == second.EventId).SingleAsync(cancellationToken);
+		unsent.Dispatches.Should().BeEmpty();
+	}
+
+	[Fact]
 	public async Task ProcessBatch_dead_letters_an_event_whose_last_allowed_attempt_fails()
 	{
 		var cancellationToken = TestContext.Current.CancellationToken;
@@ -210,9 +270,11 @@ public sealed class CaseCompletionAuditEventProcessorTests : IAsyncDisposable
 
 		public List<CaseCompletionEnvelope> SentEnvelopes { get; } = [];
 
+		public Func<Task>? OnSend { get; set; }
+
 		public void FailFor(string eventId, string message) => _failures[eventId] = message;
 
-		public Task Send(CaseCompletionEnvelope envelope, CancellationToken cancellationToken)
+		public async Task Send(CaseCompletionEnvelope envelope, CancellationToken cancellationToken)
 		{
 			SentEnvelopes.Add(envelope);
 
@@ -221,7 +283,10 @@ public sealed class CaseCompletionAuditEventProcessorTests : IAsyncDisposable
 				throw new InvalidOperationException(message);
 			}
 
-			return Task.CompletedTask;
+			if (OnSend is not null)
+			{
+				await OnSend();
+			}
 		}
 	}
 }

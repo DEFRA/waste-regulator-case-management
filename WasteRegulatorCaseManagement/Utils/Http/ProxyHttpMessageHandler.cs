@@ -166,17 +166,8 @@ public class ProxyHttpMessageHandler : HttpClientHandler
 		return webProxy;
 	}
 
-	private static string? FirstNonEmpty(params string?[] candidates)
-	{
-		foreach (var value in candidates)
-		{
-			if (!string.IsNullOrWhiteSpace(value))
-			{
-				return value;
-			}
-		}
-		return null;
-	}
+	private static string? FirstNonEmpty(params string?[] candidates) =>
+		candidates.FirstOrDefault(v => !string.IsNullOrWhiteSpace(v));
 
 	/// <summary>
 	/// Parse a NO_PROXY value into a <see cref="WebProxy.BypassList"/>

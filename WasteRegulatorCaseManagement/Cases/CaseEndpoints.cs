@@ -1,7 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Claims;
-using System.Text.Json;
 using MongoDB.Bson;
 using WasteRegulatorCaseManagement.Auth;
 using WasteRegulatorCaseManagement.Utils.Logging;
@@ -13,7 +12,10 @@ namespace WasteRegulatorCaseManagement.Cases;
 
 // Marker type for IStructuredLogger category — CaseEndpoints is a
 // static class and therefore cannot itself be used as a type argument.
-internal sealed class CaseEndpointsLogger;
+internal sealed class CaseEndpointsLogger
+{
+	public CaseEndpointsLogger() { }
+}
 
 /// <summary>
 /// HTTP endpoints for ingesting, listing and progressing cases of every
@@ -332,7 +334,7 @@ public static class CaseEndpoints
 				[CallerClientIdField] = submittedBy ?? "(unknown)",
 			}
 		);
-		var response = ToResponse(engine.Project(caseRecord));
+		var response = CaseWireProjection.ToDetailResponse(engine.Project(caseRecord));
 		// A resent submission gets the case it already created, flagged with
 		// the same header the other idempotent mutations use, so the Case
 		// Intake Processor can discard the event.
@@ -378,34 +380,11 @@ public static class CaseEndpoints
 		{
 			return TypedResults.NotFound();
 		}
-		return TypedResults.Ok(ToResponse(engine.Project(caseRecord)));
+		return TypedResults.Ok(CaseWireProjection.ToDetailResponse(engine.Project(caseRecord)));
 	}
 
 	internal static async Task<Results<Ok<CaseListResponse>, ProblemHttpResult>> GetAll(
-		[FromQuery(Name = "caseType"), Description("Only cases of this case type. Repeat to match any of several.")]
-		string[]? caseType,
-		[FromQuery(Name = "stateId"), Description("Only cases in this state. Repeat to match any of several.")]
-		string[]? stateId,
-		[FromQuery(Name = "search"), Description("Only cases whose id starts with this text, ignoring case.")]
-		string? search,
-		[FromQuery(Name = "assigneeId"), Description("Only cases assigned to this user id. With `unassigned=true`, cases assigned to this user id or to no one.")]
-		string? assigneeId,
-		[FromQuery(Name = "unassigned"), Description("`true` for only the cases with no assignee.")]
-		bool? unassigned,
-		[FromQuery(Name = "orgId"), Description("Only cases of this organisation.")]
-		string? orgId,
-		[FromQuery(Name = "producerType"), Description("Only cases of this producer type, such as `DIRECT_PRODUCER`. Repeat to match any of several.")]
-		string[]? producerType,
-		[FromQuery(Name = "isTerminal"), Description("`true` for only concluded cases, `false` for only open ones.")]
-		bool? isTerminal,
-		[FromQuery(Name = "sort"), Description("`status` orders the cases by their case type's states, in the order the case type declares them.")]
-		string? sort,
-		[FromQuery(Name = "dir"), Description("`asc` or `desc`, the direction of `sort`.")]
-		string? dir,
-		[FromQuery(Name = "page"), Description("Page number, from 1 to 1000. Defaults to 1.")]
-		int? page,
-		[FromQuery(Name = "pageSize"), Description("Cases per page, up to 100. Defaults to 20.")]
-		int? pageSize,
+		[AsParameters] CaseListRequest request,
 		HttpContext httpContext,
 		[FromServices] ICasePersistence persistence,
 		[FromServices] ICaseService engine,
@@ -417,20 +396,6 @@ public static class CaseEndpoints
 			return NationRequired();
 		}
 
-		var request = new CaseListRequest(
-			caseType,
-			stateId,
-			search,
-			assigneeId,
-			unassigned,
-			orgId,
-			producerType,
-			isTerminal,
-			sort,
-			dir,
-			page,
-			pageSize
-		);
 		var query = CaseQueryBinding.FromRequest(request) with
 		{
 			Nation = nation,
@@ -448,7 +413,7 @@ public static class CaseEndpoints
 		var casePage = await persistence.QueryAsync(query, cancellationToken);
 
 		var items = casePage
-			.Items.Select(w => ToListItemResponse(engine.Project(w)))
+			.Items.Select(w => CaseWireProjection.ToListItemResponse(engine.Project(w)))
 			.ToList();
 
 		return TypedResults.Ok(
@@ -566,7 +531,7 @@ public static class CaseEndpoints
 	{
 		if (result.IsSuccess)
 		{
-			return TypedResults.Ok(ToResponse(engine.Project(result.Case)));
+			return TypedResults.Ok(CaseWireProjection.ToDetailResponse(engine.Project(result.Case)));
 		}
 
 		return result.FailureCode switch
@@ -605,88 +570,4 @@ public static class CaseEndpoints
 		};
 	}
 
-	internal static CaseResponse ToResponse(CaseEngineProjection projection)
-	{
-		var w = projection.Case;
-		return new CaseResponse(
-			w.Id,
-			w.CaseType,
-			w.StateId,
-			w.IsTerminal,
-			w.SubmittedAt,
-			w.LastModifiedAt,
-			w.SubmittedBy,
-			projection.TemplateVersion,
-			w.SourceSystemId,
-			new CompletionEventResponse(
-				w.CompletionEvent.EventType,
-				JsonDocument.Parse(w.CompletionEvent.PayloadTemplate.ToJson()).RootElement.Clone()
-			),
-			w.Nation,
-			w.OrgId,
-			w.ProducerType,
-			w.DisplayData,
-			projection.AvailableActions,
-			w.Decision,
-			w.AssignedToId,
-			w.AssignedToName,
-			w.AssignedAt,
-			w.AssignedBy,
-			// Timeline (RA-97) is projected in reverse-chronological
-			// (newest-first) order so a UI renders the most recent activity
-			// at the top of the timeline (RA-568). Insertion index is the
-			// secondary key so entries written within the same tick (common
-			// under FakeTimeProvider, and possible in production when a
-			// single engine call appends two entries back-to-back) keep
-			// their append order reversed on the wire instead of relying on
-			// undefined behaviour from a tied OrderBy.
-			w.Timeline.Select((e, i) => (Entry: e, Index: i))
-				.OrderByDescending(x => x.Entry.PerformedAt)
-				.ThenByDescending(x => x.Index)
-				.Select(x => new CaseTimelineEntryResponse(
-					x.Entry.Id,
-					x.Entry.Action,
-					x.Entry.ActionDisplayName,
-					x.Entry.Details,
-					x.Entry.PerformedAt,
-					x.Entry.PerformedById,
-					x.Entry.PerformedByName,
-					// Per-event state snapshot (null for pre-change entries).
-					x.Entry.StateId
-				))
-				.ToList()
-		);
-	}
-
-	/// <summary>
-	/// Slim per-item projection used by the list endpoint.
-	/// Identical to <see cref="ToResponse"/>
-	/// except the per-item <c>Timeline</c> is omitted entirely from the wire
-	/// shape — it would otherwise dominate the payload of a 100-row page even
-	/// though no list view renders it.
-	/// </summary>
-	internal static CaseListItemResponse ToListItemResponse(CaseEngineProjection projection)
-	{
-		var w = projection.Case;
-		return new CaseListItemResponse(
-			w.Id,
-			w.CaseType,
-			w.StateId,
-			w.IsTerminal,
-			w.SubmittedAt,
-			w.LastModifiedAt,
-			w.SubmittedBy,
-			projection.TemplateVersion,
-			w.SourceSystemId,
-			w.Nation,
-			w.OrgId,
-			w.ProducerType,
-			w.DisplayData,
-			projection.AvailableActions,
-			w.AssignedToId,
-			w.AssignedToName,
-			w.AssignedAt,
-			w.AssignedBy
-		);
-	}
 }

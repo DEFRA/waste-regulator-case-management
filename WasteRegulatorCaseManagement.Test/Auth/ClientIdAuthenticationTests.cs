@@ -1278,7 +1278,9 @@ internal sealed class BareFactory(
 ) : WebApplicationFactory<Program>
 {
 	public readonly ICasePersistence MockPersistence = Substitute.For<ICasePersistence>();
-	public readonly FakeTimeProvider FakeTime = new(DateTimeOffset.Parse("2026-04-30T12:00:00Z"));
+	public readonly FakeTimeProvider FakeTime = new(
+		DateTimeOffset.Parse("2026-04-30T12:00:00Z", System.Globalization.CultureInfo.InvariantCulture)
+	);
 	public readonly FakeClientIdAuthNonceStore NonceStore = new();
 
 	protected override void ConfigureWebHost(IWebHostBuilder builder)

@@ -95,4 +95,40 @@ public sealed record CaseListItemResponse(
 
 	[property: Description("User id of the caseworker who last changed the assignment.")]
 	string? AssignedBy = null
-);
+)
+{
+	/// <summary>Maps an engine projection to the flat list-row wire shape.</summary>
+	internal static CaseListItemResponse FromProjection(CaseEngineProjection projection) =>
+		From(projection.Case, projection.TemplateVersion, projection.AvailableActions);
+
+	[System.Diagnostics.CodeAnalysis.SuppressMessage(
+		"Major Code Smell",
+		"S107:Methods should not have too many parameters",
+		Justification = "Flat OpenAPI list row; nested DTOs would change the wire shape."
+	)]
+	private static CaseListItemResponse From(
+		Case caseRecord,
+		string templateVersion,
+		IReadOnlyCollection<CaseTransition> availableActions
+	) =>
+		new(
+			caseRecord.Id,
+			caseRecord.CaseType,
+			caseRecord.StateId,
+			caseRecord.IsTerminal,
+			caseRecord.SubmittedAt,
+			caseRecord.LastModifiedAt,
+			caseRecord.SubmittedBy,
+			templateVersion,
+			caseRecord.SourceSystemId,
+			caseRecord.Nation,
+			caseRecord.OrgId,
+			caseRecord.ProducerType,
+			caseRecord.DisplayData,
+			availableActions,
+			caseRecord.AssignedToId,
+			caseRecord.AssignedToName,
+			caseRecord.AssignedAt,
+			caseRecord.AssignedBy
+		);
+}

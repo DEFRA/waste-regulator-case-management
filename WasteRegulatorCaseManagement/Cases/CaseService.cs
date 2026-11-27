@@ -209,6 +209,7 @@ public sealed class CaseService : ICaseService
 					ex
 				);
 			_logger.LogInformation(
+				ex,
 				"Case for source system id {SourceSystemId} was created concurrently; returning {CaseId}",
 				intake.SourceSystemId,
 				winner.Id
@@ -225,7 +226,10 @@ public sealed class CaseService : ICaseService
 				submittedBy,
 				ex.GetType().Name
 			);
-			throw;
+			throw new InvalidOperationException(
+				$"Failed to persist case {caseRecord.Id} for source system id '{intake.SourceSystemId}'.",
+				ex
+			);
 		}
 
 		_logger.LogInformation(
@@ -352,6 +356,13 @@ public sealed class CaseService : ICaseService
 			}
 			catch (CaseEventPayloadException exception)
 			{
+				_logger.LogWarning(
+					exception,
+					"Completion payload render failed for case {CaseId} ({CaseType}) on action {ActionId}",
+					caseRecord.Id,
+					caseRecord.CaseType,
+					transition.ActionId
+				);
 				return CaseActionResult.Failure(
 					CaseActionFailureCode.InvalidCompletionEvent,
 					exception.Message
@@ -613,7 +624,7 @@ public sealed class CaseService : ICaseService
 			return nationFailure;
 		}
 
-		if (ValidateNoteText(text, out var trimmed, out var noteFailure) is false)
+		if (!ValidateNoteText(text, out var trimmed, out var noteFailure))
 		{
 			return noteFailure
 				?? throw new InvalidOperationException("Note validation failed without a failure result.");
@@ -877,18 +888,6 @@ public sealed class CaseService : ICaseService
 			details
 		);
 
-	/// <summary>
-	/// Cases are created by a source system rather than a person, so the
-	/// birth entry names the calling service by its verified client id.
-	/// </summary>
-	private static Actor ServiceActor(ClaimsPrincipal user)
-	{
-		var clientId = user.FindFirstValue("client_id");
-		return new Actor($"service:{clientId}", clientId);
-	}
-
-	private sealed record Actor(string Id, string? Name);
-
 	private static void AppendTimelineEntry(
 		Case caseRecord,
 		string action,
@@ -916,6 +915,18 @@ public sealed class CaseService : ICaseService
 			}
 		);
 	}
+
+	/// <summary>
+	/// Cases are created by a source system rather than a person, so the
+	/// birth entry names the calling service by its verified client id.
+	/// </summary>
+	private static Actor ServiceActor(ClaimsPrincipal user)
+	{
+		var clientId = user.FindFirstValue("client_id");
+		return new Actor($"service:{clientId}", clientId);
+	}
+
+	private sealed record Actor(string Id, string? Name);
 
 	private static CaseActionResult ConcurrencyConflict(string caseId) =>
 		CaseActionResult.Failure(
