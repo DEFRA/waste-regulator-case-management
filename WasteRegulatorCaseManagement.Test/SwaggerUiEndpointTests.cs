@@ -35,7 +35,7 @@ public class SwaggerUiEndpointTests
 
 		response.StatusCode.Should().Be(HttpStatusCode.OK);
 		response.Content.Headers.ContentType.Should().NotBeNull();
-		response.Content.Headers.ContentType!.MediaType.Should().Be("application/javascript");
+		response.Content.Headers.ContentType.MediaType.Should().Be("application/javascript");
 
 		var body = await response.Content.ReadAsStringAsync(ct);
 		// Sanity: contains the dropdown-mount marker and one of the stub
