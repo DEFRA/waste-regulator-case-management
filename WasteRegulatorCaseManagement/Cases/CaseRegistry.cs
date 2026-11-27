@@ -47,11 +47,6 @@ public sealed class CaseRegistry
 			}
 		}
 
-		foreach (var mappedStateId in type.CallbackMappings.Keys.Where(id => !stateIds.Contains(id)))
-		{
-			throw new InvalidCaseModuleConfigException(
-				$"Case type '{type.CaseType}' maps a callback for undeclared state '{mappedStateId}'.");
-		}
 	}
 }
 

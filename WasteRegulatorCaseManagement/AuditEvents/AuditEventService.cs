@@ -14,6 +14,7 @@ public sealed class AuditEventService
 	public const string AuditEventCounterCollectionName = "auditEventCounters";
 	public const string AuditEventDispatchLeaseCollectionName = "auditEventDispatchLeases";
 	public const string AnalyticsProcessName = "analytics";
+	public const string CompletionProcessName = "completion";
 
 	private const string AuditEventCounterId = "audit_event";
 
@@ -52,6 +53,20 @@ public sealed class AuditEventService
 						.Ascending(x => x.Sequence),
 					new CreateIndexOptions { Name = $"Dispatch_{AnalyticsProcessName}_Status_NextAttemptAt_Sequence" }
 				),
+				new CreateIndexModel<AuditEvent>(
+					Builders<AuditEvent>
+						.IndexKeys.Ascending(AuditEventDispatchFieldNames.DispatchStatusPath(CompletionProcessName))
+						.Ascending(AuditEventDispatchFieldNames.DispatchNextAttemptAtPath(CompletionProcessName))
+						.Ascending(x => x.Sequence),
+					new CreateIndexOptions<AuditEvent>
+					{
+						Name = $"Dispatch_{CompletionProcessName}_Status_NextAttemptAt_Sequence",
+						PartialFilterExpression = Builders<AuditEvent>.Filter.Exists(
+							x => x.CompletionEnvelope,
+							true
+						),
+					}
+				),
 			]
 		);
 	}
@@ -70,11 +85,28 @@ public sealed class AuditEventService
 			cancellationToken
 		);
 
+		var eventId = Ulid.NewUlid().ToString();
+		var completionEnvelope =
+			auditEvent.CompletionContent is { } content
+				? new CaseCompletionEnvelope
+				{
+					EventId = eventId,
+					CaseId = content.CaseId,
+					CaseType = content.CaseType,
+					SourceSystemId = content.SourceSystemId,
+					OrgId = content.OrgId,
+					StateId = content.StateId,
+					OccurredAt = content.OccurredAt,
+					EventType = content.EventType,
+					Payload = content.Payload,
+				}
+				: null;
+
 		await _auditEvents.InsertOneAsync(
 			session,
 			new AuditEvent
 			{
-				EventId = Ulid.NewUlid().ToString(),
+				EventId = eventId,
 				Sequence = counter.Sequence,
 				Entity = auditEvent.Entity,
 				EntityId = auditEvent.EntityId,
@@ -87,6 +119,7 @@ public sealed class AuditEventService
 				Before = auditEvent.Before,
 				After = auditEvent.After,
 				SchemaVersion = auditEvent.SchemaVersion,
+				CompletionEnvelope = completionEnvelope,
 			},
 			cancellationToken: cancellationToken
 		);

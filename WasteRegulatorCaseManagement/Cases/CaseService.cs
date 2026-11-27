@@ -1,6 +1,6 @@
 using System.Security.Claims;
-using MongoDB.Bson;
 using MongoDB.Driver;
+using WasteRegulatorCaseManagement.AuditEvents;
 
 namespace WasteRegulatorCaseManagement.Cases;
 
@@ -96,25 +96,20 @@ public sealed record CaseEngineProjection(
 public sealed class CaseService : ICaseService
 {
 	private const string SourceKey = "source";
-	private const int MaxWriteAttemptsAfterCallback = 3;
-
 	private readonly CaseRegistry _registry;
 	private readonly ICasePersistence _persistence;
-	private readonly ICaseCallbackClient _callbackClient;
 	private readonly ILogger<CaseService> _logger;
 	private readonly TimeProvider _timeProvider;
 
 	public CaseService(
 		CaseRegistry registry,
 		ICasePersistence persistence,
-		ICaseCallbackClient callbackClient,
 		ILogger<CaseService> logger,
 		TimeProvider? timeProvider = null
 	)
 	{
 		this._registry = registry;
 		this._persistence = persistence;
-		_callbackClient = callbackClient;
 		this._logger = logger;
 		_timeProvider = timeProvider ?? TimeProvider.System;
 	}
@@ -158,7 +153,7 @@ public sealed class CaseService : ICaseService
 			TemplateSnapshot = snapshot,
 			TemplateVersion = snapshot.TemplateVersion,
 			SourceSystemId = intake.SourceSystemId,
-			CallbackUrl = intake.CallbackUrl,
+			CompletionEvent = intake.CompletionEvent,
 			Nation = intake.Nation,
 			OrgId = intake.OrgId,
 			ProducerType = intake.ProducerType,
@@ -274,7 +269,10 @@ public sealed class CaseService : ICaseService
 			return failure;
 		}
 
-		var actionTransitions = template!
+		ArgumentNullException.ThrowIfNull(caseRecord);
+		ArgumentNullException.ThrowIfNull(template);
+
+		var actionTransitions = template
 			.Transitions.Where(t =>
 				string.Equals(t.ActionId, actionId, StringComparison.OrdinalIgnoreCase)
 			)
@@ -283,7 +281,7 @@ public sealed class CaseService : ICaseService
 		{
 			return CaseActionResult.Failure(
 				CaseActionFailureCode.UnknownAction,
-				$"Action '{actionId}' is not declared by case type '{caseRecord!.CaseType}'."
+				$"Action '{actionId}' is not declared by case type '{caseRecord.CaseType}'."
 			);
 		}
 
@@ -295,10 +293,10 @@ public sealed class CaseService : ICaseService
 		// InvalidTransition message below still names a valid from-state.
 		var transition =
 			actionTransitions.FirstOrDefault(t =>
-				string.Equals(t.FromStateId, caseRecord!.StateId, StringComparison.OrdinalIgnoreCase)
+				string.Equals(t.FromStateId, caseRecord.StateId, StringComparison.OrdinalIgnoreCase)
 			) ?? actionTransitions[0];
 
-		if (TerminalStates.Find(template, caseRecord!.StateId) is { } currentTerminalState)
+		if (TerminalStates.Find(template, caseRecord.StateId) is { } currentTerminalState)
 		{
 			return CaseActionResult.Failure(
 				CaseActionFailureCode.TerminalState,
@@ -309,7 +307,7 @@ public sealed class CaseService : ICaseService
 		if (
 			!string.Equals(
 				transition.FromStateId,
-				caseRecord!.StateId,
+				caseRecord.StateId,
 				StringComparison.OrdinalIgnoreCase
 			)
 		)
@@ -334,70 +332,40 @@ public sealed class CaseService : ICaseService
 			);
 		}
 
-		// The source system is told first and the case only moves once it
-		// has accepted the decision, so a caseworker sees a failed callback
-		// straight away and the case never claims an outcome its source
-		// system does not hold.
-		var callbackAccepted = false;
-		if (
-			_registry
-				.Find(caseRecord.CaseType)
-				?.CallbackMappings.FirstOrDefault(mapping =>
-					string.Equals(mapping.Key, transition.ToStateId, StringComparison.OrdinalIgnoreCase)
-				)
-				.Value
-			is { } callbackMapping
-		)
-		{
-			var callbackFailure = await SendCallbackAsync(
-				caseRecord,
-				callbackMapping,
-				decision,
-				user,
-				cancellationToken
-			);
-			if (callbackFailure is not null)
-			{
-				return await RecordCallbackFailureAsync(
-					caseRecord,
-					transition,
-					callbackFailure,
-					user,
-					cancellationToken
-				);
-			}
-			callbackAccepted = true;
-		}
-
-		// Once the source system holds the decision, the case must follow
-		// it: the write ignores the caller giving up, and a note or
-		// assignment that landed during the callback is reloaded and kept.
-		var writeCancellationToken = callbackAccepted ? CancellationToken.None : cancellationToken;
 		var previousState = caseRecord.StateId;
-		for (var attempt = 1; ; attempt++)
+		var now = _timeProvider.GetUtcNow().UtcDateTime;
+		ApplyTransition(caseRecord, template, transition, decision, user, now);
+
+		CaseCompletionEnvelopeContent? completionContent = null;
+		if (caseRecord.IsTerminal)
 		{
-			ApplyTransition(caseRecord, template!, transition, decision, user);
 			try
 			{
-				await _persistence.ReplaceAsync(caseRecord, writeCancellationToken);
-				break;
+				completionContent = CaseCompletionRenderer.Build(
+					caseRecord,
+					template,
+					transition.ToStateId,
+					decision,
+					user,
+					now
+				);
 			}
-			catch (CaseConcurrencyException) when (callbackAccepted && attempt < MaxWriteAttemptsAfterCallback)
+			catch (CaseEventPayloadException exception)
 			{
-				var reloaded = await _persistence.GetByIdAsync(caseId, writeCancellationToken);
-				if (
-					reloaded is null
-					|| !string.Equals(reloaded.StateId, transition.FromStateId, StringComparison.OrdinalIgnoreCase)
-				)
-				{
-					return ConcurrencyConflict(caseId);
-				}
-				caseRecord = reloaded;
+				return CaseActionResult.Failure(
+					CaseActionFailureCode.InvalidCompletionEvent,
+					exception.Message
+				);
 			}
-			catch (CaseConcurrencyException)
-			{
-				return ConcurrencyConflict(caseRecord.Id);
-			}
+		}
+
+		try
+		{
+			await _persistence.ReplaceAsync(caseRecord, completionContent, cancellationToken);
+		}
+		catch (CaseConcurrencyException)
+		{
+			return ConcurrencyConflict(caseRecord.Id);
 		}
 		_logger.LogInformation(
 			"Case {CaseId} ({CaseType}) transitioned from {FromState} to {ToState} via action {ActionId} by {User}",
@@ -412,15 +380,15 @@ public sealed class CaseService : ICaseService
 		return CaseActionResult.Success(caseRecord);
 	}
 
-	private void ApplyTransition(
+	private static void ApplyTransition(
 		Case caseRecord,
 		ICaseTemplate template,
 		CaseTransition transition,
 		IReadOnlyDictionary<string, string>? decision,
-		ClaimsPrincipal user
+		ClaimsPrincipal user,
+		DateTime now
 	)
 	{
-		var now = _timeProvider.GetUtcNow().UtcDateTime;
 		var details = new Dictionary<string, string?>
 		{
 			["actionId"] = transition.ActionId,
@@ -440,89 +408,6 @@ public sealed class CaseService : ICaseService
 			}
 		}
 		AppendTimelineEntry(caseRecord, "state-changed", "Action applied", user, now, details);
-	}
-
-	private async Task<string?> SendCallbackAsync(
-		Case caseRecord,
-		BsonDocument callbackMapping,
-		IReadOnlyDictionary<string, string>? decision,
-		ClaimsPrincipal user,
-		CancellationToken cancellationToken
-	)
-	{
-		var values = new Dictionary<string, string?>
-		{
-			["actor.id"] = user.FindFirstValue("user:id"),
-			["actor.email"] = user.FindFirstValue("user:email"),
-			["actor.name"] = user.FindFirstValue("user:name"),
-		};
-		foreach (var (field, value) in decision ?? new Dictionary<string, string>())
-		{
-			values[$"decision.{field}"] = value;
-		}
-
-		BsonDocument payload;
-		try
-		{
-			payload = CaseCallbackPayload.Render(callbackMapping, values);
-		}
-		catch (CaseCallbackPayloadException exception)
-		{
-			return exception.Message;
-		}
-
-		return await _callbackClient.SendAsync(
-			caseRecord.CaseType,
-			caseRecord.CallbackUrl,
-			payload,
-			cancellationToken
-		);
-	}
-
-	private async Task<CaseActionResult> RecordCallbackFailureAsync(
-		Case caseRecord,
-		CaseTransition transition,
-		string failure,
-		ClaimsPrincipal user,
-		CancellationToken cancellationToken
-	)
-	{
-		var now = _timeProvider.GetUtcNow().UtcDateTime;
-		caseRecord.LastModifiedAt = now;
-		AppendTimelineEntry(
-			caseRecord,
-			"callback-failed",
-			"Callback failed",
-			user,
-			now,
-			new()
-			{
-				["actionId"] = transition.ActionId,
-				["toStateId"] = transition.ToStateId,
-				["reason"] = failure,
-			}
-		);
-		try
-		{
-			await _persistence.ReplaceAsync(caseRecord, cancellationToken);
-		}
-		catch (CaseConcurrencyException)
-		{
-			return ConcurrencyConflict(caseRecord.Id);
-		}
-		_logger.LogWarning(
-			"Case {CaseId} ({CaseType}) stayed in {StateId}: callback for action {ActionId} failed: {Failure}",
-			caseRecord.Id,
-			caseRecord.CaseType,
-			caseRecord.StateId,
-			transition.ActionId,
-			failure
-		);
-
-		return CaseActionResult.Failure(
-			CaseActionFailureCode.CallbackFailed,
-			$"The source system did not accept '{transition.ActionId}': {failure}"
-		);
 	}
 
 	public async Task<CaseActionResult> AssignAsync(
@@ -591,7 +476,8 @@ public sealed class CaseService : ICaseService
 		caseRecord.AssignedToId = trimmedAssigneeId;
 		caseRecord.AssignedToName = snapshotName;
 		caseRecord.AssignedAt = _timeProvider.GetUtcNow().UtcDateTime;
-		caseRecord.AssignedBy = actorUserId!;
+		caseRecord.AssignedBy = actorUserId
+			?? throw new InvalidOperationException("Actor identity is required for assignment.");
 		caseRecord.LastModifiedAt = caseRecord.AssignedAt.Value;
 		AppendTimelineEntry(
 			caseRecord,
@@ -609,7 +495,7 @@ public sealed class CaseService : ICaseService
 		);
 		try
 		{
-			await _persistence.ReplaceAsync(caseRecord, cancellationToken);
+			await _persistence.ReplaceAsync(caseRecord, cancellationToken: cancellationToken);
 		}
 		catch (CaseConcurrencyException)
 		{
@@ -686,7 +572,7 @@ public sealed class CaseService : ICaseService
 		);
 		try
 		{
-			await _persistence.ReplaceAsync(caseRecord, cancellationToken);
+			await _persistence.ReplaceAsync(caseRecord, cancellationToken: cancellationToken);
 		}
 		catch (CaseConcurrencyException)
 		{
@@ -729,7 +615,8 @@ public sealed class CaseService : ICaseService
 
 		if (ValidateNoteText(text, out var trimmed, out var noteFailure) is false)
 		{
-			return noteFailure!;
+			return noteFailure
+				?? throw new InvalidOperationException("Note validation failed without a failure result.");
 		}
 
 		// Case-level note (RA-96): a single GetByIdAsync, no template
@@ -759,7 +646,7 @@ public sealed class CaseService : ICaseService
 
 		try
 		{
-			await _persistence.ReplaceAsync(caseRecord, cancellationToken);
+			await _persistence.ReplaceAsync(caseRecord, cancellationToken: cancellationToken);
 		}
 		catch (CaseConcurrencyException)
 		{
@@ -982,7 +869,10 @@ public sealed class CaseService : ICaseService
 			caseRecord,
 			action,
 			actionDisplayName,
-			new Actor(ResolveActorUserId(user)!, user?.FindFirstValue("user:name")),
+			new Actor(
+				ResolveActorUserId(user)
+					?? throw new InvalidOperationException("Timeline entry requires an actor id."),
+				user?.FindFirstValue("user:name")),
 			performedAt,
 			details
 		);

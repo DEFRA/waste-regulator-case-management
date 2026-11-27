@@ -34,4 +34,10 @@ public sealed record AuditEvent
 
 	/// <summary>Outcome of publishing this event, keyed by the publishing process's name.</summary>
 	public Dictionary<string, AuditEventDispatch> Dispatches { get; init; } = [];
+
+	/// <summary>
+	/// When present, this audit event also drives a case completion publish to
+	/// the completion SNS topic.
+	/// </summary>
+	public CaseCompletionEnvelope? CompletionEnvelope { get; init; }
 }

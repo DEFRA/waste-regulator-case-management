@@ -22,7 +22,8 @@ public sealed class AuditEventDispatchService(
 	public async Task<IReadOnlyCollection<AuditEvent>> ReadUnsent(
 		string processName,
 		int batchSize,
-		CancellationToken cancellationToken
+		CancellationToken cancellationToken,
+		bool requireCompletionEnvelope = false
 	)
 	{
 		var utcNow = AuditEventTime.Now(timeProvider);
@@ -35,10 +36,19 @@ public sealed class AuditEventDispatchService(
 			Builders<AuditEvent>.Filter.Lte(AuditEventDispatchFieldNames.DispatchNextAttemptAtPath(processName), utcNow)
 		);
 
+		var filter = Builders<AuditEvent>.Filter.Or(noDispatch, failedAndDue);
+		if (requireCompletionEnvelope)
+		{
+			filter = Builders<AuditEvent>.Filter.And(
+				filter,
+				Builders<AuditEvent>.Filter.Exists(nameof(AuditEvent.CompletionEnvelope), true)
+			);
+		}
+
 		// A stale read of dispatch state can send an event more than once. The
 		// topic is at-least-once delivery, so consumers handle duplicates.
 		return await _auditEvents
-			.Find(Builders<AuditEvent>.Filter.Or(noDispatch, failedAndDue))
+			.Find(filter)
 			.SortBy(x => x.Sequence)
 			.Limit(batchSize)
 			.ToListAsync(cancellationToken);
