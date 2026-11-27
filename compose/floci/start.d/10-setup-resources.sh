@@ -5,6 +5,7 @@
 
 # SNS topics
 aws sns create-topic --name waste_regulator_case_management_analytics_events
+aws sns create-topic --name waste_regulator_case_management_completion_events
 
 # SQS queues
 # aws sqs create-queue --queue-name my-queue

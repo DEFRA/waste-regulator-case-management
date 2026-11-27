@@ -2,6 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using Amazon.SimpleNotificationService;
 using WasteRegulatorCaseManagement.AuditEvents;
 using WasteRegulatorCaseManagement.AuditEvents.Analytics;
+using WasteRegulatorCaseManagement.AuditEvents.Completion;
 using WasteRegulatorCaseManagement.Auth;
 using WasteRegulatorCaseManagement.Config;
 using WasteRegulatorCaseManagement.Health;
@@ -139,6 +140,7 @@ static void ConfigureServices(WebApplicationBuilder builder)
 
 	ConfigureCases(builder);
 	ConfigureAnalytics(services, configuration);
+	ConfigureCaseCompletion(services, configuration);
 }
 
 [ExcludeFromCodeCoverage]
@@ -149,6 +151,26 @@ static void ConfigureCases(WebApplicationBuilder builder)
 	services.AddCaseFramework();
 	services.AddSingleton<AuditEventService>();
 	services.AddSingleton<ICasePersistence, CasePersistence>();
+}
+
+[ExcludeFromCodeCoverage]
+static void ConfigureCaseCompletion(IServiceCollection services, IConfiguration configuration)
+{
+	services
+		.AddOptions<CaseCompletionEventProcessorOptions>()
+		.Bind(configuration.GetSection(CaseCompletionEventProcessorOptions.SectionName))
+		.ValidateDataAnnotations()
+		.ValidateOnStart();
+	services.AddSingleton<ICompletionEventSender, SnsCompletionEventSender>();
+
+	if (
+		configuration.GetValue<bool>(
+			$"{CaseCompletionEventProcessorOptions.SectionName}:{nameof(CaseCompletionEventProcessorOptions.ProcessingEnabled)}"
+		)
+	)
+	{
+		services.AddHostedService<CaseCompletionAuditEventProcessor>();
+	}
 }
 
 [ExcludeFromCodeCoverage]
