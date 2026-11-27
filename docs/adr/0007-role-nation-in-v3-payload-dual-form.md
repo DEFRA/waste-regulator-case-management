@@ -1,7 +1,7 @@
 # ADR-0007: Role/nation in the v3 HMAC payload — two accepted wire forms
 
 **Date:** 2026-08-22
-**Status:** Accepted
+**Status:** Superseded by [ADR-0012](0012-per-caller-api-keys-replace-hmac.md)
 **Issue:** RA-469 (hotfix for the 2026-08-22 dev outage)
 
 ## Context

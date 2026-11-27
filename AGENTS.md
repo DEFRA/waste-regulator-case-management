@@ -20,7 +20,7 @@ an `AssertionScope` so one run reports every mismatch.
 - [docs/cases.md](docs/cases.md): the case engine, intake, actions, callback
   and timeline.
 - [docs/cdp-deployment.md](docs/cdp-deployment.md): environment variables,
-  secrets and the signed-header contract.
+  secrets and the caller API key contract.
 - [docs/adr/](docs/adr/): architecture decisions.
 
 ## Non-interactive shell commands

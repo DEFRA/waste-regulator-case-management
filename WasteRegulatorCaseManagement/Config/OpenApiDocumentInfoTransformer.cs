@@ -15,10 +15,10 @@ internal sealed class OpenApiDocumentInfoTransformer : IOpenApiDocumentTransform
 
 		## Callers
 
-		Every request names its caller in `x-cdp-client-id`. Outside Development the caller signs the request with HMAC-SHA256, using the secret registered for its client id, in `x-cdp-auth-timestamp`, `x-cdp-auth-nonce` and `x-cdp-auth-signature`. A request without valid signed headers returns 401.
+		Every request names its caller in `x-cdp-client-id`. Outside Development the caller also sends the API key registered for its client id in `x-cdp-auth-key`. A request without a valid API key returns 401.
 
 		- The **Case Intake Processor** creates cases, and is the only caller that can.
-		- The **regulator frontend** acts for a caseworker and signs the caseworker's identity into `x-cdp-user-id`, `x-cdp-user-name`, `x-cdp-user-nation` and `x-cdp-user-email`.
+		- The **regulator frontend** acts for a caseworker and sends the caseworker's identity in `x-cdp-user-id`, `x-cdp-user-name`, `x-cdp-user-nation` and `x-cdp-user-email`.
 
 		## Nations
 

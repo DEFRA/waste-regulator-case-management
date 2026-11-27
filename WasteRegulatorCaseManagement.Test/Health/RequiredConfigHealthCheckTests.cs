@@ -34,9 +34,9 @@ public class RequiredConfigHealthCheckTests
 	}
 
 	[Theory]
-	[InlineData("AUTH_SHARED_SECRET:MANAGEMENT_FE", "AUTH_SHARED_SECRET__MANAGEMENT_FE")]
-	[InlineData("AUTH_SHARED_SECRET:CASE_INTAKE", "AUTH_SHARED_SECRET__CASE_INTAKE")]
-	public async Task Reports_unhealthy_when_a_caller_secret_is_missing_outside_development(
+	[InlineData("AUTH_API_KEY:MANAGEMENT_FE", "AUTH_API_KEY__MANAGEMENT_FE")]
+	[InlineData("AUTH_API_KEY:CASE_INTAKE", "AUTH_API_KEY__CASE_INTAKE")]
+	public async Task Reports_unhealthy_when_a_caller_api_key_is_missing_outside_development(
 		string configKey,
 		string expectedReportedKey
 	)
@@ -53,9 +53,9 @@ public class RequiredConfigHealthCheckTests
 	}
 
 	[Theory]
-	[InlineData("AUTH_SHARED_SECRET:MANAGEMENT_FE")]
-	[InlineData("AUTH_SHARED_SECRET:CASE_INTAKE")]
-	public async Task Reports_healthy_when_a_caller_secret_is_missing_in_development(string configKey)
+	[InlineData("AUTH_API_KEY:MANAGEMENT_FE")]
+	[InlineData("AUTH_API_KEY:CASE_INTAKE")]
+	public async Task Reports_healthy_when_a_caller_api_key_is_missing_in_development(string configKey)
 	{
 		var config = CompleteConfig();
 		config[configKey] = "";
@@ -71,8 +71,8 @@ public class RequiredConfigHealthCheckTests
 	{
 		var config = new Dictionary<string, string?>
 		{
-			["AUTH_SHARED_SECRET:MANAGEMENT_FE"] = "",
-			["AUTH_SHARED_SECRET:CASE_INTAKE"] = ""
+			["AUTH_API_KEY:MANAGEMENT_FE"] = "",
+			["AUTH_API_KEY:CASE_INTAKE"] = ""
 		};
 		var check = MakeCheck(config, isDevelopment: false);
 
@@ -80,15 +80,15 @@ public class RequiredConfigHealthCheckTests
 
 		using var scope = new AssertionScope();
 		result.Status.Should().Be(HealthStatus.Unhealthy);
-		result.Description.Should().Contain("AUTH_SHARED_SECRET__MANAGEMENT_FE");
-		result.Description.Should().Contain("AUTH_SHARED_SECRET__CASE_INTAKE");
+		result.Description.Should().Contain("AUTH_API_KEY__MANAGEMENT_FE");
+		result.Description.Should().Contain("AUTH_API_KEY__CASE_INTAKE");
 	}
 
 	private static Dictionary<string, string?> CompleteConfig() =>
 		new()
 		{
-			["AUTH_SHARED_SECRET:MANAGEMENT_FE"] = "management-fe-secret",
-			["AUTH_SHARED_SECRET:CASE_INTAKE"] = "case-intake-secret"
+			["AUTH_API_KEY:MANAGEMENT_FE"] = "management-fe-api-key",
+			["AUTH_API_KEY:CASE_INTAKE"] = "case-intake-api-key"
 		};
 
 	private static Task<HealthCheckResult> CheckHealth(RequiredConfigHealthCheck check) =>

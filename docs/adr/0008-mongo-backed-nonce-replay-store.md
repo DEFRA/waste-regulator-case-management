@@ -1,7 +1,7 @@
 # ADR-0008: Mongo-backed nonce replay store — retire the in-memory replay cache
 
 **Date:** 2026-09-08
-**Status:** Accepted
+**Status:** Superseded by [ADR-0012](0012-per-caller-api-keys-replace-hmac.md)
 **Issue:** RA-525
 
 ## Context

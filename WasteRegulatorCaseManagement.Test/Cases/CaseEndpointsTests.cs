@@ -1159,8 +1159,8 @@ public class CaseEndpointsTests
 	public async Task Get_by_id_returns_ok_for_item_not_submitted_by_caller()
 	{
 		// RBAC (who may look at whose items) now lives entirely in the
-		// frontend/BFF; the backend trusts any authenticated (shared-secret
-		// signed) caller and does not check ownership.
+		// frontend/BFF; the backend trusts any authenticated (API key
+		// verified) caller and does not check ownership.
 		var cancellationToken = TestContext.Current.CancellationToken;
 		await using var factory = NewFactory();
 		using var client = factory.CreateClient();

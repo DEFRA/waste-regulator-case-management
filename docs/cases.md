@@ -48,7 +48,7 @@ header (`x-cdp-client-id`) per RA-89/RA-85b.
 ### Intake fields
 
 Only the Case Intake Processor may create cases: `POST /cases` requires the
-`CaseIntake` policy, which matches the HMAC-verified client id against
+`CaseIntake` policy, which matches the API-key-verified client id against
 `Auth__CaseIntakeClientId` (default `case-intake-processor`). The new case's
 `case-created` timeline entry is attributed to `service:<client id>`.
 
@@ -110,7 +110,7 @@ entry records the reason.
 ### Nation scoping
 
 A caseworker sees and acts on only the cases of their own nation. Every route
-except `POST /cases` reads the signed `x-cdp-user-nation` header (claim
+except `POST /cases` reads the `x-cdp-user-nation` header (claim
 `user:nation`, one of the intake `nation` values): a caller without one gets
 `403`, and a case in another nation is `404`, so its existence is not revealed.
 The list is filtered to the caller's nation before any other filter applies.
