@@ -12,7 +12,18 @@ http:
       {
         "caseType": "CSoC",
         "sourceSystemId": "{{$randomUUID}}",
-        "callbackUrl": "https://source-system.example/submissions/callback",
+        "completionEvent": {
+          "eventType": "csoc.case.concluded",
+          "payload": {
+            "status": "{{state.callbackStatus}}",
+            "reason": "{{decision.reason}}",
+            "user": {
+              "id": "{{actor.id}}",
+              "email": "{{actor.email}}",
+              "name": "{{actor.name}}"
+            }
+          }
+        },
         "nation": "{{userNation}}",
         "orgId": "557735a2-495a-457c-95a2-465b26a827eb",
         "producerType": "DIRECT_PRODUCER"

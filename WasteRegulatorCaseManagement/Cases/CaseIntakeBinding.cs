@@ -1,3 +1,5 @@
+using MongoDB.Bson;
+
 namespace WasteRegulatorCaseManagement.Cases;
 
 /// <summary>
@@ -18,17 +20,32 @@ internal static class CaseIntakeBinding
 		{
 			return error;
 		}
-		if (RequireValue(request.CallbackUrl, "callbackUrl") is { } callbackError)
+
+		if (request.CompletionEvent is null)
 		{
-			return callbackError;
+			return "'completionEvent' is required.";
 		}
-		if (
-			!Uri.TryCreate(request.CallbackUrl.Trim(), UriKind.Absolute, out var callbackUri)
-			|| (callbackUri.Scheme != Uri.UriSchemeHttps && callbackUri.Scheme != Uri.UriSchemeHttp)
-		)
+
+		if (RequireValue(request.CompletionEvent.EventType, "completionEvent.eventType") is { } eventTypeError)
 		{
-			return "'callbackUrl' must be an absolute http or https URL.";
+			return eventTypeError;
 		}
+
+		if (request.CompletionEvent.Payload.ValueKind is not (System.Text.Json.JsonValueKind.Object))
+		{
+			return "'completionEvent.payload' must be a JSON object.";
+		}
+
+		BsonDocument payloadTemplate;
+		try
+		{
+			payloadTemplate = BsonDocument.Parse(request.CompletionEvent.Payload.GetRawText());
+		}
+		catch (Exception)
+		{
+			return "'completionEvent.payload' must be a JSON object.";
+		}
+
 		if (RequireValue(request.Nation, "nation") is { } nationError)
 		{
 			return nationError;
@@ -60,7 +77,11 @@ internal static class CaseIntakeBinding
 
 		intake = new CaseIntake(
 			request.SourceSystemId.Trim(),
-			request.CallbackUrl.Trim(),
+			new CompletionEventSpec
+			{
+				EventType = request.CompletionEvent.EventType.Trim(),
+				PayloadTemplate = payloadTemplate,
+			},
 			request.Nation.Trim(),
 			request.OrgId.Trim(),
 			request.ProducerType,

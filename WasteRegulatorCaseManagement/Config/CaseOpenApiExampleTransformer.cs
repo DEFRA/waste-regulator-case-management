@@ -23,7 +23,18 @@ internal sealed class CaseOpenApiExampleTransformer : IOpenApiDocumentTransforme
                 {
                     "caseType": "CSoC",
                     "sourceSystemId": "csoc-2024-eng-00123",
-                    "callbackUrl": "https://waste-obligations.example/organisations/org-00456/compliance-declarations/00123",
+                    "completionEvent": {
+                        "eventType": "csoc.case.concluded",
+                        "payload": {
+                            "status": "{{state.callbackStatus}}",
+                            "reason": "{{decision.reason}}",
+                            "user": {
+                                "id": "{{actor.id}}",
+                                "email": "{{actor.email}}",
+                                "name": "{{actor.name}}"
+                            }
+                        }
+                    },
                     "nation": "ENGLAND",
                     "orgId": "org-00456",
                     "producerType": "DIRECT_PRODUCER",

@@ -1,11 +1,12 @@
 using System.ComponentModel;
+using System.Text.Json;
 
 namespace WasteRegulatorCaseManagement.Cases;
 
 /// <summary>
 /// A submission from a source system that needs a regulator's decision:
-/// where it came from, which nation and organisation it belongs to, where
-/// the decision is sent, and what the caseworker dashboard shows of it.
+/// which nation and organisation it belongs to, what completion event to
+/// publish when it concludes, and what the caseworker dashboard shows.
 /// </summary>
 [Description("A submission to create a case for.")]
 internal sealed record CaseIntakeRequest(
@@ -15,8 +16,8 @@ internal sealed record CaseIntakeRequest(
 	[property: Description("The submission's id in the source system. One case is created per submission.")]
 	string SourceSystemId,
 
-	[property: Description("Absolute http or https URL the decision is sent to when the case is concluded.")]
-	string CallbackUrl,
+	[property: Description("Template for the completion event published when the case concludes.")]
+	CompletionEventIntakeRequest? CompletionEvent,
 
 	[property: Description("Nation the case belongs to: `ENGLAND`, `WALES`, `SCOTLAND` or `N_IRELAND`.")]
 	string Nation,
@@ -38,4 +39,13 @@ internal sealed record CaseIntakeRequest(
 
 	[property: Description("Name of the submitting system, recorded on the `case-created` timeline entry.")]
 	string? Source = null
+);
+
+[Description("Completion event template supplied at intake.")]
+internal sealed record CompletionEventIntakeRequest(
+	[property: Description("Event type for SNS routing (e.g. `csoc.case.concluded`).")]
+	string EventType,
+
+	[property: Description("Payload template rendered at conclusion time.")]
+	JsonElement Payload
 );

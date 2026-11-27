@@ -1,6 +1,8 @@
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Claims;
+using System.Text.Json;
+using MongoDB.Bson;
 using WasteRegulatorCaseManagement.Auth;
 using WasteRegulatorCaseManagement.Utils.Logging;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -94,8 +96,8 @@ public static class CaseEndpoints
 				"Moves the case along the transition named `actionId`, such as `accept` or `cancel`, when its "
 					+ "current state allows it. A transition that requires decision fields, such as CSoC "
 					+ "`cancel` and its `reason`, needs them in `decision`. When the new state concludes the case, "
-					+ "the decision is sent to the case's `callbackUrl` first: if the source system refuses it, "
-					+ "the case keeps its state, a `callback-failed` timeline entry records why, and the response "
+					+ "the case moves to its new state immediately and a completion event is written to the outbox for "
+					+ "async delivery to the source system. If the action is invalid, the case keeps its state and the response "
 					+ "is 502. A concluded case returns 409."
 			)
 			.ProducesProblem(StatusCodes.Status400BadRequest)
@@ -219,7 +221,7 @@ public static class CaseEndpoints
 			);
 		}
 
-		if (CaseIntakeBinding.TryRead(body, out var intake) is { } intakeError)
+		if (CaseIntakeBinding.TryRead(body, out var intakeOrNull) is { } intakeError)
 		{
 			log.Log(
 				LogLevel.Warning,
@@ -233,8 +235,10 @@ public static class CaseEndpoints
 			return BadRequest(InvalidRequestTitle, intakeError);
 		}
 
+		var intake = intakeOrNull
+			?? throw new InvalidOperationException("Intake was validated but not assigned.");
 		if (
-			intake!.InitialStateId is { } initialStateId
+			intake.InitialStateId is { } initialStateId
 			&& !type.States.Any(s => string.Equals(s.Id, initialStateId, StringComparison.Ordinal))
 		)
 		{
@@ -263,7 +267,7 @@ public static class CaseEndpoints
 		{
 			result = await engine.SubmitAsync(
 				type,
-				intake!,
+				intake,
 				submittedBy,
 				httpContext.User,
 				submissionMetadata,
@@ -315,7 +319,7 @@ public static class CaseEndpoints
 			};
 		}
 
-		var caseRecord = result.Case!;
+		var caseRecord = result.Case;
 		log.Log(
 			LogLevel.Information,
 			result.IsIdempotentReplay
@@ -562,7 +566,7 @@ public static class CaseEndpoints
 	{
 		if (result.IsSuccess)
 		{
-			return TypedResults.Ok(ToResponse(engine.Project(result.Case!)));
+			return TypedResults.Ok(ToResponse(engine.Project(result.Case)));
 		}
 
 		return result.FailureCode switch
@@ -572,7 +576,8 @@ public static class CaseEndpoints
 			or CaseActionFailureCode.InvalidTransition
 			or CaseActionFailureCode.InvalidAssignment
 			or CaseActionFailureCode.InvalidNote
-			or CaseActionFailureCode.MissingDecisionField => TypedResults.Problem(
+			or CaseActionFailureCode.MissingDecisionField
+			or CaseActionFailureCode.InvalidCompletionEvent => TypedResults.Problem(
 				title: "Invalid action",
 				detail: result.Message,
 				statusCode: StatusCodes.Status400BadRequest
@@ -586,11 +591,6 @@ public static class CaseEndpoints
 				title: "Authentication required",
 				detail: result.Message,
 				statusCode: StatusCodes.Status401Unauthorized
-			),
-			CaseActionFailureCode.CallbackFailed => TypedResults.Problem(
-				title: "Source system callback failed",
-				detail: result.Message,
-				statusCode: StatusCodes.Status502BadGateway
 			),
 			CaseActionFailureCode.TerminalState
 			or CaseActionFailureCode.ConcurrencyConflict => TypedResults.Problem(
@@ -618,6 +618,10 @@ public static class CaseEndpoints
 			w.SubmittedBy,
 			projection.TemplateVersion,
 			w.SourceSystemId,
+			new CompletionEventResponse(
+				w.CompletionEvent.EventType,
+				JsonDocument.Parse(w.CompletionEvent.PayloadTemplate.ToJson()).RootElement.Clone()
+			),
 			w.Nation,
 			w.OrgId,
 			w.ProducerType,
