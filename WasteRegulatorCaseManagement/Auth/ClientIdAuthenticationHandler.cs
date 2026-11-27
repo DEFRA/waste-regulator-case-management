@@ -55,9 +55,9 @@ public class ClientIdAuthenticationHandler(
 
 		// Length caps run BEFORE any further processing. Each cap is
 		// reported with a distinct fail reason so misbehaving clients can
-		// be diagnosed in logs. We do NOT silently truncate — the user-id
-		// and user-name end up in audit attribution, where corruption
-		// would be worse than a 401.
+		// be diagnosed in logs. We do NOT silently truncate — the user id
+		// ends up in audit attribution, where corruption would be worse
+		// than a 401.
 		if (clientId.Length > Options.MaxClientIdLength)
 		{
 			return AuthenticateResult.Fail(
@@ -76,15 +76,6 @@ public class ClientIdAuthenticationHandler(
 			return userIdFailure;
 		if (
 			TryValidateOptionalHeader(
-				Options.UserNameHeaderName,
-				Options.MaxUserNameLength,
-				out var userName
-			) is
-			{ } userNameFailure
-		)
-			return userNameFailure;
-		if (
-			TryValidateOptionalHeader(
 				Options.RoleHeaderName,
 				Options.MaxUserRoleLength,
 				out var role
@@ -101,15 +92,6 @@ public class ClientIdAuthenticationHandler(
 			{ } nationFailure
 		)
 			return nationFailure;
-		if (
-			TryValidateOptionalHeader(
-				Options.EmailHeaderName,
-				Options.MaxUserEmailLength,
-				out var email
-			) is
-			{ } emailFailure
-		)
-			return emailFailure;
 
 		if (Options.ApiKeys.Count > 0)
 		{
@@ -141,7 +123,7 @@ public class ClientIdAuthenticationHandler(
 			);
 		}
 
-		var claims = BuildClaims(clientId, userId, userName, role, nation, email);
+		var claims = BuildClaims(clientId, userId, role, nation);
 		var identity = new ClaimsIdentity(claims, Scheme.Name);
 		var principal = new ClaimsPrincipal(identity);
 		var ticket = new AuthenticationTicket(principal, Scheme.Name);
@@ -150,10 +132,10 @@ public class ClientIdAuthenticationHandler(
 	}
 
 	/// <summary>
-	/// Reads one optional trust header (userId/userName/role/nation/email), guards
-	/// its length, and reports the outcome as either a fail result or the
+	/// Reads one optional trust header (userId/role/nation), guards its
+	/// length, and reports the outcome as either a fail result or the
 	/// resolved value via <paramref name="value"/> — the shared shape behind
-	/// all five optional-header checks in <see cref="Authenticate"/>.
+	/// all three optional-header checks in <see cref="Authenticate"/>.
 	/// Returns <c>null</c> (with <paramref name="value"/> set) on success;
 	/// the header being entirely absent is success with a <c>null</c> value,
 	/// not a failure.
@@ -240,10 +222,8 @@ public class ClientIdAuthenticationHandler(
 	private static List<Claim> BuildClaims(
 		string clientId,
 		string? userId,
-		string? userName,
 		string? role,
-		string? nation,
-		string? email
+		string? nation
 	)
 	{
 		var claims = new List<Claim>
@@ -254,14 +234,10 @@ public class ClientIdAuthenticationHandler(
 
 		if (userId is not null)
 			claims.Add(new Claim("user:id", userId));
-		if (userName is not null)
-			claims.Add(new Claim("user:name", userName));
 		if (role is not null)
 			claims.Add(new Claim("user:role", role));
 		if (nation is not null)
 			claims.Add(new Claim("user:nation", nation));
-		if (email is not null)
-			claims.Add(new Claim("user:email", email));
 
 		return claims;
 	}

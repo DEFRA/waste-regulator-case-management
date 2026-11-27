@@ -56,7 +56,7 @@ public sealed class CaseTimelineEntry
 
 	/// <summary>
 	/// Human-readable name of the actor at the time the entry was recorded
-	/// (<c>user:name</c> claim) so list views do not need a separate user
+	/// (the request's <c>actorName</c>) so list views do not need a separate user
 	/// lookup.
 	/// </summary>
 	public string? PerformedByName { get; init; }

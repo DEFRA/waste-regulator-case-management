@@ -30,7 +30,6 @@ public class CorsPolicyTests
 	[Theory]
 	[InlineData("x-cdp-client-id")]
 	[InlineData("x-cdp-user-id")]
-	[InlineData("x-cdp-user-name")]
 	[InlineData("x-cdp-auth-key")]
 	[InlineData("Authorization")]
 	[InlineData("Cookie")]

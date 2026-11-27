@@ -12,5 +12,8 @@ internal sealed record AssignCaseRequest(
 	string AssigneeId,
 
 	[property: Description("The caseworker's name, kept on the case for display.")]
-	string? AssigneeName = null
+	string? AssigneeName = null,
+
+	[property: Description("The name of the caseworker making the assignment, recorded on the timeline.")]
+	string? ActorName = null
 );

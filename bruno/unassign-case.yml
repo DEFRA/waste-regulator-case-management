@@ -6,5 +6,11 @@ http:
   method: POST
   url: "{{baseUrl}}/cases/{{caseId}}/unassign"
   auth: inherit
+  body:
+    type: json
+    data: |-
+      {
+        "actorName": "{{userName}}"
+      }
 settings:
   encodeUrl: true

@@ -40,7 +40,7 @@ are mounted by `MapCaseFrameworkEndpoints()`:
 | `POST` | `/cases` | Submit a new case. Body: `{ "caseType", "sourceSystemId", "callbackUrl", "nation", "orgId", "producerType"?, "displayData"? }` — see below. The `caseType` must be a case type in `caseModuleConfig`; the server stamps the case with the type's `InitialState`, the caller's CDP client id and a server-side timestamp. Returns `201 Created` with `Location: /cases/{id}`; a `sourceSystemId` that already has a case returns that case with `200 OK` and `X-Idempotent-Replay: true`. |
 | `GET` | `/cases/{id}` | Fetch a single case by id, projected with the actions the engine will currently allow. |
 | `GET` | `/cases` | List persisted cases (with the same projection), newest first, with filter / search / pagination per RA-93. Query string parameters: `caseType` (repeatable), `stateId` (repeatable), `search` (matched against the start of the case id), `page` (1-based, default 1), `pageSize` (default 20, capped at 100). Returns a paged envelope: `{ items, totalCount, page, pageSize }`. |
-| `POST` | `/cases/{id}/actions/{actionId}` | Invoke a named action declared by the type's transitions, with an optional body `{ "decision": { field: string } }` (see below). `409` if the case is in a terminal state; `400` for unknown actions, transitions whose from-state does not match, and a decision missing a field the transition requires. |
+| `POST` | `/cases/{id}/actions/{actionId}` | Invoke a named action declared by the type's transitions, with an optional body `{ "decision": { field: string }, "actorName", "actorEmail" }` (see below). `409` if the case is in a terminal state; `400` for unknown actions, transitions whose from-state does not match, and a decision missing a field the transition requires. |
 
 All three endpoints require authentication via the CDP client id
 header (`x-cdp-client-id`) per RA-89/RA-85b.
@@ -86,8 +86,9 @@ When an action moves a case into a state that its case type's
 `callbackMappings` names, the service PATCHes the mapping to the case's
 `callbackUrl` before it changes the case
 ([ADR-0011](adr/0011-gated-source-system-callback.md)). Placeholders in string
-values are filled from the acting user (`{{actor.id}}`, `{{actor.email}}` and
-`{{actor.name}}`, from the signed identity headers) and the decision
+values are filled from the acting user (`{{actor.id}}` from the
+`x-cdp-user-id` header, and `{{actor.email}}` and `{{actor.name}}` from the
+request's `actorEmail` and `actorName`) and the decision
 (`{{decision.<field>}}`). CSoC `cancel` sends:
 
 ```json
@@ -211,19 +212,13 @@ Entra ID is not provisioned yet.
 
 ### Identity from the BFF
 
-The client id auth handler (`ClientIdAuthenticationHandler`)
-optionally reads two headers forwarded by the BFF and turns them into
-`ClaimsPrincipal` claims:
-
-| Header | Claim |
-| --- | --- |
-| `x-cdp-user-id` | `user:id` (used by `ResolveActorUserId`) |
-| `x-cdp-user-name` | `user:name` |
-| `x-cdp-user-email` | `user:email` (sent in the source system callback) |
-
-These are used for audit attribution (`Case.Timeline.PerformedById` /
-`PerformedByName` and similar). Role membership is not part of the trust
-contract — see ADR-0005.
+The client id auth handler (`ClientIdAuthenticationHandler`) reads the
+caseworker's id from the `x-cdp-user-id` header as the `user:id` claim,
+which `Case.Timeline.PerformedById` records. The caseworker's name and
+email are not headers: each request that changes a case carries them in its
+body as `actorName` and `actorEmail`, recorded as `PerformedByName` and sent
+in the source system callback (ADR-0013). Role membership is not part of
+the trust contract — see ADR-0005.
 
 ### Storage
 
@@ -255,11 +250,11 @@ If both are supplied, the list holds the cases assigned to that user or to no on
 
 ```
 POST /cases/{id}/assign
-  Body: { "assigneeId": "<userId>", "assigneeName": "<display name>" }
+  Body: { "assigneeId": "<userId>", "assigneeName": "<display name>", "actorName": "<display name>" }
   Authorization: a caseworker in the case's nation.
 
 POST /cases/{id}/unassign
-  Body: (none)
+  Body: (optional) { "actorName": "<display name>" }
   Authorization: a caseworker in the case's nation.
 ```
 
@@ -276,7 +271,7 @@ share one append-only, attributed history.
 
 ```
 POST /cases/{id}/notes
-  Body: { "text": "<note body>" }
+  Body: { "text": "<note body>", "actorName": "<display name>" }
   Authorization: any authenticated user.
 
   Validation:
@@ -336,7 +331,7 @@ the case document. An entry carries:
 | `Details` | `Dictionary<string, string?>` of contextual fields per action: `caseType`/`stateId`/`templateVersion` (submission); `actionId`/`actionDisplayName`/`fromStateId`/`toStateId`; `assigneeId`/`assigneeName`/`previousAssigneeId`/`previousAssigneeName` (unassigned); `text` (note); `actionId`/`toStateId`/`reason` (callback failed). |
 | `PerformedAt` | UTC timestamp from the injected `TimeProvider`. |
 | `PerformedById` | Snapshot of the actor's user id (`user:id` claim, required — mutations without it are rejected with 401). |
-| `PerformedByName` | Snapshot of the actor's display name (`user:name`) at write time. |
+| `PerformedByName` | Snapshot of the actor's display name (the request's `actorName`) at write time. |
 
 ### Wire format
 

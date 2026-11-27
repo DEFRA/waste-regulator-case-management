@@ -21,13 +21,6 @@ public static class ClientIdDefaults
 	public const string DefaultUserIdHeaderName = "x-cdp-user-id";
 
 	/// <summary>
-	/// Optional header carrying the end user's display name (used for audit
-	/// log lines and as the snapshot name on assignment writes so list views
-	/// can render an assignee without a separate lookup).
-	/// </summary>
-	public const string DefaultUserNameHeaderName = "x-cdp-user-name";
-
-	/// <summary>
 	/// Optional header carrying the caller's role as the BFF sees it (e.g.
 	/// <c>"standard"</c>/<c>"support-readonly"</c>) — becomes claim
 	/// <c>"user:role"</c>.
@@ -40,12 +33,6 @@ public static class ClientIdDefaults
 	/// claim <c>"user:nation"</c>, which scopes every case read and mutation.
 	/// </summary>
 	public const string DefaultNationHeaderName = "x-cdp-user-nation";
-
-	/// <summary>
-	/// Header carrying the end user's email address — becomes claim
-	/// <c>"user:email"</c>.
-	/// </summary>
-	public const string DefaultEmailHeaderName = "x-cdp-user-email";
 
 	/// <summary>
 	/// Header carrying the caller's API key: the key registered for the

@@ -32,7 +32,6 @@ public class HeaderPropagationAllowListTests
 		"x-cdp-auth-key",
 		"x-api-key",
 		"x-cdp-user-id",
-		"x-cdp-user-name",
 		"x-cdp-client-id",
 	};
 

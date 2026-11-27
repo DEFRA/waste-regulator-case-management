@@ -198,10 +198,6 @@ static void ConfigureAuth(IServiceCollection services, IConfiguration configurat
 					"Auth:MaxUserIdLength",
 					options.MaxUserIdLength
 				);
-				options.MaxUserNameLength = config.GetValue(
-					"Auth:MaxUserNameLength",
-					options.MaxUserNameLength
-				);
 			}
 		);
 
@@ -308,8 +304,7 @@ static void ConfigureHeaderPropagation(IServiceCollection services, IConfigurati
 		//   * x-cdp-auth-key, x-api-key — caller credentials for THIS
 		//     API and the CDP gateway. Forwarding either downstream would
 		//     leak it to another service.
-		//   * x-cdp-user-id, x-cdp-user-name,
-		//     x-cdp-client-id — identity headers from the BFF are
+		//   * x-cdp-user-id, x-cdp-client-id — identity headers from the BFF are
 		//     for THIS service to consume; downstream services that need
 		//     them must mint their own.
 		//
@@ -465,8 +460,7 @@ static void ConfigureCors(IServiceCollection services, IConfiguration configurat
 						//     browser. The API key check remains the primary
 						//     defence; excluding them here ensures a browser
 						//     preflight cannot even smuggle them.
-						//   * x-cdp-user-id, x-cdp-user-name,
-						//     x-cdp-client-id — identity headers are
+						//   * x-cdp-user-id, x-cdp-client-id — identity headers are
 						//     BFF-injected and must not be browser-supplied.
 						//
 						// To advertise a new header, add it here AND document why

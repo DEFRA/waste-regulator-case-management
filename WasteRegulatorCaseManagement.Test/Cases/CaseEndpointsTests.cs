@@ -46,11 +46,9 @@ public class CaseEndpointsTests
 	private TestApplicationFactory NewFactory(
 		bool includeAuthHeader = true,
 		string? userId = "test-user",
-		string? userName = null,
 		IReadOnlyCollection<CaseState>? states = null,
-		string? nation = "ENGLAND",
-		string? userEmail = "caseworker@regulator.example"
-	) => new(_fixture, includeAuthHeader, userId, userName, states, nation, userEmail);
+		string? nation = "ENGLAND"
+	) => new(_fixture, includeAuthHeader, userId, states, nation);
 
 	[Fact]
 	public async Task Post_returns_unauthorized_without_client_id()
@@ -237,7 +235,7 @@ public class CaseEndpointsTests
 		// CreateAsync call that persists the new document, attributed to
 		// the calling service and stamped with Case.SubmittedAt.
 		var cancellationToken = TestContext.Current.CancellationToken;
-		await using var factory = NewFactory(userId: "alice-1", userName: "Alice Example");
+		await using var factory = NewFactory(userId: "alice-1");
 		using var client = factory.CreateClient();
 
 		var response = await client.PostAsJsonAsync(
@@ -350,7 +348,7 @@ public class CaseEndpointsTests
 		// alongside the existing caseType / stateId / templateVersion keys so audit consumers can reconstruct the
 		// submission origin without joining back to request logs.
 		var cancellationToken = TestContext.Current.CancellationToken;
-		await using var factory = NewFactory(userId: "alice-1", userName: "Alice Example");
+		await using var factory = NewFactory(userId: "alice-1");
 		using var client = factory.CreateClient();
 
 		var response = await client.PostAsJsonAsync(
@@ -778,14 +776,14 @@ public class CaseEndpointsTests
 	{
 		// Arrange
 		var cancellationToken = TestContext.Current.CancellationToken;
-		await using var factory = NewFactory(userName: "Casey Worker");
+		await using var factory = NewFactory();
 		using var client = factory.CreateClient();
 		var caseId = await SubmitCSoCCaseAsync(client, "csoc-2024-eng-00126", cancellationToken);
 
 		// Act
 		var response = await client.PostAsJsonAsync(
 			$"/cases/{caseId}/actions/cancel",
-			new { decision = new { reason = "Submitted against the wrong obligation year." } },
+			new { decision = new { reason = "Submitted against the wrong obligation year." }, actorName = "Casey Worker", actorEmail = "caseworker@regulator.example" },
 			cancellationToken
 		);
 
@@ -797,6 +795,7 @@ public class CaseEndpointsTests
 		body.Decision!["reason"].Should().Be("Submitted against the wrong obligation year.");
 		var stateChange = body.Timeline!.Should().ContainSingle(e => e.Action == "state-changed").Subject;
 		stateChange.Details["decision.reason"].Should().Be("Submitted against the wrong obligation year.");
+		stateChange.PerformedByName.Should().Be("Casey Worker");
 	}
 
 	[Fact]
@@ -804,14 +803,14 @@ public class CaseEndpointsTests
 	{
 		// Arrange
 		var cancellationToken = TestContext.Current.CancellationToken;
-		await using var factory = NewFactory(userId: "alice-1", userName: "Alice");
+		await using var factory = NewFactory(userId: "alice-1");
 		using var client = factory.CreateClient();
 		var caseId = await SubmitCSoCCaseAsync(client, "csoc-2024-eng-00129", cancellationToken);
 
 		// Act
 		await client.PostAsJsonAsync(
 			$"/cases/{caseId}/actions/cancel",
-			new { decision = new { reason = "Duplicate submission." } },
+			new { decision = new { reason = "Duplicate submission." }, actorName = "Casey Worker", actorEmail = "caseworker@regulator.example" },
 			cancellationToken
 		);
 
@@ -850,12 +849,16 @@ public class CaseEndpointsTests
 	{
 		// Arrange
 		var cancellationToken = TestContext.Current.CancellationToken;
-		await using var factory = NewFactory(userName: "Casey Worker");
+		await using var factory = NewFactory();
 		using var client = factory.CreateClient();
 		var caseId = await SubmitCSoCCaseAsync(client, "csoc-2024-eng-00127", cancellationToken);
 
 		// Act
-		var response = await client.PostAsync($"/cases/{caseId}/actions/accept", content: null, cancellationToken);
+		var response = await client.PostAsJsonAsync(
+			$"/cases/{caseId}/actions/accept",
+			new { actorName = "Casey Worker", actorEmail = "caseworker@regulator.example" },
+			cancellationToken
+		);
 
 		// Assert
 		response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -892,12 +895,12 @@ public class CaseEndpointsTests
 	{
 		// Arrange
 		var cancellationToken = TestContext.Current.CancellationToken;
-		await using var factory = NewFactory(userName: "Casey Worker");
+		await using var factory = NewFactory();
 		using var client = factory.CreateClient();
 		var caseId = await SubmitCSoCCaseAsync(client, Ulid.NewUlid().ToString(), cancellationToken);
 
 		// Act
-		var response = await client.PostAsJsonAsync($"/cases/{caseId}/actions/accept", new { }, cancellationToken);
+		var response = await client.PostAsJsonAsync($"/cases/{caseId}/actions/accept", new { actorName = "Casey Worker", actorEmail = "caseworker@regulator.example" }, cancellationToken);
 
 		// Assert
 		response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -910,12 +913,16 @@ public class CaseEndpointsTests
 	{
 		// Arrange
 		var cancellationToken = TestContext.Current.CancellationToken;
-		await using var factory = NewFactory(userId: "ae5cf737-333a-4af0-8d91-18f7768ceb96", userName: "Casey Worker");
+		await using var factory = NewFactory(userId: "ae5cf737-333a-4af0-8d91-18f7768ceb96");
 		using var client = factory.CreateClient();
 		var caseId = await SubmitCSoCCaseAsync(client, "csoc-2024-eng-00130", cancellationToken);
 
 		// Act
-		var response = await client.PostAsync($"/cases/{caseId}/actions/accept", content: null, cancellationToken);
+		var response = await client.PostAsJsonAsync(
+			$"/cases/{caseId}/actions/accept",
+			new { actorName = "Casey Worker", actorEmail = "caseworker@regulator.example" },
+			cancellationToken
+		);
 
 		// Assert
 		response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -936,14 +943,14 @@ public class CaseEndpointsTests
 	{
 		// Arrange
 		var cancellationToken = TestContext.Current.CancellationToken;
-		await using var factory = NewFactory(userName: "Casey Worker");
+		await using var factory = NewFactory();
 		using var client = factory.CreateClient();
 		var caseId = await SubmitCSoCCaseAsync(client, "csoc-2024-eng-00131", cancellationToken);
 
 		// Act
 		await client.PostAsJsonAsync(
 			$"/cases/{caseId}/actions/cancel",
-			new { decision = new { reason = "Submitted against the wrong obligation year." } },
+			new { decision = new { reason = "Submitted against the wrong obligation year." }, actorName = "Casey Worker", actorEmail = "caseworker@regulator.example" },
 			cancellationToken
 		);
 
@@ -958,13 +965,17 @@ public class CaseEndpointsTests
 	{
 		// Arrange
 		var cancellationToken = TestContext.Current.CancellationToken;
-		await using var factory = NewFactory(userName: "Casey Worker");
+		await using var factory = NewFactory();
 		using var client = factory.CreateClient();
 		var caseId = await SubmitCSoCCaseAsync(client, "csoc-2024-eng-00132", cancellationToken);
 		factory.Callbacks.Respond = _ => new HttpResponseMessage(HttpStatusCode.InternalServerError);
 
 		// Act
-		var response = await client.PostAsync($"/cases/{caseId}/actions/accept", content: null, cancellationToken);
+		var response = await client.PostAsJsonAsync(
+			$"/cases/{caseId}/actions/accept",
+			new { actorName = "Casey Worker", actorEmail = "caseworker@regulator.example" },
+			cancellationToken
+		);
 
 		// Assert
 		response.StatusCode.Should().Be(HttpStatusCode.BadGateway);
@@ -980,7 +991,7 @@ public class CaseEndpointsTests
 	{
 		// Arrange
 		var cancellationToken = TestContext.Current.CancellationToken;
-		await using var factory = NewFactory(userName: "Casey Worker");
+		await using var factory = NewFactory();
 		using var client = factory.CreateClient();
 		var caseId = await SubmitCSoCCaseAsync(client, "csoc-2024-eng-00133", cancellationToken);
 		factory.Callbacks.Respond = request =>
@@ -992,7 +1003,11 @@ public class CaseEndpointsTests
 				};
 
 		// Act
-		var response = await client.PostAsync($"/cases/{caseId}/actions/accept", content: null, cancellationToken);
+		var response = await client.PostAsJsonAsync(
+			$"/cases/{caseId}/actions/accept",
+			new { actorName = "Casey Worker", actorEmail = "caseworker@regulator.example" },
+			cancellationToken
+		);
 
 		// Assert
 		response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -1006,7 +1021,7 @@ public class CaseEndpointsTests
 	{
 		// Arrange
 		var cancellationToken = TestContext.Current.CancellationToken;
-		await using var factory = NewFactory(userName: "Casey Worker");
+		await using var factory = NewFactory();
 		using var client = factory.CreateClient();
 		var caseId = await SubmitCSoCCaseAsync(client, "csoc-2024-eng-00134", cancellationToken);
 		factory.Callbacks.Respond = request =>
@@ -1018,7 +1033,11 @@ public class CaseEndpointsTests
 				};
 
 		// Act
-		var response = await client.PostAsync($"/cases/{caseId}/actions/accept", content: null, cancellationToken);
+		var response = await client.PostAsJsonAsync(
+			$"/cases/{caseId}/actions/accept",
+			new { actorName = "Casey Worker", actorEmail = "caseworker@regulator.example" },
+			cancellationToken
+		);
 
 		// Assert
 		response.StatusCode.Should().Be(HttpStatusCode.BadGateway);
@@ -1031,7 +1050,7 @@ public class CaseEndpointsTests
 	{
 		// Arrange
 		var cancellationToken = TestContext.Current.CancellationToken;
-		await using var factory = NewFactory(userName: "Casey Worker");
+		await using var factory = NewFactory();
 		using var client = factory.CreateClient();
 		var caseId = await SubmitCSoCCaseAsync(client, "csoc-2024-eng-00136", cancellationToken);
 		factory.Callbacks.Respond = request =>
@@ -1040,7 +1059,11 @@ public class CaseEndpointsTests
 				: new HttpResponseMessage(HttpStatusCode.NotFound);
 
 		// Act
-		var response = await client.PostAsync($"/cases/{caseId}/actions/accept", content: null, cancellationToken);
+		var response = await client.PostAsJsonAsync(
+			$"/cases/{caseId}/actions/accept",
+			new { actorName = "Casey Worker", actorEmail = "caseworker@regulator.example" },
+			cancellationToken
+		);
 
 		// Assert
 		response.StatusCode.Should().Be(HttpStatusCode.BadGateway);
@@ -1054,13 +1077,17 @@ public class CaseEndpointsTests
 	{
 		// Arrange
 		var cancellationToken = TestContext.Current.CancellationToken;
-		await using var factory = NewFactory(userName: "Casey Worker");
+		await using var factory = NewFactory();
 		using var client = factory.CreateClient();
 		var caseId = await SubmitCSoCCaseAsync(client, "csoc-2024-eng-00137", cancellationToken);
 		factory.Callbacks.Respond = _ => throw new HttpRequestException("Connection refused");
 
 		// Act
-		var response = await client.PostAsync($"/cases/{caseId}/actions/accept", content: null, cancellationToken);
+		var response = await client.PostAsJsonAsync(
+			$"/cases/{caseId}/actions/accept",
+			new { actorName = "Casey Worker", actorEmail = "caseworker@regulator.example" },
+			cancellationToken
+		);
 
 		// Assert
 		response.StatusCode.Should().Be(HttpStatusCode.BadGateway);
@@ -1077,12 +1104,16 @@ public class CaseEndpointsTests
 	{
 		// Arrange
 		var cancellationToken = TestContext.Current.CancellationToken;
-		await using var factory = NewFactory(userName: "Casey Worker", userEmail: null);
+		await using var factory = NewFactory();
 		using var client = factory.CreateClient();
 		var caseId = await SubmitCSoCCaseAsync(client, "csoc-2024-eng-00135", cancellationToken);
 
 		// Act
-		var response = await client.PostAsync($"/cases/{caseId}/actions/accept", content: null, cancellationToken);
+		var response = await client.PostAsJsonAsync(
+			$"/cases/{caseId}/actions/accept",
+			new { actorName = "Casey Worker" },
+			cancellationToken
+		);
 
 		// Assert
 		response.StatusCode.Should().Be(HttpStatusCode.BadGateway);
@@ -1531,6 +1562,7 @@ public class CaseEndpointsTests
 				caseId,
 				Arg.Any<string>(),
 				Arg.Any<string?>(),
+				Arg.Any<string?>(),
 				Arg.Any<System.Security.Claims.ClaimsPrincipal>(),
 				Arg.Any<CancellationToken>()
 			)
@@ -1838,6 +1870,43 @@ public class CaseEndpointsTests
 	}
 
 	[Fact]
+	public async Task Assign_records_the_actor_name_from_the_body_on_the_timeline()
+	{
+		// Arrange
+		var cancellationToken = TestContext.Current.CancellationToken;
+		await using var factory = NewFactory(userId: "actor-1");
+		using var client = factory.CreateClient();
+		var id = Ulid.NewUlid().ToString();
+		await factory.SeedAsync(
+			new Case
+			{
+				SourceSystemId = Ulid.NewUlid().ToString(),
+				CallbackUrl = "https://source-system.test/callback",
+				Nation = "ENGLAND",
+				OrgId = "test-org",
+				Id = id,
+				CaseType = CaseType,
+				StateId = "submitted",
+				SubmittedBy = "test-client",
+			},
+			cancellationToken
+		);
+
+		// Act
+		var response = await client.PostAsJsonAsync(
+			$"/cases/{id}/assign",
+			new { assigneeId = "alice-1", assigneeName = "Alice Example", actorName = "Gwŷn Caseworker" },
+			cancellationToken
+		);
+
+		// Assert
+		response.StatusCode.Should().Be(HttpStatusCode.OK);
+		var persisted = await factory.Persistence.GetByIdAsync(id, cancellationToken);
+		persisted!.Timeline.Should().ContainSingle(e => e.Action == "assigned")
+			.Which.Should().BeEquivalentTo(new { PerformedById = "actor-1", PerformedByName = "Gwŷn Caseworker" });
+	}
+
+	[Fact]
 	public async Task Assign_returns_400_when_assigneeId_missing()
 	{
 		var cancellationToken = TestContext.Current.CancellationToken;
@@ -2023,6 +2092,45 @@ public class CaseEndpointsTests
 				AssignedBy = (string?)null,
 			}
 		);
+	}
+
+	[Fact]
+	public async Task Unassign_records_the_actor_name_from_the_body_on_the_timeline()
+	{
+		// Arrange
+		var cancellationToken = TestContext.Current.CancellationToken;
+		await using var factory = NewFactory(userId: "actor-1");
+		using var client = factory.CreateClient();
+		var id = Ulid.NewUlid().ToString();
+		await factory.SeedAsync(
+			new Case
+			{
+				SourceSystemId = Ulid.NewUlid().ToString(),
+				CallbackUrl = "https://source-system.test/callback",
+				Nation = "ENGLAND",
+				OrgId = "test-org",
+				Id = id,
+				CaseType = CaseType,
+				StateId = "submitted",
+				SubmittedBy = "test-client",
+				AssignedToId = "alice-1",
+				AssignedToName = "Alice",
+			},
+			cancellationToken
+		);
+
+		// Act
+		var response = await client.PostAsJsonAsync(
+			$"/cases/{id}/unassign",
+			new { actorName = "Gwŷn Caseworker" },
+			cancellationToken
+		);
+
+		// Assert
+		response.StatusCode.Should().Be(HttpStatusCode.OK);
+		var persisted = await factory.Persistence.GetByIdAsync(id, cancellationToken);
+		persisted!.Timeline.Should().ContainSingle(e => e.Action == "unassigned")
+			.Which.Should().BeEquivalentTo(new { PerformedById = "actor-1", PerformedByName = "Gwŷn Caseworker" });
 	}
 
 	[Fact]
@@ -2336,7 +2444,7 @@ public class CaseEndpointsTests
 	public async Task AddNote_persists_note_and_returns_updated_response()
 	{
 		var cancellationToken = TestContext.Current.CancellationToken;
-		await using var factory = NewFactory(userId: "alice-1", userName: "Alice Example");
+		await using var factory = NewFactory(userId: "alice-1");
 		using var client = factory.CreateClient();
 
 		var id = Ulid.NewUlid().ToString();
@@ -2357,7 +2465,7 @@ public class CaseEndpointsTests
 
 		var response = await client.PostAsJsonAsync(
 			$"/cases/{id}/notes",
-			new { text = "Reviewed evidence; awaiting confirmation." },
+			new { text = "Reviewed evidence; awaiting confirmation.", actorName = "Alice Example" },
 			cancellationToken
 		);
 
@@ -2665,10 +2773,8 @@ public class CaseEndpointsTests
 		);
 		private readonly bool _includeAuthHeader;
 		private readonly string? _userId;
-		private readonly string? _userName;
 		private readonly IReadOnlyCollection<CaseState>? _states;
 		private readonly string? _nation;
-		private readonly string? _userEmail;
 
 		/// <summary>
 		/// The client id allowed to create cases. Defaults to the client
@@ -2680,18 +2786,14 @@ public class CaseEndpointsTests
 			MongoIntegrationFixture fixture,
 			bool includeAuthHeader,
 			string? userId,
-			string? userName,
 			IReadOnlyCollection<CaseState>? states,
-			string? nation,
-			string? userEmail
+			string? nation
 		)
 		{
 			_nation = nation;
-			_userEmail = userEmail;
 			_fixture = fixture;
 			_includeAuthHeader = includeAuthHeader;
 			_userId = userId;
-			_userName = userName;
 			_states = states;
 		}
 
@@ -2767,17 +2869,9 @@ public class CaseEndpointsTests
 			{
 				client.DefaultRequestHeaders.Add("x-cdp-user-id", _userId);
 			}
-			if (_userName is not null)
-			{
-				client.DefaultRequestHeaders.Add("x-cdp-user-name", _userName);
-			}
 			if (_nation is not null)
 			{
 				client.DefaultRequestHeaders.Add("x-cdp-user-nation", _nation);
-			}
-			if (_userEmail is not null)
-			{
-				client.DefaultRequestHeaders.Add("x-cdp-user-email", _userEmail);
 			}
 		}
 

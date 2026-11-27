@@ -10,7 +10,8 @@ http:
     type: json
     data: |-
       {
-        "text": "Test note."
+        "text": "Test note.",
+        "actorName": "{{userName}}"
       }
 settings:
   encodeUrl: true

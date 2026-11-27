@@ -9,5 +9,8 @@ namespace WasteRegulatorCaseManagement.Cases;
 [Description("A note to add to the case.")]
 internal sealed record AddCaseNoteRequest(
 	[property: Description("The note, at most 4,000 characters. Leading and trailing whitespace is removed.")]
-	string Text
+	string Text,
+
+	[property: Description("The name of the caseworker adding the note, recorded on the timeline.")]
+	string? ActorName = null
 );

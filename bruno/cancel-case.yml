@@ -10,7 +10,9 @@ http:
     type: json
     data: |-
       {
-        "decision": { "reason": "Test cancellation." }
+        "decision": { "reason": "Test cancellation." },
+        "actorName": "{{userName}}",
+        "actorEmail": "{{userEmail}}"
       }
 settings:
   encodeUrl: true

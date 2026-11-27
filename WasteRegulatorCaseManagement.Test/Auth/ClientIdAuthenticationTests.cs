@@ -303,7 +303,6 @@ public class ClientIdAuthenticationTests
 	[Theory]
 	[InlineData(ClientIdDefaults.DefaultHeaderName, 256)]
 	[InlineData("x-cdp-user-id", 128)]
-	[InlineData("x-cdp-user-name", 256)]
 	public async Task Identity_header_exceeding_cap_is_401_with_descriptive_reason(
 		string header,
 		int cap
@@ -355,7 +354,6 @@ public class ClientIdAuthenticationTests
 	[Theory]
 	[InlineData(ClientIdDefaults.DefaultHeaderName, 256)]
 	[InlineData("x-cdp-user-id", 128)]
-	[InlineData("x-cdp-user-name", 256)]
 	public async Task Identity_header_at_exactly_cap_is_accepted(string header, int cap)
 	{
 		var cancellationToken = TestContext.Current.CancellationToken;

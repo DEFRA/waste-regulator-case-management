@@ -66,8 +66,7 @@ Swagger UI explorer is available at <http://localhost:8085/swagger>.
 The explorer has a dev-only **"Authenticate as:"** dropdown in the topbar
 (`stub-caseworker-1`, `stub-caseworker-2`, `stub-caseworker-3`). Pick a user
 and every "Try it out" call is sent with that user's trust headers:
-`x-cdp-client-id`, `x-cdp-user-id`, `x-cdp-user-name`, `x-cdp-user-nation`
-(`ENGLAND`) and `x-cdp-user-email`. The selection persists in the browser's
+`x-cdp-client-id`, `x-cdp-user-id` and `x-cdp-user-nation` (`ENGLAND`). The selection persists in the browser's
 `localStorage`. Picking "— anonymous —" clears it.
 
 The caseworkers are sent with the client id `local-swagger-ui`. To create a
@@ -139,8 +138,9 @@ registered:
 
 - **The [Case Intake Processor](https://github.com/DEFRA/waste-case-intake-processor/)**
   is the only caller that can create cases.
-- **The regulator frontend** acts for a caseworker, forwarding the user's id,
-  name, nation and email as headers. A caseworker sees and acts on the
+- **The regulator frontend** acts for a caseworker, forwarding the user's id
+  and nation as headers, and their name and email in the body of each request
+  that changes a case. A caseworker sees and acts on the
   cases of their own nation only.
 
 In Development only, with no API keys configured, the handler trusts the

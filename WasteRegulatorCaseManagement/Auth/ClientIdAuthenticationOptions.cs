@@ -12,17 +12,11 @@ public class ClientIdAuthenticationOptions : AuthenticationSchemeOptions
 	/// <summary>Optional header carrying the end user's identifier.</summary>
 	public string UserIdHeaderName { get; set; } = ClientIdDefaults.DefaultUserIdHeaderName;
 
-	/// <summary>Optional header carrying the end user's display name.</summary>
-	public string UserNameHeaderName { get; set; } = ClientIdDefaults.DefaultUserNameHeaderName;
-
 	/// <summary>Optional header carrying the caller's role. See <see cref="ClientIdDefaults.DefaultRoleHeaderName"/>.</summary>
 	public string RoleHeaderName { get; set; } = ClientIdDefaults.DefaultRoleHeaderName;
 
 	/// <summary>Optional header carrying the caller's nation scope. See <see cref="ClientIdDefaults.DefaultNationHeaderName"/>.</summary>
 	public string NationHeaderName { get; set; } = ClientIdDefaults.DefaultNationHeaderName;
-
-	/// <summary>Optional header carrying the end user's email address. See <see cref="ClientIdDefaults.DefaultEmailHeaderName"/>.</summary>
-	public string EmailHeaderName { get; set; } = ClientIdDefaults.DefaultEmailHeaderName;
 
 	/// <summary>
 	/// Name of the request header carrying the caller's API key. See
@@ -58,12 +52,6 @@ public class ClientIdAuthenticationOptions : AuthenticationSchemeOptions
 	public int MaxUserIdLength { get; set; } = 128;
 
 	/// <summary>
-	/// Maximum permitted length of the user display name header. Persisted
-	/// into <c>Case.Timeline.PerformedByName</c>.
-	/// </summary>
-	public int MaxUserNameLength { get; set; } = 256;
-
-	/// <summary>
 	/// Maximum permitted length of the role header. Persisted into the
 	/// <c>user:role</c> claim.
 	/// </summary>
@@ -74,12 +62,6 @@ public class ClientIdAuthenticationOptions : AuthenticationSchemeOptions
 	/// <c>user:nation</c> claim.
 	/// </summary>
 	public int MaxUserNationLength { get; set; } = 32;
-
-	/// <summary>
-	/// Maximum permitted length of the email header, the longest address
-	/// RFC 5321 allows. Persisted into the <c>user:email</c> claim.
-	/// </summary>
-	public int MaxUserEmailLength { get; set; } = 320;
 
 	/// <summary>
 	/// Maximum permitted length of the API key header, so an oversize

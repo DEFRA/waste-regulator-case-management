@@ -183,9 +183,6 @@ public static class CaseEndpoints
 				["caller.user_id"] = req.Headers.TryGetValue("x-cdp-user-id", out var uid)
 					? uid.ToString()
 					: AbsentValue,
-				["caller.user_name"] = req.Headers.TryGetValue("x-cdp-user-name", out var uname)
-					? uname.ToString()
-					: AbsentValue,
 				["http.request.mime_type"] = req.ContentType ?? AbsentValue,
 				["http.request.body.bytes"] = req.ContentLength?.ToString() ?? AbsentValue,
 			}
@@ -479,6 +476,8 @@ public static class CaseEndpoints
 			id,
 			actionId,
 			decision,
+			actorName: body?.ActorName,
+			actorEmail: body?.ActorEmail,
 			httpContext.User,
 			cancellationToken
 		);
@@ -505,6 +504,7 @@ public static class CaseEndpoints
 			id,
 			body.AssigneeId,
 			body.AssigneeName,
+			body.ActorName,
 			httpContext.User,
 			cancellationToken
 		);
@@ -517,12 +517,18 @@ public static class CaseEndpoints
 
 	internal static async Task<Results<Ok<CaseResponse>, NotFound, ProblemHttpResult>> Unassign(
 		[FromRoute, Description("Case id.")] string id,
+		UnassignCaseRequest? body,
 		HttpContext httpContext,
 		[FromServices] ICaseService engine,
 		CancellationToken cancellationToken
 	)
 	{
-		var result = await engine.UnassignAsync(id, httpContext.User, cancellationToken);
+		var result = await engine.UnassignAsync(
+			id,
+			actorName: body?.ActorName,
+			httpContext.User,
+			cancellationToken
+		);
 		if (result.IsIdempotentReplay)
 		{
 			httpContext.Response.Headers[IdempotentReplayHeader] = "true";
@@ -549,6 +555,7 @@ public static class CaseEndpoints
 		var result = await engine.AddNoteAsync(
 			id,
 			body.Text,
+			body.ActorName,
 			httpContext.User,
 			cancellationToken
 		);

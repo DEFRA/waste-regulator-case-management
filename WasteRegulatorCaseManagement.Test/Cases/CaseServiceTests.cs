@@ -155,6 +155,8 @@ public class CaseServiceTests : IAsyncDisposable
 				caseRecord.Id,
 				"approve",
 				decision: null,
+				actorName: null,
+				actorEmail: null,
 				User(),
 				TestContext.Current.CancellationToken
 			);
@@ -177,6 +179,8 @@ public class CaseServiceTests : IAsyncDisposable
 				caseRecord.Id,
 				"approve",
 				decision: null,
+				actorName: null,
+				actorEmail: null,
 				User(),
 				TestContext.Current.CancellationToken
 			);
@@ -199,6 +203,8 @@ public class CaseServiceTests : IAsyncDisposable
 				caseRecord.Id,
 				"withdraw",
 				decision: null,
+				actorName: null,
+				actorEmail: null,
 				User(),
 				TestContext.Current.CancellationToken
 			);
@@ -221,6 +227,8 @@ public class CaseServiceTests : IAsyncDisposable
 				caseRecord.Id,
 				"approve",
 				decision: null,
+				actorName: null,
+				actorEmail: null,
 				User(),
 				TestContext.Current.CancellationToken
 			);
@@ -237,7 +245,7 @@ public class CaseServiceTests : IAsyncDisposable
 		var caseRecord = await SeedAsync();
 
 		var result = await BuildService(type)
-			.ApplyActionAsync(caseRecord.Id, "delete", decision: null, User(), TestContext.Current.CancellationToken);
+			.ApplyActionAsync(caseRecord.Id, "delete", decision: null, actorName: null, actorEmail: null, User(), TestContext.Current.CancellationToken);
 
 		result.Should().BeEquivalentTo(new { IsSuccess = false, FailureCode = CaseActionFailureCode.UnknownAction });
 	}
@@ -270,7 +278,7 @@ public class CaseServiceTests : IAsyncDisposable
 		var caseRecord = await SeedAsync(stateId: "state-b");
 
 		var result = await BuildService(type)
-			.ApplyActionAsync(caseRecord.Id, "ping", decision: null, User(), TestContext.Current.CancellationToken);
+			.ApplyActionAsync(caseRecord.Id, "ping", decision: null, actorName: null, actorEmail: null, User(), TestContext.Current.CancellationToken);
 
 		result.IsSuccess.Should().BeTrue();
 		var fetched = await GetAsync(caseRecord.Id);
@@ -301,7 +309,7 @@ public class CaseServiceTests : IAsyncDisposable
 		var caseRecord = await SeedAsync(stateId: "state-c");
 
 		var result = await BuildService(type)
-			.ApplyActionAsync(caseRecord.Id, "ping", decision: null, User(), TestContext.Current.CancellationToken);
+			.ApplyActionAsync(caseRecord.Id, "ping", decision: null, actorName: null, actorEmail: null, User(), TestContext.Current.CancellationToken);
 
 		result.Should().BeEquivalentTo(new { IsSuccess = false, FailureCode = CaseActionFailureCode.InvalidTransition });
 	}
@@ -319,6 +327,8 @@ public class CaseServiceTests : IAsyncDisposable
 			caseRecord.Id,
 			"approve",
 			decision: null,
+			actorName: null,
+			actorEmail: null,
 			User(),
 			TestContext.Current.CancellationToken
 		);
@@ -371,6 +381,8 @@ public class CaseServiceTests : IAsyncDisposable
 			caseRecord.Id,
 			"approve",
 			decision: null,
+			actorName: null,
+			actorEmail: null,
 			User(),
 			TestContext.Current.CancellationToken
 		);
@@ -393,6 +405,7 @@ public class CaseServiceTests : IAsyncDisposable
 			.AddNoteAsync(
 				caseRecord.Id,
 				"An audit-worthy observation.",
+				actorName: null,
 				User(),
 				TestContext.Current.CancellationToken
 			);
@@ -533,6 +546,8 @@ public class CaseServiceTests : IAsyncDisposable
 				caseRecord.Id,
 				"approve",
 				decision: null,
+				actorName: null,
+				actorEmail: null,
 				User(),
 				TestContext.Current.CancellationToken
 			);
@@ -562,6 +577,7 @@ public class CaseServiceTests : IAsyncDisposable
 				caseRecord.Id,
 				"alice-1",
 				"Alice",
+				actorName: null,
 				user,
 				TestContext.Current.CancellationToken
 			);
@@ -583,6 +599,7 @@ public class CaseServiceTests : IAsyncDisposable
 				caseRecord.Id,
 				"alice-1",
 				"Alice Example",
+				actorName: null,
 				actor,
 				TestContext.Current.CancellationToken
 			);
@@ -620,6 +637,7 @@ public class CaseServiceTests : IAsyncDisposable
 				caseRecord.Id,
 				"carol-1",
 				"Carol",
+				actorName: null,
 				actor,
 				TestContext.Current.CancellationToken
 			);
@@ -647,6 +665,7 @@ public class CaseServiceTests : IAsyncDisposable
 				caseRecord.Id,
 				"alice-1",
 				"Alice",
+				actorName: null,
 				actor,
 				TestContext.Current.CancellationToken
 			);
@@ -673,6 +692,7 @@ public class CaseServiceTests : IAsyncDisposable
 				caseRecord.Id,
 				"alice-1",
 				"Alice",
+				actorName: null,
 				UserWithoutActorId(),
 				TestContext.Current.CancellationToken
 			);
@@ -697,6 +717,7 @@ public class CaseServiceTests : IAsyncDisposable
 		var result = await BuildService(type)
 			.UnassignAsync(
 				caseRecord.Id,
+				actorName: null,
 				UserWithoutActorId(),
 				TestContext.Current.CancellationToken
 			);
@@ -740,6 +761,7 @@ public class CaseServiceTests : IAsyncDisposable
 				caseRecord.Id,
 				"alice-1",
 				"Alice",
+				actorName: null,
 				actor,
 				TestContext.Current.CancellationToken
 			);
@@ -779,7 +801,7 @@ public class CaseServiceTests : IAsyncDisposable
 
 		var actor = UserWithRoles("actor-1", "assign");
 		var result = await BuildService(type)
-			.UnassignAsync(caseRecord.Id, actor, TestContext.Current.CancellationToken);
+			.UnassignAsync(caseRecord.Id, actorName: null, actor, TestContext.Current.CancellationToken);
 
 		var fetched = await GetAsync(caseRecord.Id);
 
@@ -814,6 +836,7 @@ public class CaseServiceTests : IAsyncDisposable
 				caseRecord.Id,
 				"alice-1",
 				"Alice",
+				actorName: null,
 				UserWithRoles("actor-1", "assign"),
 				TestContext.Current.CancellationToken
 			);
@@ -830,6 +853,7 @@ public class CaseServiceTests : IAsyncDisposable
 		var result = await BuildService(type)
 			.UnassignAsync(
 				caseRecord.Id,
+				actorName: null,
 				UserWithRoles("actor-1", "assign"),
 				TestContext.Current.CancellationToken
 			);
@@ -863,6 +887,7 @@ public class CaseServiceTests : IAsyncDisposable
 				caseRecord.Id,
 				"alice-1",
 				"Alice",
+				actorName: null,
 				UserWithRoles("actor-1", "assign"),
 				TestContext.Current.CancellationToken
 			);
@@ -882,6 +907,7 @@ public class CaseServiceTests : IAsyncDisposable
 				caseRecord.Id,
 				"alice-1",
 				"Alice",
+				actorName: null,
 				UserWithRoles("actor-1", "assign"),
 				TestContext.Current.CancellationToken
 			);
@@ -932,6 +958,7 @@ public class CaseServiceTests : IAsyncDisposable
 				caseRecord.Id,
 				"alice-1",
 				"Alice",
+				actorName: null,
 				UserWithRoles("actor-1", "assign"),
 				TestContext.Current.CancellationToken
 			);
@@ -954,6 +981,7 @@ public class CaseServiceTests : IAsyncDisposable
 		var result = await BuildService(BuildType())
 			.UnassignAsync(
 				caseRecord.Id,
+				actorName: null,
 				UserWithRoles("actor-1", "assign"),
 				TestContext.Current.CancellationToken
 			);
@@ -972,7 +1000,7 @@ public class CaseServiceTests : IAsyncDisposable
 
 		var actor = UserWithRoles("actor-1", "assign");
 		var result = await BuildService(type)
-			.AssignAsync(caseRecord.Id, "   ", null, actor, TestContext.Current.CancellationToken);
+			.AssignAsync(caseRecord.Id, "   ", null, actorName: null, actor, TestContext.Current.CancellationToken);
 
 		result.Should().BeEquivalentTo(new { IsSuccess = false, FailureCode = CaseActionFailureCode.InvalidAssignment });
 	}
@@ -987,6 +1015,7 @@ public class CaseServiceTests : IAsyncDisposable
 				Ulid.NewUlid().ToString(),
 				"alice-1",
 				"Alice",
+				actorName: null,
 				actor,
 				TestContext.Current.CancellationToken
 			);
@@ -1000,7 +1029,7 @@ public class CaseServiceTests : IAsyncDisposable
 		var type = BuildType();
 		var actor = UserWithRoles("actor-1", "assign");
 		var result = await BuildService(type)
-			.UnassignAsync(Ulid.NewUlid().ToString(), actor, TestContext.Current.CancellationToken);
+			.UnassignAsync(Ulid.NewUlid().ToString(), actorName: null, actor, TestContext.Current.CancellationToken);
 
 		result.Should().BeEquivalentTo(new { IsSuccess = false, FailureCode = CaseActionFailureCode.CaseNotFound });
 	}
@@ -1017,6 +1046,7 @@ public class CaseServiceTests : IAsyncDisposable
 				caseRecord.Id,
 				"alice-1",
 				"Alice",
+				actorName: null,
 				actor,
 				TestContext.Current.CancellationToken
 			);
@@ -1045,6 +1075,7 @@ public class CaseServiceTests : IAsyncDisposable
 				caseRecord.Id,
 				"carol-1",
 				"Carol",
+				actorName: null,
 				actor,
 				TestContext.Current.CancellationToken
 			);
@@ -1068,7 +1099,7 @@ public class CaseServiceTests : IAsyncDisposable
 
 		var actor = UserWithRoles("actor-2", "assign");
 		var result = await BuildService(type)
-			.UnassignAsync(caseRecord.Id, actor, TestContext.Current.CancellationToken);
+			.UnassignAsync(caseRecord.Id, actorName: null, actor, TestContext.Current.CancellationToken);
 
 		result.IsSuccess.Should().BeTrue();
 		var fetched = await GetAsync(caseRecord.Id);
@@ -1093,7 +1124,7 @@ public class CaseServiceTests : IAsyncDisposable
 
 		var actor = UserWithRoles("actor-1", "assign");
 		var result = await BuildService(type)
-			.UnassignAsync(caseRecord.Id, actor, TestContext.Current.CancellationToken);
+			.UnassignAsync(caseRecord.Id, actorName: null, actor, TestContext.Current.CancellationToken);
 
 		result.IsSuccess.Should().BeTrue();
 		var fetched = await GetAsync(caseRecord.Id);
@@ -1118,7 +1149,7 @@ public class CaseServiceTests : IAsyncDisposable
 
 		var actor = UserWithRoles("alice-1", "standard");
 		var result = await BuildService(type)
-			.UnassignAsync(caseRecord.Id, actor, TestContext.Current.CancellationToken);
+			.UnassignAsync(caseRecord.Id, actorName: null, actor, TestContext.Current.CancellationToken);
 
 		result.IsSuccess.Should().BeTrue();
 		var fetched = await GetAsync(caseRecord.Id);
@@ -1136,7 +1167,6 @@ public class CaseServiceTests : IAsyncDisposable
 				[
 					new Claim("client_id", "test-client"),
 					new Claim("user:nation", "ENGLAND"), new Claim("user:id", "alice-1"),
-					new Claim("user:name", "Alice Example"),
 				],
 				"test"
 			)
@@ -1146,6 +1176,7 @@ public class CaseServiceTests : IAsyncDisposable
 			.AddNoteAsync(
 				caseRecord.Id,
 				"  Spoke to applicant; awaiting evidence.  ",
+				actorName: "Alice Example",
 				actor,
 				TestContext.Current.CancellationToken
 			);
@@ -1174,7 +1205,7 @@ public class CaseServiceTests : IAsyncDisposable
 		var caseRecord = await SeedAsync();
 
 		var result = await BuildService(type)
-			.AddNoteAsync(caseRecord.Id, "   ", User(), TestContext.Current.CancellationToken);
+			.AddNoteAsync(caseRecord.Id, "   ", actorName: null, User(), TestContext.Current.CancellationToken);
 
 		result.Should().BeEquivalentTo(new { IsSuccess = false, FailureCode = CaseActionFailureCode.InvalidNote });
 		var fetched = await GetAsync(caseRecord.Id);
@@ -1189,7 +1220,7 @@ public class CaseServiceTests : IAsyncDisposable
 
 		var oversized = new string('x', CaseService.MaxNoteLength + 1);
 		var result = await BuildService(type)
-			.AddNoteAsync(caseRecord.Id, oversized, User(), TestContext.Current.CancellationToken);
+			.AddNoteAsync(caseRecord.Id, oversized, actorName: null, User(), TestContext.Current.CancellationToken);
 
 		result.Should().BeEquivalentTo(new { IsSuccess = false, FailureCode = CaseActionFailureCode.InvalidNote });
 		var fetched = await GetAsync(caseRecord.Id);
@@ -1205,6 +1236,7 @@ public class CaseServiceTests : IAsyncDisposable
 			.AddNoteAsync(
 				Ulid.NewUlid().ToString(),
 				"anything",
+				actorName: null,
 				User(),
 				TestContext.Current.CancellationToken
 			);
@@ -1226,6 +1258,7 @@ public class CaseServiceTests : IAsyncDisposable
 			.AddNoteAsync(
 				caseRecord.Id,
 				"Note from a standard user.",
+				actorName: null,
 				standardUser,
 				TestContext.Current.CancellationToken
 			);
@@ -1243,15 +1276,13 @@ public class CaseServiceTests : IAsyncDisposable
 	// ---------------------- Timeline (RA-97) ----------------------
 
 	private static ClaimsPrincipal AuditUser(
-		string userId = "alice-1",
-		string userName = "Alice Example"
+		string userId = "alice-1"
 	) =>
 		new(
 			new ClaimsIdentity(
 				[
 					new Claim("client_id", "test-client"),
 					new Claim("user:nation", "ENGLAND"), new Claim("user:id", userId),
-					new Claim("user:name", userName),
 				],
 				"test"
 			)
@@ -1277,6 +1308,8 @@ public class CaseServiceTests : IAsyncDisposable
 				caseRecord.Id,
 				"withdraw",
 				decision: null,
+				actorName: "Alice Example",
+				actorEmail: null,
 				AuditUser(),
 				TestContext.Current.CancellationToken
 			);
@@ -1322,6 +1355,8 @@ public class CaseServiceTests : IAsyncDisposable
 				caseRecord.Id,
 				"approve",
 				decision: null,
+				actorName: "Alice Example",
+				actorEmail: null,
 				AuditUser(),
 				TestContext.Current.CancellationToken
 			);
@@ -1347,6 +1382,7 @@ public class CaseServiceTests : IAsyncDisposable
 				caseRecord.Id,
 				"carol-1",
 				"Carol Example",
+				actorName: null,
 				actor,
 				TestContext.Current.CancellationToken
 			);
@@ -1387,6 +1423,7 @@ public class CaseServiceTests : IAsyncDisposable
 				caseRecord.Id,
 				"alice-1",
 				"Alice",
+				actorName: null,
 				actor,
 				TestContext.Current.CancellationToken
 			);
@@ -1403,7 +1440,7 @@ public class CaseServiceTests : IAsyncDisposable
 
 		var actor = UserWithRoles("alice-1", "standard");
 		var result = await BuildService(type)
-			.AssignAsync(caseRecord.Id, "   ", "Bob", actor, TestContext.Current.CancellationToken);
+			.AssignAsync(caseRecord.Id, "   ", "Bob", actorName: null, actor, TestContext.Current.CancellationToken);
 
 		result.IsSuccess.Should().BeFalse();
 		var fetched = await GetAsync(caseRecord.Id);
@@ -1422,7 +1459,7 @@ public class CaseServiceTests : IAsyncDisposable
 
 		var actor = UserWithRoles("actor-1", "assign");
 		await BuildService(type)
-			.UnassignAsync(caseRecord.Id, actor, TestContext.Current.CancellationToken);
+			.UnassignAsync(caseRecord.Id, actorName: null, actor, TestContext.Current.CancellationToken);
 
 		var fetched = await GetAsync(caseRecord.Id);
 		fetched.Timeline.Should().BeEquivalentTo(
@@ -1450,7 +1487,7 @@ public class CaseServiceTests : IAsyncDisposable
 
 		var actor = UserWithRoles("actor-1", "assign");
 		await BuildService(type)
-			.UnassignAsync(caseRecord.Id, actor, TestContext.Current.CancellationToken);
+			.UnassignAsync(caseRecord.Id, actorName: null, actor, TestContext.Current.CancellationToken);
 
 		var fetched = await GetAsync(caseRecord.Id);
 		fetched.Timeline.Should().BeEmpty();
@@ -1466,6 +1503,7 @@ public class CaseServiceTests : IAsyncDisposable
 			.AddNoteAsync(
 				caseRecord.Id,
 				"  A note.  ",
+				actorName: "Alice Example",
 				AuditUser(),
 				TestContext.Current.CancellationToken
 			);
@@ -1494,7 +1532,7 @@ public class CaseServiceTests : IAsyncDisposable
 		var caseRecord = await SeedAsync();
 
 		var result = await BuildService(type)
-			.AddNoteAsync(caseRecord.Id, "   ", AuditUser(), TestContext.Current.CancellationToken);
+			.AddNoteAsync(caseRecord.Id, "   ", actorName: "Alice Example", AuditUser(), TestContext.Current.CancellationToken);
 
 		result.IsSuccess.Should().BeFalse();
 		var fetched = await GetAsync(caseRecord.Id);
@@ -1525,6 +1563,7 @@ public class CaseServiceTests : IAsyncDisposable
 		await service.AddNoteAsync(
 			caseRecord.Id,
 			"first",
+			actorName: "Alice Example",
 			AuditUser(),
 			TestContext.Current.CancellationToken
 		);
@@ -1533,6 +1572,7 @@ public class CaseServiceTests : IAsyncDisposable
 			caseRecord.Id,
 			"alice-1",
 			"Alice Example",
+			actorName: "Alice Example",
 			AuditUser(),
 			TestContext.Current.CancellationToken
 		);
@@ -1541,6 +1581,8 @@ public class CaseServiceTests : IAsyncDisposable
 			caseRecord.Id,
 			"approve",
 			decision: null,
+			actorName: "Alice Example",
+			actorEmail: null,
 			AuditUser(),
 			TestContext.Current.CancellationToken
 		);

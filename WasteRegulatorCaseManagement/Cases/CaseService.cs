@@ -35,10 +35,18 @@ public interface ICaseService
 		CancellationToken cancellationToken = default
 	);
 
+	/// <summary>
+	/// Apply the action <paramref name="actionId"/> to a case.
+	/// <paramref name="actorName"/> is recorded on the timeline, and with
+	/// <paramref name="actorEmail"/> fills the <c>actor.*</c> placeholders
+	/// of a source-system callback.
+	/// </summary>
 	Task<CaseActionResult> ApplyActionAsync(
 		string caseId,
 		string actionId,
 		IReadOnlyDictionary<string, string>? decision,
+		string? actorName,
+		string? actorEmail,
 		ClaimsPrincipal user,
 		CancellationToken cancellationToken = default
 	);
@@ -54,6 +62,7 @@ public interface ICaseService
 		string caseId,
 		string assigneeId,
 		string? assigneeName,
+		string? actorName,
 		ClaimsPrincipal user,
 		CancellationToken cancellationToken = default
 	);
@@ -64,20 +73,21 @@ public interface ICaseService
 	/// </summary>
 	Task<CaseActionResult> UnassignAsync(
 		string caseId,
+		string? actorName,
 		ClaimsPrincipal user,
 		CancellationToken cancellationToken = default
 	);
 
 	/// <summary>
-	/// Append a free-text case-level note (RA-96). Authoring identity is
-	/// snapshotted from the supplied <see cref="ClaimsPrincipal"/> at the
-	/// time of the call so the audit narrative survives later directory
-	/// changes. Notes are append-only; this is the only mutation the
+	/// Append a free-text case-level note (RA-96). The author's id and
+	/// <paramref name="actorName"/> are snapshotted at the time of the call
+	/// so the audit narrative survives later directory changes. Notes are append-only; this is the only mutation the
 	/// framework offers for them. Audited as <c>note-added</c>.
 	/// </summary>
 	Task<CaseActionResult> AddNoteAsync(
 		string caseId,
 		string text,
+		string? actorName,
 		ClaimsPrincipal user,
 		CancellationToken cancellationToken = default
 	);
@@ -248,6 +258,8 @@ public sealed class CaseService : ICaseService
 		string caseId,
 		string actionId,
 		IReadOnlyDictionary<string, string>? decision,
+		string? actorName,
+		string? actorEmail,
 		ClaimsPrincipal user,
 		CancellationToken cancellationToken = default
 	)
@@ -353,6 +365,8 @@ public sealed class CaseService : ICaseService
 				caseRecord,
 				callbackMapping,
 				decision,
+				actorName,
+				actorEmail,
 				user,
 				cancellationToken
 			);
@@ -362,6 +376,7 @@ public sealed class CaseService : ICaseService
 					caseRecord,
 					transition,
 					callbackFailure,
+					actorName,
 					user,
 					cancellationToken
 				);
@@ -376,7 +391,7 @@ public sealed class CaseService : ICaseService
 		var previousState = caseRecord.StateId;
 		for (var attempt = 1; ; attempt++)
 		{
-			ApplyTransition(caseRecord, template!, transition, decision, user);
+			ApplyTransition(caseRecord, template!, transition, decision, actorName, user);
 			try
 			{
 				await _persistence.ReplaceAsync(caseRecord, writeCancellationToken);
@@ -417,6 +432,7 @@ public sealed class CaseService : ICaseService
 		ICaseTemplate template,
 		CaseTransition transition,
 		IReadOnlyDictionary<string, string>? decision,
+		string? actorName,
 		ClaimsPrincipal user
 	)
 	{
@@ -439,13 +455,15 @@ public sealed class CaseService : ICaseService
 				details[$"decision.{field}"] = value;
 			}
 		}
-		AppendTimelineEntry(caseRecord, "state-changed", "Action applied", user, now, details);
+		AppendTimelineEntry(caseRecord, "state-changed", "Action applied", actorName, user, now, details);
 	}
 
 	private async Task<string?> SendCallbackAsync(
 		Case caseRecord,
 		BsonDocument callbackMapping,
 		IReadOnlyDictionary<string, string>? decision,
+		string? actorName,
+		string? actorEmail,
 		ClaimsPrincipal user,
 		CancellationToken cancellationToken
 	)
@@ -453,8 +471,8 @@ public sealed class CaseService : ICaseService
 		var values = new Dictionary<string, string?>
 		{
 			["actor.id"] = user.FindFirstValue("user:id"),
-			["actor.email"] = user.FindFirstValue("user:email"),
-			["actor.name"] = user.FindFirstValue("user:name"),
+			["actor.email"] = actorEmail,
+			["actor.name"] = actorName,
 		};
 		foreach (var (field, value) in decision ?? new Dictionary<string, string>())
 		{
@@ -483,6 +501,7 @@ public sealed class CaseService : ICaseService
 		Case caseRecord,
 		CaseTransition transition,
 		string failure,
+		string? actorName,
 		ClaimsPrincipal user,
 		CancellationToken cancellationToken
 	)
@@ -493,6 +512,7 @@ public sealed class CaseService : ICaseService
 			caseRecord,
 			"callback-failed",
 			"Callback failed",
+			actorName,
 			user,
 			now,
 			new()
@@ -529,6 +549,7 @@ public sealed class CaseService : ICaseService
 		string caseId,
 		string assigneeId,
 		string? assigneeName,
+		string? actorName,
 		ClaimsPrincipal user,
 		CancellationToken cancellationToken = default
 	)
@@ -597,6 +618,7 @@ public sealed class CaseService : ICaseService
 			caseRecord,
 			"assigned",
 			"Assigned",
+			actorName,
 			user,
 			caseRecord.AssignedAt.Value,
 			new()
@@ -629,6 +651,7 @@ public sealed class CaseService : ICaseService
 
 	public async Task<CaseActionResult> UnassignAsync(
 		string caseId,
+		string? actorName,
 		ClaimsPrincipal user,
 		CancellationToken cancellationToken = default
 	)
@@ -676,6 +699,7 @@ public sealed class CaseService : ICaseService
 			caseRecord,
 			"unassigned",
 			"Unassigned",
+			actorName,
 			user,
 			now,
 			new()
@@ -714,6 +738,7 @@ public sealed class CaseService : ICaseService
 	public async Task<CaseActionResult> AddNoteAsync(
 		string caseId,
 		string text,
+		string? actorName,
 		ClaimsPrincipal user,
 		CancellationToken cancellationToken = default
 	)
@@ -752,6 +777,7 @@ public sealed class CaseService : ICaseService
 			caseRecord,
 			"note-added",
 			"Note added",
+			actorName,
 			user,
 			now,
 			new() { ["text"] = trimmed }
@@ -967,13 +993,14 @@ public sealed class CaseService : ICaseService
 	/// <summary>
 	/// Append a single entry to the case's timeline (RA-97). Called
 	/// from every engine method on the success path so every case type
-	/// has a complete, automatic audit trail. Identity is snapshotted from the supplied principal at
-	/// write time.
+	/// has a complete, automatic audit trail. The actor's id, from the
+	/// supplied principal, and name are snapshotted at write time.
 	/// </summary>
 	private static void AppendTimelineEntry(
 		Case caseRecord,
 		string action,
 		string actionDisplayName,
+		string? actorName,
 		ClaimsPrincipal? user,
 		DateTime performedAt,
 		Dictionary<string, string?> details
@@ -982,7 +1009,7 @@ public sealed class CaseService : ICaseService
 			caseRecord,
 			action,
 			actionDisplayName,
-			new Actor(ResolveActorUserId(user)!, user?.FindFirstValue("user:name")),
+			new Actor(ResolveActorUserId(user)!, actorName),
 			performedAt,
 			details
 		);

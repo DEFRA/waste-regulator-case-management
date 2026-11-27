@@ -64,8 +64,7 @@ public class CaseServiceTimestampTests
 		new(new ClaimsIdentity(
 		[
 			new Claim("client_id", "test-client"),
-			new Claim("user:nation", "ENGLAND"), new Claim("user:id", "alice-1"),
-			new Claim("user:name", "Alice Example")
+			new Claim("user:nation", "ENGLAND"), new Claim("user:id", "alice-1")
 		], "test"));
 
 	private async Task<Case> SeedAsync(Case caseRecord)
@@ -131,7 +130,7 @@ public class CaseServiceTimestampTests
 		var expected = _time.GetUtcNow().UtcDateTime;
 
 		var result = await BuildService(BuildType()).AddNoteAsync(
-			caseRecord.Id, "Reviewed evidence.", User(), TestContext.Current.CancellationToken);
+			caseRecord.Id, "Reviewed evidence.", actorName: null, User(), TestContext.Current.CancellationToken);
 
 		result.IsSuccess.Should().BeTrue(result.Message);
 

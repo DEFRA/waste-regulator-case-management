@@ -31,16 +31,12 @@ request:
           ? bru.getEnvVar("AUTH_API_KEY__CASE_INTAKE")
           : bru.getEnvVar("AUTH_API_KEY__MANAGEMENT_FE");
         const userId = isCaseIntake ? "" : bru.getEnvVar("userId");
-        const userName = isCaseIntake ? "" : bru.getEnvVar("userName");
         const nation = isCaseIntake ? "" : bru.getEnvVar("userNation");
-        const email = isCaseIntake ? "" : bru.getEnvVar("userEmail");
 
         req.setHeader("x-cdp-client-id", clientId);
         if (!isCaseIntake) {
           req.setHeader("x-cdp-user-id", userId);
-          req.setHeader("x-cdp-user-name", userName);
           req.setHeader("x-cdp-user-nation", nation);
-          req.setHeader("x-cdp-user-email", email);
         }
 
         if (callerApiKey) {
@@ -72,7 +68,7 @@ docs:
     The collection's pre-request script then sets the caller headers:
 
     - `POST /cases` is sent as the Case Intake Processor (`caseIntakeClientId`).
-    - Every other request is sent as the regulator frontend (`frontendClientId`), acting for the caseworker in the environment's `userId`, `userName`, `userEmail` and `userNation`.
+    - Every other request is sent as the regulator frontend (`frontendClientId`), acting for the caseworker in the environment's `userId` and `userNation`. Requests that change a case send the caseworker's `userName` and `userEmail` in their body as `actorName` and `actorEmail`.
 
     When that caller's API key is set, the script also sends it in `x-cdp-auth-key`, as described in the service's [caller API keys](https://github.com/DEFRA/waste-regulator-case-management/blob/main/docs/cdp-deployment.md#caller-api-keys).
 

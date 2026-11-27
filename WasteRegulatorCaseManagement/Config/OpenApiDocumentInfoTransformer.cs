@@ -18,7 +18,7 @@ internal sealed class OpenApiDocumentInfoTransformer : IOpenApiDocumentTransform
 		Every request names its caller in `x-cdp-client-id`. Outside Development the caller also sends the API key registered for its client id in `x-cdp-auth-key`. A request without a valid API key returns 401.
 
 		- The **Case Intake Processor** creates cases, and is the only caller that can.
-		- The **regulator frontend** acts for a caseworker and sends the caseworker's identity in `x-cdp-user-id`, `x-cdp-user-name`, `x-cdp-user-nation` and `x-cdp-user-email`.
+		- The **regulator frontend** acts for a caseworker and sends the caseworker's id and nation in `x-cdp-user-id` and `x-cdp-user-nation`. A request that changes a case also carries the caseworker's name, and for an action their email, in `actorName` and `actorEmail` in its body.
 
 		## Nations
 
