@@ -36,6 +36,7 @@ public class CaseEndpointsTests
 {
 	private static readonly string[] s_expectedCapturedStateIds = ["submitted"];
 	private static readonly string[] s_expectedCapturedTypeIds = ["re-accreditation", "other-type"];
+	private static readonly string[] s_expectedCapturedProducerTypes = ["DIRECT_PRODUCER", "COMPLIANCE_SCHEME"];
 
 	private const string CaseType = "test-type";
 	private readonly MongoIntegrationFixture _fixture;
@@ -1407,8 +1408,8 @@ public class CaseEndpointsTests
 		var cancellationToken = TestContext.Current.CancellationToken;
 		await using var factory = NewFactory();
 		using var client = factory.CreateClient();
-		await factory.SeedAsync(ProducerCase(orgId: "org-00456", producerType: "DIRECT_PRODUCER"), cancellationToken);
-		await factory.SeedAsync(ProducerCase(orgId: "org-00789", producerType: "COMPLIANCE_SCHEME"), cancellationToken);
+		await factory.SeedAsync(ListedCase(orgId: "org-00456", stateId: "submitted", isTerminal: false, producerType: "DIRECT_PRODUCER"), cancellationToken);
+		await factory.SeedAsync(ListedCase(orgId: "org-00789", stateId: "submitted", isTerminal: false, producerType: "COMPLIANCE_SCHEME"), cancellationToken);
 
 		// Act
 		var body = await client.GetFromJsonAsync<CaseListResponse>("/cases?producerType=DIRECT_PRODUCER", cancellationToken);
@@ -1436,21 +1437,7 @@ public class CaseEndpointsTests
 		item.StateId.Should().Be("approved");
 	}
 
-	private static Case ProducerCase(string orgId, string producerType) =>
-		new()
-		{
-			SourceSystemId = Ulid.NewUlid().ToString(),
-			CallbackUrl = "https://source-system.test/callback",
-			Nation = "ENGLAND",
-			OrgId = orgId,
-			Id = Ulid.NewUlid().ToString(),
-			CaseType = CaseType,
-			StateId = "submitted",
-			SubmittedBy = "test-client",
-			ProducerType = producerType,
-		};
-
-	private static Case ListedCase(string orgId, string stateId, bool isTerminal) =>
+	private static Case ListedCase(string orgId, string stateId, bool isTerminal, string? producerType = null) =>
 		new()
 		{
 			SourceSystemId = Ulid.NewUlid().ToString(),
@@ -1462,6 +1449,7 @@ public class CaseEndpointsTests
 			StateId = stateId,
 			IsTerminal = isTerminal,
 			SubmittedBy = "test-client",
+			ProducerType = producerType,
 		};
 
 	[Fact]
@@ -1777,7 +1765,7 @@ public class CaseEndpointsTests
 		using var client = factory.CreateClient();
 
 		var response = await client.GetAsync(
-			"/cases?caseType=re-accreditation&caseType=other-type&stateId=submitted&search=acme&assigneeId=alice-1&unassigned=true&page=2&pageSize=5",
+			"/cases?caseType=re-accreditation&caseType=other-type&stateId=submitted&search=acme&assigneeId=alice-1&unassigned=true&orgId=org-00456&producerType=DIRECT_PRODUCER&producerType=COMPLIANCE_SCHEME&page=2&pageSize=5",
 			cancellationToken
 		);
 		response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -1788,12 +1776,14 @@ public class CaseEndpointsTests
 		using var scope = new AssertionScope();
 		captured!.CaseTypes.Should().Equal(s_expectedCapturedTypeIds);
 		captured.StateIds.Should().Equal(s_expectedCapturedStateIds);
+		captured.ProducerTypes.Should().Equal(s_expectedCapturedProducerTypes);
 		captured.Should().BeEquivalentTo(
 			new
 			{
 				Search = "acme",
 				AssigneeId = "alice-1",
 				UnassignedOnly = true,
+				OrgId = "org-00456",
 				Page = 2,
 				PageSize = 5,
 			}
