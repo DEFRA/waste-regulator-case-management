@@ -263,7 +263,7 @@ public static class CaseEndpoints
 		{
 			result = await engine.SubmitAsync(
 				type,
-				intake!,
+				intake,
 				submittedBy,
 				httpContext.User,
 				submissionMetadata,
