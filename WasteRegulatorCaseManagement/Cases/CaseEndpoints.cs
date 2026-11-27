@@ -390,6 +390,8 @@ public static class CaseEndpoints
 		bool? unassigned,
 		[FromQuery(Name = "orgId"), Description("Only cases of this organisation.")]
 		string? orgId,
+		[FromQuery(Name = "producerType"), Description("Only cases of this producer type, such as `DIRECT_PRODUCER`. Repeat to match any of several.")]
+		string[]? producerType,
 		[FromQuery(Name = "isTerminal"), Description("`true` for only concluded cases, `false` for only open ones.")]
 		bool? isTerminal,
 		[FromQuery(Name = "sort"), Description("`status` orders the cases by their case type's states, in the order the case type declares them.")]
@@ -418,6 +420,7 @@ public static class CaseEndpoints
 			assigneeId,
 			unassigned,
 			orgId,
+			producerType,
 			isTerminal,
 			sort,
 			dir,

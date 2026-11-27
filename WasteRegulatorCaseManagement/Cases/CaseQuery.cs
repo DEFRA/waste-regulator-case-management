@@ -36,6 +36,10 @@ namespace WasteRegulatorCaseManagement.Cases;
 /// <param name="OrgId">
 /// Restrict to cases of this organisation. Empty/null means "any organisation".
 /// </param>
+/// <param name="ProducerTypes">
+/// Restrict to cases whose <see cref="Case.ProducerType"/> is in this set.
+/// Empty/null means "any producer type".
+/// </param>
 /// <param name="IsTerminal">
 /// <c>true</c> restricts to concluded cases, <c>false</c> to open ones;
 /// <c>null</c> means both.
@@ -52,7 +56,8 @@ public sealed record CaseQuery(
 	string? Sort = null,
 	bool? SortDescending = null,
 	string? OrgId = null,
-	bool? IsTerminal = null)
+	bool? IsTerminal = null,
+	IReadOnlyCollection<string>? ProducerTypes = null)
 {
 	public const int DefaultPageSize = 20;
 	public const int MinPageSize = 1;
