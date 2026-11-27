@@ -1,7 +1,7 @@
 # ADR-0011: Call the source system before concluding a case
 
 **Date:** 2026-11-05
-**Status:** Accepted
+**Status:** Superseded by [ADR-0012](0012-case-completion-events.md)
 **Issue:** <https://eaflood.atlassian.net/browse/AMCR-622>
 
 ## Context

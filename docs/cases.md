@@ -37,7 +37,7 @@ are mounted by `MapCaseFrameworkEndpoints()`:
 
 | Method | Route | Description |
 | --- | --- | --- |
-| `POST` | `/cases` | Submit a new case. Body: `{ "caseType", "sourceSystemId", "callbackUrl", "nation", "orgId", "producerType"?, "displayData"? }` — see below. The `caseType` must be a case type in `caseModuleConfig`; the server stamps the case with the type's `InitialState`, the caller's CDP client id and a server-side timestamp. Returns `201 Created` with `Location: /cases/{id}`; a `sourceSystemId` that already has a case returns that case with `200 OK` and `X-Idempotent-Replay: true`. |
+| `POST` | `/cases` | Submit a new case. Body: `{ "caseType", "sourceSystemId", "completionEvent", "nation", "orgId", "producerType"?, "displayData"? }` — see below. The `caseType` must be a case type in `caseModuleConfig`; the server stamps the case with the type's `InitialState`, the caller's CDP client id and a server-side timestamp. Returns `201 Created` with `Location: /cases/{id}`; a `sourceSystemId` that already has a case returns that case with `200 OK` and `X-Idempotent-Replay: true`. |
 | `GET` | `/cases/{id}` | Fetch a single case by id, projected with the actions the engine will currently allow. |
 | `GET` | `/cases` | List persisted cases (with the same projection), newest first, with filter / search / pagination per RA-93. Query string parameters: `caseType` (repeatable), `stateId` (repeatable), `search` (matched against the start of the case id), `page` (1-based, default 1), `pageSize` (default 20, capped at 100). Returns a paged envelope: `{ items, totalCount, page, pageSize }`. |
 | `POST` | `/cases/{id}/actions/{actionId}` | Invoke a named action declared by the type's transitions, with an optional body `{ "decision": { field: string } }` (see below). `409` if the case is in a terminal state; `400` for unknown actions, transitions whose from-state does not match, and a decision missing a field the transition requires. |
@@ -55,7 +55,7 @@ Only the Case Intake Processor may create cases: `POST /cases` requires the
 | Field | Required | Notes |
 | --- | --- | --- |
 | `sourceSystemId` | Yes | Immutable reference to the submission in the source system. Unique: one case per submission. |
-| `callbackUrl` | Yes | Absolute http(s) URL the outcome is reported to when the case reaches a terminal state. |
+| `completionEvent` | Yes | Immutable `{ "eventType": string, "payload": object }` template used to build the SNS completion message when the case first enters a terminal state. String values may use `{{actor.*}}`, `{{decision.*}}` and `{{state.*}}` placeholders (see below). |
 | `nation` | Yes | `ENGLAND`, `WALES`, `SCOTLAND` or `N_IRELAND`. |
 | `orgId` | Yes | The submitting organisation's id in the source system. |
 | `producerType` | No | Stored and returned uninterpreted (for CSoC, `DIRECT_PRODUCER` or `COMPLIANCE_SCHEME`). |
@@ -80,32 +80,49 @@ requires `reason`:
 The decision is stored on the case as `decision` and on the action's
 `state-changed` timeline entry as `decision.<field>` details.
 
-### Callback to the source system
+### Completion events
 
-When an action moves a case into a state that its case type's
-`callbackMappings` names, the service PATCHes the mapping to the case's
-`callbackUrl` before it changes the case
-([ADR-0011](adr/0011-gated-source-system-callback.md)). Placeholders in string
-values are filled from the acting user (`{{actor.id}}`, `{{actor.email}}` and
-`{{actor.name}}`, from the signed identity headers) and the decision
-(`{{decision.<field>}}`). CSoC `cancel` sends:
+When an action moves a case into a terminal state for the first time, the
+service renders the stored `completionEvent.payload` template and writes a
+**completion envelope** on the `state-changed` audit event in the same Mongo
+transaction as the case update ([ADR-0012](adr/0012-case-completion-events.md)).
+A background processor then publishes the envelope to the completion SNS topic
+(`CaseCompletionEventProcessor:TopicArn`).
+
+Placeholders in string values are filled from the acting user (`{{actor.id}}`,
+`{{actor.email}}` and `{{actor.name}}`, from the signed identity headers), the
+decision (`{{decision.<field>}}`) and the terminal state
+(`{{state.callbackStatus}}` resolves to the terminal state's `displayName`).
+Missing `decision.*` values become JSON `null` (for example `reason` on accept).
+Missing `actor.*` or `state.*` values return `400` and leave the case
+non-terminal.
+
+The published JSON envelope includes `eventId`, `caseId`, `caseType`,
+`sourceSystemId`, `orgId`, `stateId`, `occurredAt`, `eventType` and the
+rendered `payload`. SNS message attributes carry `caseType` and `eventType`.
+`eventId` matches the audit outbox document id so consumers can dedupe retries.
+
+CSoC intake typically supplies:
 
 ```json
 {
-  "status": "Cancelled",
-  "reason": "Submitted against the wrong obligation year.",
-  "user": { "id": "<user id>", "email": "<user email>", "name": "<user name>" }
+  "eventType": "csoc.case.concluded",
+  "payload": {
+    "status": "{{state.callbackStatus}}",
+    "reason": "{{decision.reason}}",
+    "user": {
+      "id": "{{actor.id}}",
+      "email": "{{actor.email}}",
+      "name": "{{actor.name}}"
+    }
+  }
 }
 ```
 
-The request carries Basic credentials from `CALLBACK_AUTH__<caseType>`
-(`clientId:clientSecret`). When the source system accepts it, the action is
-applied. When it returns `422`, the service reads the resource back from the
-same URL and treats the decision as applied if every top-level string field
-the two share matches, because the source system refuses a decision it
-already holds. Otherwise, or when a placeholder has no value, the action
-returns `502`, the case keeps its state, and a `callback-failed` timeline
-entry records the reason.
+After cancel, the rendered payload matches what Waste Obligations expects on
+`UpdateComplianceDeclarationRequest` (`status`, optional `reason`, `user`).
+Publish failures are retried via `dispatches.completion` until
+`MaxDispatchAttempts`, then dead-lettered; the case remains concluded.
 
 ### Nation scoping
 
@@ -134,18 +151,7 @@ for example `CSoC.json`:
   "transitions": [
     { "actionId": "accept", "displayName": "Accept", "fromStateId": "SUBMITTED", "toStateId": "ACCEPTED" },
     { "actionId": "cancel", "displayName": "Cancel", "fromStateId": "SUBMITTED", "toStateId": "CANCELLED", "requiredDecisionFields": ["reason"] }
-  ],
-  "callbackMappings": {
-    "ACCEPTED": {
-      "status": "Accepted",
-      "user": { "id": "{{actor.id}}", "email": "{{actor.email}}", "name": "{{actor.name}}" }
-    },
-    "CANCELLED": {
-      "status": "Cancelled",
-      "reason": "{{decision.reason}}",
-      "user": { "id": "{{actor.id}}", "email": "{{actor.email}}", "name": "{{actor.name}}" }
-    }
-  }
+  ]
 }
 ```
 
@@ -219,7 +225,7 @@ optionally reads two headers forwarded by the BFF and turns them into
 | --- | --- |
 | `x-cdp-user-id` | `user:id` (used by `ResolveActorUserId`) |
 | `x-cdp-user-name` | `user:name` |
-| `x-cdp-user-email` | `user:email` (sent in the source system callback) |
+| `x-cdp-user-email` | `user:email` (rendered into completion event payloads) |
 
 These are used for audit attribution (`Case.Timeline.PerformedById` /
 `PerformedByName` and similar). Role membership is not part of the trust
@@ -311,6 +317,12 @@ or `Failed` with a next attempt time, or `DeadLettered` once
 is sent gzip-compressed and base64-encoded with a `Content-Encoding:
 gzip+base64` attribute. Delivery is at least once, so consumers de-duplicate
 on `eventId`.
+
+Terminal `state-changed` audit events may also carry a `completionEnvelope`.
+When `CaseCompletionEventProcessor:ProcessingEnabled` is true, a separate
+processor publishes only those events (filtered by the presence of
+`completionEnvelope`) to `CaseCompletionEventProcessor:TopicArn` under
+`dispatches.completion`, with the same lease, retry and dead-letter behaviour.
 
 ### Mechanism
 
