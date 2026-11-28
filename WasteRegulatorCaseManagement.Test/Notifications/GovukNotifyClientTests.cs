@@ -537,7 +537,7 @@ public class GovukNotifyClientTests
 	public async Task SendEmailAsync_converts_a_timeout_that_is_not_the_callers_token_into_a_failure_result()
 	{
 		using var pollyInternalTimeoutSource = new CancellationTokenSource();
-		pollyInternalTimeoutSource.Cancel();
+		await pollyInternalTimeoutSource.CancelAsync();
 
 		var inner = Substitute.For<IAsyncNotificationClient>();
 		inner
@@ -578,7 +578,7 @@ public class GovukNotifyClientTests
 	public async Task SendEmailAsync_rethrows_when_the_callers_own_cancellation_token_fires()
 	{
 		using var cts = new CancellationTokenSource();
-		cts.Cancel();
+		await cts.CancelAsync();
 
 		var inner = Substitute.For<IAsyncNotificationClient>();
 		inner

@@ -48,7 +48,11 @@ public interface ICasePersistence
 	/// Implementations replace the document in its entirety so callers can
 	/// mutate any field on the supplied <see cref="Case"/> before saving.
 	/// </summary>
-	Task ReplaceAsync(Case caseRecord, CancellationToken cancellationToken = default);
+	Task ReplaceAsync(
+		Case caseRecord,
+		CaseCompletionEnvelopeContent? completionContent = null,
+		CancellationToken cancellationToken = default
+	);
 }
 
 public sealed class CasePersistence
@@ -277,7 +281,11 @@ public sealed class CasePersistence
 	}
 
 	[ExcludeFromCodeCoverage]
-	public async Task ReplaceAsync(Case caseRecord, CancellationToken cancellationToken = default)
+	public async Task ReplaceAsync(
+		Case caseRecord,
+		CaseCompletionEnvelopeContent? completionContent = null,
+		CancellationToken cancellationToken = default
+	)
 	{
 		var expectedVersion = caseRecord.Version;
 		caseRecord.Version = expectedVersion + 1;
@@ -297,7 +305,12 @@ public sealed class CasePersistence
 						) ?? throw new CaseConcurrencyException(caseRecord.Id, expectedVersion);
 					await _auditEvents.RecordEvent(
 						session,
-						AuditEventFor(caseRecord, AuditEventOperation.Update, before.ToBsonDocument()),
+						AuditEventFor(
+							caseRecord,
+							AuditEventOperation.Update,
+							before.ToBsonDocument(),
+							completionContent
+						),
 						transactionCancellationToken
 					);
 					return true;
@@ -326,7 +339,8 @@ public sealed class CasePersistence
 	private static AuditEventRequest AuditEventFor(
 		Case caseRecord,
 		AuditEventOperation operation,
-		BsonDocument? before
+		BsonDocument? before,
+		CaseCompletionEnvelopeContent? completionContent = null
 	)
 	{
 		var entry =
@@ -344,7 +358,8 @@ public sealed class CasePersistence
 			Before: before,
 			After: caseRecord.ToBsonDocument(),
 			SchemaVersion: AuditSchemaVersion,
-			OccurredAt: entry.PerformedAt
+			OccurredAt: entry.PerformedAt,
+			CompletionContent: completionContent
 		);
 	}
 

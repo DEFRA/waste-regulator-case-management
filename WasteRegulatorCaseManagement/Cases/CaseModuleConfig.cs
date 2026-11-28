@@ -38,15 +38,6 @@ public sealed class CaseModuleConfig : ICaseTemplate
 	/// </summary>
 	public required IReadOnlyCollection<CaseTransition> Transitions { get; init; }
 
-	/// <summary>
-	/// The payload PATCHed to a case's <see cref="Case.CallbackUrl"/> when
-	/// it moves into a state, keyed by state id. String values may contain
-	/// <c>{{actor.id}}</c>, <c>{{actor.email}}</c>, <c>{{actor.name}}</c> and
-	/// <c>{{decision.field}}</c> placeholders.
-	/// </summary>
-	[JsonConverter(typeof(CallbackMappingsJsonConverter))]
-	public Dictionary<string, BsonDocument> CallbackMappings { get; init; } = [];
-
 	[BsonIgnore]
 	[JsonIgnore]
 	public CaseState InitialState =>

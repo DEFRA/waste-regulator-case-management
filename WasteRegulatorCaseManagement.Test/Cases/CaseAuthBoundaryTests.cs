@@ -62,7 +62,7 @@ public class CaseAuthBoundaryTests
 		persisted.Should().NotBeNull();
 
 		using var scope = new AssertionScope();
-		persisted!.Should().BeEquivalentTo(new { AssignedToId = "bob-2", Version = 1 });
+		TestAsserts.NotNull(persisted).Should().BeEquivalentTo(new { AssignedToId = "bob-2", Version = 1 });
 		persisted.Timeline.Should().ContainSingle();
 	}
 
@@ -89,7 +89,7 @@ public class CaseAuthBoundaryTests
 		persisted.Should().NotBeNull();
 
 		using var scope = new AssertionScope();
-		persisted!.Should().BeEquivalentTo(new { AssignedToId = "alice-1", Version = 1 });
+		TestAsserts.NotNull(persisted).Should().BeEquivalentTo(new { AssignedToId = "alice-1", Version = 1 });
 		persisted.Timeline.Should().ContainSingle();
 	}
 
@@ -113,7 +113,7 @@ public class CaseAuthBoundaryTests
 		persisted.Should().NotBeNull();
 
 		using var scope = new AssertionScope();
-		persisted!.Should().BeEquivalentTo(new { AssignedToId = (string?)null, Version = 1 });
+		TestAsserts.NotNull(persisted).Should().BeEquivalentTo(new { AssignedToId = (string?)null, Version = 1 });
 		persisted.Timeline.Should().ContainSingle();
 	}
 
@@ -127,7 +127,7 @@ public class CaseAuthBoundaryTests
 	{
 		Id = id,
 		SourceSystemId = Ulid.NewUlid().ToString(),
-		CallbackUrl = "https://source-system.test/callback",
+		CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 		Nation = "ENGLAND",
 		OrgId = "test-org",
 		CaseType = CaseType,

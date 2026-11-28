@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace WasteRegulatorCaseManagement.Cases;
 
 /// <summary>
@@ -34,10 +36,10 @@ public enum CaseActionFailureCode
 	MissingDecisionField,
 
 	/// <summary>
-	/// The case's source system did not accept the decision, so the case
-	/// was left in its current state.
+	/// The stored completion event template could not be rendered for this
+	/// action (e.g. a required placeholder had no value).
 	/// </summary>
-	CallbackFailed,
+	InvalidCompletionEvent,
 
 	/// <summary>
 	/// The case was modified by another caller between load and save
@@ -88,6 +90,7 @@ public sealed record CaseActionResult
 	/// </summary>
 	public bool IsIdempotentReplay { get; }
 
+	[MemberNotNullWhen(true, nameof(Case))]
 	public bool IsSuccess => FailureCode is null;
 
 	public static CaseActionResult Success(Case caseRecord) =>

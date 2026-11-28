@@ -79,8 +79,8 @@ case with `POST /cases`, pick "Case Intake Processor", which sends only
 > attached by the picker. The actual XHR over the wire does — check the
 > server response, not the cURL snippet, to confirm authentication.
 
-Concluding a CSoC case calls its `callbackUrl`, so locally a case can only be
-accepted or cancelled when that URL points at something that answers.
+Concluding a CSoC case publishes a completion message asynchronously; no
+outbound HTTP to a source system is required for accept or cancel.
 
 ## Running with Docker Compose
 
@@ -169,7 +169,6 @@ per-environment list — the tables below summarise it.
 | --- | --- | --- |
 | `AUTH_SHARED_SECRET__CASE_INTAKE` | Yes | Verifies inbound signed requests from the Case Intake Processor — must match the secret it signs with exactly |
 | `AUTH_SHARED_SECRET__MANAGEMENT_FE` | Yes | Verifies inbound signed requests from the regulator frontend — must match the secret it signs with exactly |
-| `CALLBACK_AUTH__CSOC` | Yes | `clientId:clientSecret` for the Waste Obligations API, sent as Basic auth on the CSoC decision callback |
 | `Auth__CaseIntakeClientId` | No | Expected `x-cdp-client-id` on inbound calls from the Case Intake Processor (default `case-intake-processor`) |
 | `Auth__ManagementFeClientId` | No | Expected `x-cdp-client-id` on inbound calls from the regulator frontend (default `frontend`) — must differ from `Auth__CaseIntakeClientId` or the service throws at first request |
 
@@ -192,6 +191,13 @@ registered) but required in every other environment.
 | --- | --- | --- |
 | `AnalyticsAuditEventProcessor__ProcessingEnabled` | No | Publish audit events to the analytics SNS topic (default `false`; `true` in Docker Compose) |
 | `AnalyticsAuditEventProcessor__TopicArn` | No | Analytics SNS topic ARN, required when processing is enabled |
+
+### Case completion events
+
+| Variable | Secret? | Description |
+| --- | --- | --- |
+| `CaseCompletionEventProcessor__ProcessingEnabled` | No | Publish terminal-state completion envelopes to the completion SNS topic (default `false`) |
+| `CaseCompletionEventProcessor__TopicArn` | No | Completion SNS topic ARN, required when processing is enabled |
 
 ### Database and misc
 

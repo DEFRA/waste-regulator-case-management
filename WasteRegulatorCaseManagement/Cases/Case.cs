@@ -99,11 +99,10 @@ public sealed class Case
 	public required string SourceSystemId { get; init; }
 
 	/// <summary>
-	/// Where this service reports the case's outcome to the source system
-	/// when it reaches a terminal state. Supplied at intake and stored
-	/// unchanged.
+	/// Template for the completion event published when the case reaches a
+	/// terminal state. Supplied at intake and stored unchanged.
 	/// </summary>
-	public required string CallbackUrl { get; init; }
+	public required CompletionEventSpec CompletionEvent { get; init; }
 
 	/// <summary>
 	/// The UK nation the case belongs to, one of <see cref="CaseNations.All"/>.

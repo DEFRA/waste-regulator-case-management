@@ -66,7 +66,7 @@ public sealed class AnalyticsAuditEventProcessorTests : IAsyncDisposable
 		var caseRecord = new Case
 		{
 			SourceSystemId = Ulid.NewUlid().ToString(),
-			CallbackUrl = "https://source-system.test/callback",
+			CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 			Nation = "WALES",
 			OrgId = "test-org",
 			CaseType = "test",
@@ -105,7 +105,8 @@ public sealed class AnalyticsAuditEventProcessorTests : IAsyncDisposable
 					Before = (BsonDocument?)null,
 				}
 			);
-		sent.After!["nation"].AsString.Should().Be("WALES");
+		ArgumentNullException.ThrowIfNull(sent.After);
+		sent.After["nation"].AsString.Should().Be("WALES");
 		using var message = JsonDocument.Parse(JsonSerializer.Serialize(sent));
 		message.RootElement.GetProperty("after").GetProperty("submittedAt").GetString().Should().Be("2026-11-05T09:30:00.000Z");
 	}

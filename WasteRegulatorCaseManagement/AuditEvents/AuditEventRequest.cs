@@ -12,5 +12,6 @@ public sealed record AuditEventRequest(
 	BsonDocument? Before,
 	BsonDocument? After,
 	string SchemaVersion,
-	DateTime OccurredAt
+	DateTime OccurredAt,
+	CaseCompletionEnvelopeContent? CompletionContent = null
 );

@@ -105,7 +105,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
 		var caseRecord = new Case
 		{
 			SourceSystemId = Ulid.NewUlid().ToString(),
-			CallbackUrl = "https://source-system.test/callback",
+			CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 			Nation = "ENGLAND",
 			OrgId = "test-org",
 			CaseType = "re-accreditation",
@@ -214,7 +214,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
 		var caseRecord = new Case
 		{
 			SourceSystemId = Ulid.NewUlid().ToString(),
-			CallbackUrl = "https://source-system.test/callback",
+			CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 			Nation = "ENGLAND",
 			OrgId = "test-org",
 			CaseType = "re-accreditation",
@@ -240,7 +240,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
 			caseRecord.Id,
 			TestContext.Current.CancellationToken
 		);
-		full!.Timeline.Should().ContainSingle();
+		TestAsserts.NotNull(full).Timeline.Should().ContainSingle();
 
 		// QueryAsync is the projected path; the timeline must be empty.
 		var page = await _persistence.QueryAsync(
@@ -262,7 +262,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
 		var item = new Case
 		{
 			SourceSystemId = Ulid.NewUlid().ToString(),
-			CallbackUrl = "https://source-system.test/callback",
+			CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 			Nation = "ENGLAND",
 			OrgId = orgId,
 			CaseType = "test",
@@ -302,7 +302,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
 
 		var page = await _persistence.QueryAsync(new CaseQuery(Sort: "status"), ct);
 
-		page.Items.Select(i => i.StateId).ToArray().Should().Equal(s_expectedStatusRankAscending);
+		page.Items.Select(i => i.StateId).Should().Equal(s_expectedStatusRankAscending);
 	}
 
 	[Fact]
@@ -370,7 +370,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
 		var item = new Case
 		{
 			SourceSystemId = Ulid.NewUlid().ToString(),
-			CallbackUrl = "https://source-system.test/callback",
+			CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 			Nation = "ENGLAND",
 			OrgId = "Acme",
 			CaseType = "test",
@@ -432,7 +432,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
 		var caseRecord = new Case
 		{
 			SourceSystemId = Ulid.NewUlid().ToString(),
-			CallbackUrl = "https://source-system.test/callback",
+			CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 			Nation = "ENGLAND",
 			OrgId = "test-org",
 			CaseType = "test",
@@ -444,12 +444,14 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
 		await _persistence.CreateAsync(caseRecord, cancellationToken);
 		var stale = await _persistence.GetByIdAsync(caseRecord.Id, cancellationToken);
 		var fresh = await _persistence.GetByIdAsync(caseRecord.Id, cancellationToken);
-		fresh!.Timeline.Add(NoteEntry(now));
-		await _persistence.ReplaceAsync(fresh, cancellationToken);
-		stale!.Timeline.Add(NoteEntry(now));
+		ArgumentNullException.ThrowIfNull(fresh);
+		ArgumentNullException.ThrowIfNull(stale);
+		fresh.Timeline.Add(NoteEntry(now));
+		await _persistence.ReplaceAsync(fresh, cancellationToken: cancellationToken);
+		stale.Timeline.Add(NoteEntry(now));
 
 		// Act
-		var act = () => _persistence.ReplaceAsync(stale, cancellationToken);
+		var act = () => _persistence.ReplaceAsync(stale, cancellationToken: cancellationToken);
 		await act.Should().ThrowExactlyAsync<CaseConcurrencyException>();
 
 		// Assert
@@ -458,8 +460,8 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
 			.Find(FilterDefinition<AuditEvent>.Empty)
 			.SortBy(e => e.Sequence)
 			.ToListAsync(cancellationToken);
-		auditEvents.Select(e => e.Operation).Should().Equal(["insert", "update"]);
-		auditEvents.Select(e => e.Version).Should().Equal([0, 1]);
+		auditEvents.Select(e => e.Operation).Should().Equal("insert", "update");
+		auditEvents.Select(e => e.Version).Should().Equal(0, 1);
 	}
 
 	private static CaseTimelineEntry CreatedEntry(DateTime now) =>
@@ -487,7 +489,7 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
 		var caseRecord = new Case
 		{
 			SourceSystemId = Ulid.NewUlid().ToString(),
-			CallbackUrl = "https://source-system.test/callback",
+			CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 			Nation = "ENGLAND",
 			OrgId = "test-org",
 			CaseType = "re-accreditation",
@@ -512,11 +514,13 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
 			TestContext.Current.CancellationToken
 		);
 
-		fresh!.StateId = "in-progress";
-		await _persistence.ReplaceAsync(fresh, TestContext.Current.CancellationToken);
+		ArgumentNullException.ThrowIfNull(fresh);
+		ArgumentNullException.ThrowIfNull(stale);
+		fresh.StateId = "in-progress";
+		await _persistence.ReplaceAsync(fresh, cancellationToken: TestContext.Current.CancellationToken);
 
-		stale!.StateId = "approved";
-		var act = () => _persistence.ReplaceAsync(stale, TestContext.Current.CancellationToken);
+		stale.StateId = "approved";
+		var act = () => _persistence.ReplaceAsync(stale, cancellationToken: TestContext.Current.CancellationToken);
 		var ex = (await act.Should().ThrowExactlyAsync<CaseConcurrencyException>()).Which;
 		ex.CaseId.Should().Be(caseRecord.Id);
 
@@ -529,7 +533,8 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
 			caseRecord.Id,
 			TestContext.Current.CancellationToken
 		);
-		final!.StateId.Should().Be("in-progress");
+		ArgumentNullException.ThrowIfNull(final);
+		final.StateId.Should().Be("in-progress");
 	}
 
 	// ------------------- RA-342 legacy snapshot tolerance -------------------
@@ -658,10 +663,10 @@ public sealed class CasePersistenceMongoIntegrationTests : IAsyncDisposable, IDi
 		// Single-item fetch path (CasePersistence.GetByIdAsync) must be
 		// equally tolerant.
 		var fetched = await _persistence.GetByIdAsync(id, ct);
-		fetched.Should().NotBeNull();
-		fetched!.Id.Should().Be(id);
-		fetched.TemplateSnapshot.Should().NotBeNull();
-		fetched.TemplateSnapshot!.States.Should().ContainSingle(s => s.Id == "submitted")
+		ArgumentNullException.ThrowIfNull(fetched);
+		fetched.Id.Should().Be(id);
+		ArgumentNullException.ThrowIfNull(fetched.TemplateSnapshot);
+		fetched.TemplateSnapshot.States.Should().ContainSingle(s => s.Id == "submitted")
 			.Which.DisplayName.Should().Be("Submitted");
 	}
 }

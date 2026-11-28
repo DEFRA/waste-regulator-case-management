@@ -23,7 +23,18 @@ internal sealed class CaseOpenApiExampleTransformer : IOpenApiDocumentTransforme
                 {
                     "caseType": "CSoC",
                     "sourceSystemId": "csoc-2024-eng-00123",
-                    "callbackUrl": "https://waste-obligations.example/organisations/org-00456/compliance-declarations/00123",
+                    "completionEvent": {
+                        "eventType": "csoc.case.concluded",
+                        "payload": {
+                            "status": "{{state.callbackStatus}}",
+                            "reason": "{{decision.reason}}",
+                            "user": {
+                                "id": "{{actor.id}}",
+                                "email": "{{actor.email}}",
+                                "name": "{{actor.name}}"
+                            }
+                        }
+                    },
                     "nation": "ENGLAND",
                     "orgId": "org-00456",
                     "producerType": "DIRECT_PRODUCER",
@@ -50,22 +61,20 @@ internal sealed class CaseOpenApiExampleTransformer : IOpenApiDocumentTransforme
 		OpenApiDocumentTransformerContext context,
 		CancellationToken cancellationToken)
 	{
-		foreach (var pathItem in document.Paths.Values)
+		foreach (var operation in document.Paths.Values
+			.Where(pathItem => pathItem.Operations is not null)
+			.SelectMany(pathItem => pathItem.Operations!.Values))
 		{
-			if (pathItem.Operations is null) continue;
-			foreach (var operation in pathItem.Operations.Values)
+			if (operation.OperationId is null ||
+				!s_examples.TryGetValue(operation.OperationId, out var example))
 			{
-				if (operation.OperationId is null ||
-					!s_examples.TryGetValue(operation.OperationId, out var example))
-				{
-					continue;
-				}
+				continue;
+			}
 
-				if (operation.RequestBody?.Content?.TryGetValue(
-						"application/json", out var mediaType) == true)
-				{
-					mediaType.Example = example;
-				}
+			if (operation.RequestBody?.Content?.TryGetValue(
+					"application/json", out var mediaType) == true)
+			{
+				mediaType.Example = example;
 			}
 		}
 

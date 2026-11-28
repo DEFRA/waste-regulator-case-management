@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Text.Json;
 
 namespace WasteRegulatorCaseManagement.Cases;
 
@@ -40,6 +41,9 @@ public sealed record CaseResponse(
 	[property: Description("The submission's id in the source system.")]
 	string SourceSystemId,
 
+	[property: Description("Template for the completion event published when the case concludes.")]
+	CompletionEventResponse CompletionEvent,
+
 	[property: Description("Nation the case belongs to: `ENGLAND`, `WALES`, `SCOTLAND` or `N_IRELAND`.")]
 	string Nation,
 
@@ -72,6 +76,15 @@ public sealed record CaseResponse(
 
 	[property: Description("Everything that has happened to the case, newest first.")]
 	IReadOnlyCollection<CaseTimelineEntryResponse>? Timeline = null
+);
+
+[Description("Completion event template stored on the case at intake.")]
+public sealed record CompletionEventResponse(
+	[property: Description("Event type for SNS routing (e.g. `csoc.case.concluded`).")]
+	string EventType,
+
+	[property: Description("Payload template rendered when the case concludes.")]
+	JsonElement Payload
 );
 
 /// <summary>

@@ -39,18 +39,12 @@ public class CaseServiceTests : IAsyncDisposable
 		await _clientFactory.GetClient().DropDatabaseAsync(_databaseName);
 
 	private CaseService BuildService(CaseModuleConfig type) =>
-		new(
-			new CaseRegistry([type]),
-			_persistence,
-			Substitute.For<ICaseCallbackClient>(),
-			NullLogger<CaseService>.Instance,
-			_time
-		);
+		new(new CaseRegistry([type]), _persistence, NullLogger<CaseService>.Instance, _time);
 
 	private static CaseIntake NewIntake() =>
 		new(
 			SourceSystemId: Ulid.NewUlid().ToString(),
-			CallbackUrl: "https://source-system.test/callback",
+			CompletionEvent: CaseTestCompletionEvent.DefaultSpec,
 			Nation: "ENGLAND",
 			OrgId: "test-org",
 			ProducerType: null,
@@ -82,7 +76,7 @@ public class CaseServiceTests : IAsyncDisposable
 		var caseRecord = new Case
 		{
 			SourceSystemId = Ulid.NewUlid().ToString(),
-			CallbackUrl = "https://source-system.test/callback",
+			CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 			Nation = "ENGLAND",
 			OrgId = "test-org",
 			Id = Ulid.NewUlid().ToString(),
@@ -100,17 +94,10 @@ public class CaseServiceTests : IAsyncDisposable
 	private async Task<Case> GetAsync(string id)
 	{
 		var fetched = await _persistence.GetByIdAsync(id, TestContext.Current.CancellationToken);
-		fetched.Should().NotBeNull();
-		return fetched!;
+		return TestAsserts.NotNull(fetched);
 	}
 
-	private static ClaimsPrincipal User() =>
-		new(
-			new ClaimsIdentity(
-				[new Claim("client_id", "test-client"), new Claim("user:nation", "ENGLAND"), new Claim("user:id", "test-user")],
-				"test"
-			)
-		);
+	private static ClaimsPrincipal User() => TestCaseworkerClaims.Principal();
 
 	private static ClaimsPrincipal UserWithoutActorId() =>
 		new(
@@ -122,7 +109,9 @@ public class CaseServiceTests : IAsyncDisposable
 
 	private static ClaimsPrincipal UserWithRoles(string userId, params string[] roles)
 	{
-		var claims = new List<Claim> { new("client_id", "test-client"), new("user:nation", "ENGLAND"), new("user:id", userId) };
+		var claims = new List<Claim>(TestCaseworkerClaims.StandardClaims);
+		claims.RemoveAll(c => c.Type == "user:id");
+		claims.Add(new Claim("user:id", userId));
 		foreach (var role in roles)
 		{
 			claims.Add(new Claim(ClaimTypes.Role, role));
@@ -327,9 +316,11 @@ public class CaseServiceTests : IAsyncDisposable
 	}
 
 	[Fact]
-	public async Task ApplyAction_keeps_a_change_that_landed_during_an_accepted_callback_and_still_applies_the_action()
+	public async Task ApplyAction_returns_conflict_when_another_change_lands_during_replace()
 	{
-		// Arrange
+		// ADR-0011 used to reload and merge a competing note after a
+		// successful callback. Completion events conclude the case in one
+		// transactional write instead, so a version race aborts the action.
 		var type = new CaseModuleConfig
 		{
 			CaseType = CaseType,
@@ -338,13 +329,8 @@ public class CaseServiceTests : IAsyncDisposable
 			InitialStateId = "submitted",
 			States = [new CaseState("submitted", "Submitted"), new CaseState("approved", "Approved", IsTerminal: true)],
 			Transitions = [new CaseTransition("approve", "Approve", "submitted", "approved")],
-			CallbackMappings = new() { ["approved"] = new BsonDocument("status", "Approved") },
 		};
 		var caseRecord = await SeedAsync();
-		var callbackClient = Substitute.For<ICaseCallbackClient>();
-		callbackClient
-			.SendAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<BsonDocument>(), Arg.Any<CancellationToken>())
-			.Returns((string?)null);
 		var raced = false;
 		var racingOnce = new RacingPersistence(
 			_persistence,
@@ -361,12 +347,10 @@ public class CaseServiceTests : IAsyncDisposable
 		var service = new CaseService(
 			new CaseRegistry([type]),
 			racingOnce,
-			callbackClient,
 			NullLogger<CaseService>.Instance,
 			_time
 		);
 
-		// Act
 		var result = await service.ApplyActionAsync(
 			caseRecord.Id,
 			"approve",
@@ -375,12 +359,13 @@ public class CaseServiceTests : IAsyncDisposable
 			TestContext.Current.CancellationToken
 		);
 
-		// Assert
-		result.IsSuccess.Should().BeTrue();
-		var persisted = await _persistence.GetByIdAsync(caseRecord.Id, TestContext.Current.CancellationToken);
-		persisted!.StateId.Should().Be("approved");
+		result.Should().BeEquivalentTo(new { IsSuccess = false, FailureCode = CaseActionFailureCode.ConcurrencyConflict });
+		var persisted = TestAsserts.NotNull(
+			await _persistence.GetByIdAsync(caseRecord.Id, TestContext.Current.CancellationToken)
+		);
+		persisted.StateId.Should().Be("submitted");
 		persisted.Timeline.Should().Contain(entry => entry.PerformedById == "competing-user");
-		persisted.Timeline.Should().ContainSingle(entry => entry.Action == "state-changed");
+		persisted.Timeline.Should().NotContain(entry => entry.Action == "state-changed");
 	}
 
 	[Fact]
@@ -425,7 +410,7 @@ public class CaseServiceTests : IAsyncDisposable
 		var caseRecord = new Case
 		{
 			SourceSystemId = Ulid.NewUlid().ToString(),
-			CallbackUrl = "https://source-system.test/callback",
+			CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 			Nation = "ENGLAND",
 			OrgId = "test-org",
 			Id = Ulid.NewUlid().ToString(),
@@ -438,8 +423,8 @@ public class CaseServiceTests : IAsyncDisposable
 
 		var projection = BuildService(type).Project(caseRecord);
 
-		projection.AvailableActions.Select(a => a.ActionId).OrderBy(a => a).ToArray()
-			.Should().Equal(["approve", "reject", "withdraw"]);
+		projection.AvailableActions.Select(a => a.ActionId).OrderBy(a => a)
+			.Should().Equal("approve", "reject", "withdraw");
 	}
 
 	[Fact]
@@ -457,7 +442,7 @@ public class CaseServiceTests : IAsyncDisposable
 		var caseRecord = new Case
 		{
 			SourceSystemId = Ulid.NewUlid().ToString(),
-			CallbackUrl = "https://source-system.test/callback",
+			CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 			Nation = "ENGLAND",
 			OrgId = "test-org",
 			Id = Ulid.NewUlid().ToString(),
@@ -470,8 +455,8 @@ public class CaseServiceTests : IAsyncDisposable
 
 		var projection = BuildService(type).Project(caseRecord);
 
-		projection.AvailableActions.Select(a => a.ActionId).OrderBy(a => a).ToArray()
-			.Should().Equal(["approve", "reject"]);
+		projection.AvailableActions.Select(a => a.ActionId).OrderBy(a => a)
+			.Should().Equal("approve", "reject");
 		await Task.CompletedTask;
 	}
 
@@ -484,7 +469,7 @@ public class CaseServiceTests : IAsyncDisposable
 		var caseRecord = new Case
 		{
 			SourceSystemId = Ulid.NewUlid().ToString(),
-			CallbackUrl = "https://source-system.test/callback",
+			CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 			Nation = "ENGLAND",
 			OrgId = "test-org",
 			Id = Ulid.NewUlid().ToString(),
@@ -515,7 +500,7 @@ public class CaseServiceTests : IAsyncDisposable
 		var caseRecord = new Case
 		{
 			SourceSystemId = Ulid.NewUlid().ToString(),
-			CallbackUrl = "https://source-system.test/callback",
+			CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 			Nation = "ENGLAND",
 			OrgId = "test-org",
 			Id = Ulid.NewUlid().ToString(),
@@ -904,7 +889,7 @@ public class CaseServiceTests : IAsyncDisposable
 		var caseRecord = new Case
 		{
 			SourceSystemId = Ulid.NewUlid().ToString(),
-			CallbackUrl = "https://source-system.test/callback",
+			CompletionEvent = CaseTestCompletionEvent.DefaultSpec,
 			Nation = "ENGLAND",
 			OrgId = "test-org",
 			Id = Ulid.NewUlid().ToString(),
@@ -1244,14 +1229,17 @@ public class CaseServiceTests : IAsyncDisposable
 
 	private static ClaimsPrincipal AuditUser(
 		string userId = "alice-1",
-		string userName = "Alice Example"
+		string userName = "Alice Example",
+		string userEmail = "alice-1@regulator.example"
 	) =>
 		new(
 			new ClaimsIdentity(
 				[
-					new Claim("client_id", "test-client"),
-					new Claim("user:nation", "ENGLAND"), new Claim("user:id", userId),
+					new Claim("client_id", TestCaseworkerClaims.ClientId),
+					new Claim("user:nation", TestCaseworkerClaims.Nation),
+					new Claim("user:id", userId),
 					new Claim("user:name", userName),
+					new Claim("user:email", userEmail),
 				],
 				"test"
 			)
@@ -1517,7 +1505,6 @@ public class CaseServiceTests : IAsyncDisposable
 		var service = new CaseService(
 			new CaseRegistry([type]),
 			_persistence,
-			Substitute.For<ICaseCallbackClient>(),
 			NullLogger<CaseService>.Instance,
 			time
 		);
@@ -1549,7 +1536,7 @@ public class CaseServiceTests : IAsyncDisposable
 		fetched.Timeline.Should().HaveCount(3);
 
 		using var scope = new AssertionScope();
-		fetched.Timeline.Select(e => e.Action).Should().Equal(["note-added", "assigned", "state-changed"]);
+		fetched.Timeline.Select(e => e.Action).Should().Equal("note-added", "assigned", "state-changed");
 		// Strictly increasing timestamps — entries are appended in
 		// chronological (insertion) order on disk.
 		fetched.Timeline[0].PerformedAt.Should().BeBefore(fetched.Timeline[1].PerformedAt);
@@ -1560,7 +1547,7 @@ public class CaseServiceTests : IAsyncDisposable
 		// This is the regression the bug was about: earlier entries must NOT
 		// inherit the live current state.
 		fetched.StateId.Should().Be("approved");
-		fetched.Timeline.Select(e => e.StateId).Should().Equal(["submitted", "submitted", "approved"]);
+		fetched.Timeline.Select(e => e.StateId).Should().Equal("submitted", "submitted", "approved");
 	}
 
 	private sealed class MutableTimeProvider(DateTime initial) : TimeProvider
@@ -1598,8 +1585,7 @@ public class CaseServiceTests : IAsyncDisposable
 			);
 
 		result.IsSuccess.Should().BeTrue();
-		result.Case.Should().NotBeNull();
-		var fetched = await GetAsync(result.Case!.Id);
+		var fetched = await GetAsync(TestAsserts.NotNull(result.Case).Id);
 
 		using var scope = new AssertionScope();
 		fetched.Should().BeEquivalentTo(
@@ -1635,8 +1621,7 @@ public class CaseServiceTests : IAsyncDisposable
 			);
 
 		result.IsSuccess.Should().BeTrue();
-		result.Case.Should().NotBeNull();
-		var fetched = await GetAsync(result.Case!.Id);
+		var fetched = await GetAsync(TestAsserts.NotNull(result.Case).Id);
 
 		using var scope = new AssertionScope();
 		fetched.SubmittedAt.Should().Be(TickedNow);
@@ -1686,7 +1671,7 @@ public class CaseServiceTests : IAsyncDisposable
 			);
 
 		result.IsSuccess.Should().BeTrue(result.Message);
-		var fetched = await GetAsync(result.Case!.Id);
+		var fetched = await GetAsync(TestAsserts.NotNull(result.Case).Id);
 		var entry = fetched.Timeline.Should().ContainSingle().Subject;
 		entry.PerformedById.Should().Be("service:test-client");
 	}
@@ -1716,7 +1701,7 @@ public class CaseServiceTests : IAsyncDisposable
 			);
 
 		result.IsSuccess.Should().BeTrue();
-		var fetched = await GetAsync(result.Case!.Id);
+		var fetched = await GetAsync(TestAsserts.NotNull(result.Case).Id);
 		fetched.Timeline.Should().BeEquivalentTo(
 			[
 				new
@@ -1754,7 +1739,7 @@ public class CaseServiceTests : IAsyncDisposable
 			);
 
 		result.IsSuccess.Should().BeTrue();
-		var fetched = await GetAsync(result.Case!.Id);
+		var fetched = await GetAsync(TestAsserts.NotNull(result.Case).Id);
 		var entry = fetched.Timeline.Should().ContainSingle().Subject;
 		entry.Details.Should().Contain(
 			new Dictionary<string, string?>
@@ -1777,7 +1762,6 @@ public class CaseServiceTests : IAsyncDisposable
 		return new CaseService(
 			new CaseRegistry([type]),
 			racing,
-			Substitute.For<ICaseCallbackClient>(),
 			NullLogger<CaseService>.Instance,
 			_time
 		);
@@ -1785,8 +1769,8 @@ public class CaseServiceTests : IAsyncDisposable
 
 	private void AddCompetingNote(string id)
 	{
-		var raceLoaded = _persistence.GetByIdAsync(id).GetAwaiter().GetResult();
-		raceLoaded!.LastModifiedAt = raceLoaded.LastModifiedAt.AddMinutes(1);
+		var raceLoaded = TestAsserts.NotNull(_persistence.GetByIdAsync(id).GetAwaiter().GetResult());
+		raceLoaded.LastModifiedAt = raceLoaded.LastModifiedAt.AddMinutes(1);
 		raceLoaded.Timeline.Add(new CaseTimelineEntry
 		{
 			Action = "note-added",
@@ -1818,10 +1802,14 @@ public class CaseServiceTests : IAsyncDisposable
 			CancellationToken cancellationToken = default
 		) => inner.QueryAsync(query, cancellationToken);
 
-		public Task ReplaceAsync(Case caseRecord, CancellationToken cancellationToken = default)
+		public Task ReplaceAsync(
+			Case caseRecord,
+			CaseCompletionEnvelopeContent? completionContent = null,
+			CancellationToken cancellationToken = default
+		)
 		{
 			onBeforeReplace();
-			return inner.ReplaceAsync(caseRecord, cancellationToken);
+			return inner.ReplaceAsync(caseRecord, completionContent, cancellationToken);
 		}
 	}
 }

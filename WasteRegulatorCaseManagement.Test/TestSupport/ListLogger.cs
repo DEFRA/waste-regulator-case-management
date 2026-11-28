@@ -2,6 +2,12 @@ using Microsoft.Extensions.Logging;
 
 namespace WasteRegulatorCaseManagement.Test.TestSupport;
 
+internal sealed class NullLogScope : IDisposable
+{
+	public static readonly NullLogScope Instance = new();
+	public void Dispose() { }
+}
+
 /// <summary>
 /// Minimal in-memory <see cref="ILogger{T}"/> used by tests that need
 /// to assert against structured-log output. Captures the level,
@@ -25,7 +31,7 @@ internal sealed class ListLogger<T> : ILogger<T>
 			_scopes.Push(kvs);
 			return new PopOnDispose(_scopes);
 		}
-		return NullScope.Instance;
+		return NullLogScope.Instance;
 	}
 
 	public bool IsEnabled(LogLevel logLevel) => true;
@@ -78,10 +84,5 @@ internal sealed class ListLogger<T> : ILogger<T>
 		}
 	}
 
-	private sealed class NullScope : IDisposable
-	{
-		public static readonly NullScope Instance = new();
-		public void Dispose() { }
-	}
 }
 

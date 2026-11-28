@@ -10,7 +10,7 @@ namespace WasteRegulatorCaseManagement.Cases;
 /// </summary>
 public sealed record CaseIntake(
 	string SourceSystemId,
-	string CallbackUrl,
+	CompletionEventSpec CompletionEvent,
 	string Nation,
 	string OrgId,
 	string? ProducerType,

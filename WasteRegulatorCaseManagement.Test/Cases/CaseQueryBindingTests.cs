@@ -4,25 +4,12 @@ namespace WasteRegulatorCaseManagement.Test.Cases;
 
 public class CaseQueryBindingTests
 {
-	private static readonly CaseListRequest s_noFilters = new(
-		CaseType: null,
-		StateId: null,
-		Search: null,
-		AssigneeId: null,
-		Unassigned: null,
-		OrgId: null,
-		ProducerType: null,
-		IsTerminal: null,
-		Sort: null,
-		Dir: null,
-		Page: null,
-		PageSize: null
-	);
+	private static readonly CaseListRequest s_noFilters = new();
 
 	[Fact]
 	public void OrgIdIsNullWhenTheQueryValueIsWhitespace()
 	{
-		var query = CaseQueryBinding.FromRequest(s_noFilters with { OrgId = "   " });
+		var query = CaseQueryBinding.FromRequest(new CaseListRequest { OrgId = "   " });
 
 		query.OrgId.Should().BeNull();
 	}
@@ -30,7 +17,9 @@ public class CaseQueryBindingTests
 	[Fact]
 	public void BlankAndRepeatedProducerTypesAreDropped()
 	{
-		var query = CaseQueryBinding.FromRequest(s_noFilters with { ProducerType = [" DIRECT_PRODUCER ", "", "DIRECT_PRODUCER"] });
+		var query = CaseQueryBinding.FromRequest(
+			new CaseListRequest { ProducerType = [" DIRECT_PRODUCER ", "", "DIRECT_PRODUCER"] }
+		);
 
 		query.ProducerTypes.Should().Equal("DIRECT_PRODUCER");
 	}
@@ -38,7 +27,9 @@ public class CaseQueryBindingTests
 	[Fact]
 	public void BlankAndRepeatedCaseTypesAreDropped()
 	{
-		var query = CaseQueryBinding.FromRequest(s_noFilters with { CaseType = [" CSoC ", "", "CSoC"] });
+		var query = CaseQueryBinding.FromRequest(
+			new CaseListRequest { CaseType = [" CSoC ", "", "CSoC"] }
+		);
 
 		query.CaseTypes.Should().Equal("CSoC");
 	}
@@ -57,7 +48,7 @@ public class CaseQueryBindingTests
 	[InlineData("status")]
 	public void SortTokenIsBound(string token)
 	{
-		var query = CaseQueryBinding.FromRequest(s_noFilters with { Sort = token });
+		var query = CaseQueryBinding.FromRequest(new CaseListRequest { Sort = token });
 
 		query.Sort.Should().Be(token);
 	}
@@ -70,7 +61,7 @@ public class CaseQueryBindingTests
 	[InlineData("ascending", false)]
 	public void SortDirectionIsParsed(string dir, bool expectedDescending)
 	{
-		var query = CaseQueryBinding.FromRequest(s_noFilters with { Dir = dir });
+		var query = CaseQueryBinding.FromRequest(new CaseListRequest { Dir = dir });
 
 		query.SortDescending.Should().Be(expectedDescending);
 	}
@@ -81,7 +72,7 @@ public class CaseQueryBindingTests
 	[InlineData("   ")]
 	public void UnrecognisedOrBlankSortDirectionIsNull(string dir)
 	{
-		var query = CaseQueryBinding.FromRequest(s_noFilters with { Dir = dir });
+		var query = CaseQueryBinding.FromRequest(new CaseListRequest { Dir = dir });
 
 		query.SortDescending.Should().BeNull();
 	}

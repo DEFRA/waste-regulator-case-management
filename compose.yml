@@ -71,6 +71,9 @@ services:
       AnalyticsAuditEventProcessor__ProcessingEnabled: true
       AnalyticsAuditEventProcessor__TopicArn: arn:aws:sns:eu-west-2:000000000000:waste_regulator_case_management_analytics_events
       AnalyticsAuditEventProcessor__PollIntervalSeconds: 1
+      CaseCompletionEventProcessor__ProcessingEnabled: true
+      CaseCompletionEventProcessor__TopicArn: arn:aws:sns:eu-west-2:000000000000:waste_regulator_case_management_completion_events
+      CaseCompletionEventProcessor__PollIntervalSeconds: 1
       NOTIFY_API_KEY: ${NOTIFY_API_KEY}
     networks:
       - cdp-tenant

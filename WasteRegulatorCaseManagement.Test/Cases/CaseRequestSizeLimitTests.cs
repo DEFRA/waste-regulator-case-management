@@ -55,7 +55,7 @@ public class CaseRequestSizeLimitTests
 			.OfType<Microsoft.AspNetCore.Http.Metadata.IRequestSizeLimitMetadata>()
 			.FirstOrDefault();
 		sizeLimit.Should().NotBeNull();
-		sizeLimit!.MaxRequestBodySize.Should().Be(expectedBytes);
+		TestAsserts.NotNull(sizeLimit).MaxRequestBodySize.Should().Be(expectedBytes);
 	}
 
 	/// <summary>
